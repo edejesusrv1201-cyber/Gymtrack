@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MiGymTrack</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="app">
+  <header class="app-header">
+    <div class="title-row">
+      <div>
+        <h1 id="headerTitle">MiGymTrack</h1>
+        <div class="subtitle" id="headerSubtitle"></div>
+      </div>
+      <button class="header-btn" id="btnMore" aria-label="Más opciones">⚙️</button>
+    </div>
+  </header>
+
+  <main id="viewRoot"></main>
+</div>
+
+<nav class="bottom-nav">
+  <button class="nav-btn" data-view="hoy"><span class="ic">🏠</span><span class="lbl">Hoy</span></button>
+  <button class="nav-btn" data-view="plan"><span class="ic">📅</span><span class="lbl">Plan</span></button>
+  <button class="nav-btn" data-view="calorias"><span class="ic">🍽️</span><span class="lbl">Calorías</span></button>
+  <button class="nav-btn" data-view="medidas"><span class="ic">📏</span><span class="lbl">Medidas</span></button>
+  <button class="nav-btn" data-view="mas"><span class="ic">☰</span><span class="lbl">Más</span></button>
+</nav>
+
+<script src="js/db.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/timer.js"></script>
+<script src="js/modal.js"></script>
+<script src="js/nutrition.js"></script>
+<script src="js/views/today.js"></script>
+<script src="js/views/plan.js"></script>
+<script src="js/views/workout.js"></script>
+<script src="js/views/calories.js"></script>
+<script src="js/views/measurements.js"></script>
+<script src="js/views/more.js"></script>
+<script src="js/views/calculator.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
