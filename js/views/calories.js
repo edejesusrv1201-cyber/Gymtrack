@@ -63,6 +63,8 @@ const CaloriesView = (() => {
     });
     view.appendChild(summary);
 
+    view.appendChild(renderWaterCard(root, cursorIso, settings));
+
     // ---- comidas ----
     MEALS.forEach((meal) => {
       const mealEntries = entries.filter((e) => e.meal === meal.key);
@@ -101,6 +103,62 @@ const CaloriesView = (() => {
     root.appendChild(view);
   }
 
+  function renderWaterCard(root, iso, settings) {
+    const waterLog = DB.getWaterLog();
+    const entries = waterLog[iso] || [];
+    const totalMl = entries.reduce((s, e) => s + e.ml, 0);
+    const goalMl = settings.waterGoalMl || 2500;
+    const pct = Math.min(100, Math.round((totalMl / goalMl) * 100)) || 0;
+
+    function addWater(ml) {
+      const wl = DB.getWaterLog();
+      wl[iso] = wl[iso] || [];
+      wl[iso].push({ id: DB.uid(), ml, time: new Date().toISOString() });
+      DB.saveWaterLog(wl);
+      Utils.vibrate(20);
+      render(root);
+    }
+
+    const card = Utils.el('div', { class: 'card' });
+    card.appendChild(Utils.el('div', { class: 'flex-between' }, [
+      Utils.el('h3', { class: 'mb-0', text: '💧 Agua' }),
+      Utils.el('span', { class: 'pill', text: `${Utils.round1(totalMl / 1000)} L / ${Utils.round1(goalMl / 1000)} L` }),
+    ]));
+    card.appendChild(Utils.el('div', { class: 'macro-bar mt-8' }, [
+      Utils.el('div', { class: 'macro-bar-fill', style: `width:${pct}%;background:var(--accent-2);` }),
+    ]));
+    const quickRow = Utils.el('div', { class: 'grid-3 mt-8' });
+    [[250, '🥛 250ml'], [500, '🍶 500ml'], [1000, '🚰 1L']].forEach(([ml, label]) => {
+      const b = Utils.el('button', { class: 'btn-secondary', text: label });
+      b.addEventListener('click', () => addWater(ml));
+      quickRow.appendChild(b);
+    });
+    card.appendChild(quickRow);
+
+    const customInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'ml personalizado' });
+    const customBtn = Utils.el('button', { class: 'btn-secondary', text: '➕' });
+    customBtn.addEventListener('click', () => {
+      const v = Number(customInput.value);
+      if (v > 0) { addWater(v); customInput.value = ''; }
+    });
+    card.appendChild(Utils.el('div', { class: 'field-row mt-8' }, [
+      Utils.el('div', { class: 'field' }, [customInput]),
+      customBtn,
+    ]));
+
+    if (entries.length > 0) {
+      const undoBtn = Utils.el('button', { class: 'link-btn small mt-8', text: '↩️ Deshacer último' });
+      undoBtn.addEventListener('click', () => {
+        const wl = DB.getWaterLog();
+        wl[iso] = (wl[iso] || []).slice(0, -1);
+        DB.saveWaterLog(wl);
+        render(root);
+      });
+      card.appendChild(undoBtn);
+    }
+    return card;
+  }
+
   function shiftDay(delta, root) {
     const d = Utils.parseISO(cursorIso);
     d.setDate(d.getDate() + delta);
@@ -108,8 +166,36 @@ const CaloriesView = (() => {
     render(root);
   }
 
+  function recentFoodIds(limit = 6) {
+    const log = DB.getCalorieLog();
+    const seen = new Set();
+    const ids = [];
+    Object.keys(log).sort().reverse().forEach((d) => {
+      [...log[d]].reverse().forEach((e) => {
+        if (!e.foodId || seen.has(e.foodId)) return;
+        seen.add(e.foodId);
+        ids.push(e.foodId);
+      });
+    });
+    return ids.slice(0, limit);
+  }
+
   function openAddFood(mealKey, onDone) {
     const body = Utils.el('div');
+
+    const allFoods = DB.getFoods();
+    const recentFoods = recentFoodIds().map((id) => allFoods.find((f) => f.id === id)).filter(Boolean);
+    if (recentFoods.length > 0) {
+      body.appendChild(Utils.el('div', { class: 'small text-dim', text: 'RECIENTES · toca para agregar rápido' }));
+      const chipsWrap = Utils.el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px;' });
+      recentFoods.forEach((f) => {
+        const chip = Utils.el('button', { class: 'btn-small', text: f.name });
+        chip.addEventListener('click', () => openQuantityPrompt(f, mealKey, onDone));
+        chipsWrap.appendChild(chip);
+      });
+      body.appendChild(chipsWrap);
+    }
+
     const searchInput = Utils.el('input', { type: 'text', placeholder: 'Buscar alimento...' });
     body.appendChild(searchInput);
     const listWrap = Utils.el('div', { class: 'mt-8' });

@@ -12,6 +12,7 @@
    - gt_routines       -> [] rutinas (Push, Pull, Legs, Descanso...)
    - gt_monthlyPlans   -> { 'YYYY-MM': { days: { '1': routineId, ... } } }
    - gt_workoutLog     -> { 'YYYY-MM-DD': { routineId, exercises:[...], notes } }
+   - gt_waterLog       -> { 'YYYY-MM-DD': [{id, ml, time}] }
    ============================================================ */
 
 const DB = (() => {
@@ -24,6 +25,7 @@ const DB = (() => {
     routines: 'gt_routines',
     monthlyPlans: 'gt_monthlyPlans',
     workoutLog: 'gt_workoutLog',
+    waterLog: 'gt_waterLog',
   };
 
   function read(key, fallback) {
@@ -60,6 +62,7 @@ const DB = (() => {
     proteinGoal: 160,
     carbGoal: 280,
     fatGoal: 70,
+    waterGoalMl: 2500,
     onboarded: false,
     // perfil para la calculadora de mantenimiento (Nutrition)
     calcWeightKg: null,
@@ -199,6 +202,7 @@ const DB = (() => {
     if (read(KEYS.calorieLog, null) === null) write(KEYS.calorieLog, {});
     if (read(KEYS.monthlyPlans, null) === null) write(KEYS.monthlyPlans, {});
     if (read(KEYS.workoutLog, null) === null) write(KEYS.workoutLog, {});
+    if (read(KEYS.waterLog, null) === null) write(KEYS.waterLog, {});
   }
 
   return {
@@ -227,6 +231,9 @@ const DB = (() => {
     // Workout log
     getWorkoutLog: () => read(KEYS.workoutLog, {}),
     saveWorkoutLog: (obj) => write(KEYS.workoutLog, obj),
+    // Water log
+    getWaterLog: () => read(KEYS.waterLog, {}),
+    saveWaterLog: (obj) => write(KEYS.waterLog, obj),
 
     // Export / import (backup completo)
     exportAll() {

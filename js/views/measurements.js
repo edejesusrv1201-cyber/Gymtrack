@@ -141,82 +141,12 @@ const MeasurementsView = (() => {
   function drawChart(canvas, measurements, fieldKey, tooltipEl) {
     const points = measurements
       .filter((m) => m[fieldKey] !== undefined && m[fieldKey] !== null && m[fieldKey] !== '')
-      .map((m) => ({ date: m.date, value: m[fieldKey] }));
-    if (points.length < 2) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const cssWidth = canvas.parentElement.clientWidth;
-    const cssHeight = 160;
-    canvas.width = cssWidth * dpr;
-    canvas.height = cssHeight * dpr;
-    canvas.style.width = cssWidth + 'px';
-    canvas.style.height = cssHeight + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, cssWidth, cssHeight);
-
-    const padL = 34, padR = 12, padT = 14, padB = 20;
-    const w = cssWidth - padL - padR;
-    const h = cssHeight - padT - padB;
-    const values = points.map((p) => p.value);
-    let min = Math.min(...values), max = Math.max(...values);
-    if (min === max) { min -= 1; max += 1; }
-    const margin = (max - min) * 0.15;
-    min -= margin; max += margin;
-
-    const xAt = (i) => padL + (points.length === 1 ? 0 : (i / (points.length - 1)) * w);
-    const yAt = (v) => padT + h - ((v - min) / (max - min)) * h;
-
-    // grid (recesivo)
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 3; i++) {
-      const y = padT + (h / 3) * i;
-      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + w, y); ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(Utils.round1(max).toString(), padL - 6, padT + 4);
-    ctx.fillText(Utils.round1(min).toString(), padL - 6, padT + h);
-
-    // línea (2px, extremos redondeados)
-    ctx.strokeStyle = '#ff6a3d';
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    points.forEach((p, i) => {
-      const x = xAt(i), y = yAt(p.value);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      .map((m) => ({ x: m.date, y: m[fieldKey] }));
+    const fieldDef = FIELDS.find((f) => f.key === fieldKey);
+    Utils.drawLineChart(canvas, points, {
+      color: '#ff6a3d',
+      onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)}: ${p.y}${fieldDef.unit()}`; },
     });
-    ctx.stroke();
-
-    // puntos (>=8px)
-    points.forEach((p, i) => {
-      const x = xAt(i), y = yAt(p.value);
-      ctx.beginPath();
-      ctx.fillStyle = '#0f1115';
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.fillStyle = '#ff6a3d';
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    canvas.onclick = (evt) => {
-      const rect = canvas.getBoundingClientRect();
-      const clickX = evt.clientX - rect.left;
-      let nearest = 0, bestDist = Infinity;
-      points.forEach((p, i) => {
-        const d = Math.abs(xAt(i) - clickX);
-        if (d < bestDist) { bestDist = d; nearest = i; }
-      });
-      const p = points[nearest];
-      const fieldDef = FIELDS.find((f) => f.key === fieldKey);
-      tooltipEl.textContent = `${Utils.friendlyDate(p.date)}: ${p.value}${fieldDef.unit()}`;
-    };
   }
 
   return { render };

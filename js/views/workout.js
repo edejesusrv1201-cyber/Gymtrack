@@ -11,6 +11,10 @@ const WorkoutView = (() => {
     { key: 'fallo', icon: '❌', label: 'Fallé' },
   ];
 
+  // ejercicios agregados al día que el usuario ya expandió para registrar
+  // (además de los que ya tienen al menos una serie, que siempre se muestran expandidos)
+  const expandedSet = new Set();
+
   function getLog(iso) {
     const wl = DB.getWorkoutLog();
     return wl[iso];
@@ -58,8 +62,26 @@ const WorkoutView = (() => {
     view.appendChild(renderWarmupCard(iso, log));
 
     const exList = Utils.el('div');
-    log.exercises.forEach((entry, idx) => exList.appendChild(renderExerciseCard(iso, log, entry, idx)));
+    const pendingItems = Utils.el('div');
+    let pendingCount = 0;
+    log.exercises.forEach((entry, idx) => {
+      const key = `${iso}:${entry.exerciseId}`;
+      const isExpanded = entry.sets.length > 0 || expandedSet.has(key);
+      if (isExpanded) {
+        exList.appendChild(renderExerciseCard(iso, log, entry, idx));
+      } else {
+        pendingCount += 1;
+        pendingItems.appendChild(renderPendingRow(iso, log, entry, key, () => render(root, params)));
+      }
+    });
     view.appendChild(exList);
+
+    if (pendingCount > 0) {
+      const pendingCard = Utils.el('div', { class: 'card' });
+      pendingCard.appendChild(Utils.el('h3', { text: '📋 Pendientes de hoy' }));
+      pendingCard.appendChild(pendingItems);
+      view.appendChild(pendingCard);
+    }
 
     const addExBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Agregar ejercicio' });
     addExBtn.addEventListener('click', () => openAddExercise(iso, log, () => render(root, params)));
@@ -88,14 +110,18 @@ const WorkoutView = (() => {
     const settings = DB.getSettings();
 
     const card = Utils.el('div', { class: 'card exercise-card' });
-    card.appendChild(Utils.el('div', { class: 'ex-header' }, [
-      Utils.el('h3', { class: 'mb-0', text: ex ? ex.name : '(ejercicio eliminado)' }),
+    const headerBtns = Utils.el('div', { style: 'display:flex;gap:4px;' }, [
+      ex ? Utils.el('button', { class: 'icon-btn', text: '📈', title: 'Ver progreso', onclick: () => openProgressModal(ex, isCardio) }) : null,
       Utils.el('button', { class: 'icon-btn', text: '🗑️', onclick: () => {
         if (!Utils.confirmDialog('¿Quitar este ejercicio del día?')) return;
         log.exercises.splice(idx, 1);
         saveLog(iso, log);
         render(document.getElementById('viewRoot'), { date: iso });
       } }),
+    ]);
+    card.appendChild(Utils.el('div', { class: 'ex-header' }, [
+      Utils.el('h3', { class: 'mb-0', text: ex ? ex.name : '(ejercicio eliminado)' }),
+      headerBtns,
     ]));
     if (target) card.appendChild(Utils.el('div', { class: 'ex-target', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }));
 
@@ -230,6 +256,70 @@ const WorkoutView = (() => {
     return card;
   }
 
+  function renderPendingRow(iso, log, entry, key, onExpand) {
+    const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
+    const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
+    const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
+    const row = Utils.el('div', { class: 'list-item' }, [
+      Utils.el('div', {}, [
+        Utils.el('div', { text: ex ? ex.name : '(ejercicio eliminado)' }),
+        target ? Utils.el('div', { class: 'meta', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }) : null,
+      ]),
+      Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
+    ]);
+    row.querySelector('button').addEventListener('click', () => {
+      expandedSet.add(key);
+      onExpand();
+    });
+    return row;
+  }
+
+  // ---- progreso histórico de un ejercicio (peso o duración según el tipo) ----
+  function exerciseHistory(exerciseId, isCardio) {
+    const wl = DB.getWorkoutLog();
+    return Object.keys(wl)
+      .filter((d) => {
+        const entry = wl[d].exercises.find((e) => e.exerciseId === exerciseId);
+        return entry && entry.sets.length > 0;
+      })
+      .sort()
+      .map((d) => {
+        const entry = wl[d].exercises.find((e) => e.exerciseId === exerciseId);
+        const best = isCardio
+          ? entry.sets.reduce((a, b) => ((b.duration || 0) > (a.duration || 0) ? b : a), entry.sets[0])
+          : entry.sets.reduce((a, b) => (b.weight > a.weight ? b : a), entry.sets[0]);
+        return { date: d, best };
+      });
+  }
+
+  function openProgressModal(ex, isCardio) {
+    const history = exerciseHistory(ex.id, isCardio);
+    const body = Utils.el('div');
+    if (history.length < 2) {
+      body.appendChild(Utils.el('p', { text: 'Necesitas al menos 2 días registrados en este ejercicio para ver el progreso.' }));
+    } else {
+      const chartWrap = Utils.el('div', { class: 'chart-wrap' });
+      const canvas = Utils.el('canvas', { class: 'chart' });
+      chartWrap.appendChild(canvas);
+      body.appendChild(chartWrap);
+      const tooltip = Utils.el('div', { class: 'small text-dim mt-8', text: 'Toca un punto para ver el detalle' });
+      body.appendChild(tooltip);
+      const settings = DB.getSettings();
+      requestAnimationFrame(() => {
+        Utils.drawLineChart(canvas, history.map((h) => ({ x: h.date, y: isCardio ? h.best.duration : h.best.weight })), {
+          color: '#3d8de0',
+          onPointClick: (p, i) => {
+            const h = history[i];
+            tooltip.textContent = isCardio
+              ? `${Utils.friendlyDate(h.date)}: ${h.best.duration} min${h.best.distance ? ` · ${h.best.distance} km` : ''}`
+              : `${Utils.friendlyDate(h.date)}: ${h.best.weight}${settings.units} × ${h.best.reps} reps`;
+          },
+        });
+      });
+    }
+    Modal.open(`📈 Progreso: ${ex.name}`, body);
+  }
+
   function openAddExercise(iso, log, onDone) {
     const body = Utils.el('div');
     const existingIds = new Set(log.exercises.map((e) => e.exerciseId));
@@ -248,6 +338,7 @@ const WorkoutView = (() => {
         row.querySelector('button').addEventListener('click', () => {
           log.exercises.push({ exerciseId: ex.id, sets: [] });
           saveLog(iso, log);
+          expandedSet.add(`${iso}:${ex.id}`);
           Modal.close();
           onDone();
         });

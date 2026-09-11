@@ -26,24 +26,29 @@ const MoreView = (() => {
     const proteinInput = Utils.el('input', { type: 'number', value: settings.proteinGoal });
     const carbInput = Utils.el('input', { type: 'number', value: settings.carbGoal });
     const fatInput = Utils.el('input', { type: 'number', value: settings.fatGoal });
+    const waterInput = Utils.el('input', { type: 'number', value: settings.waterGoalMl || 2500 });
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Meta de calorías diarias (kcal)' }), kcalInput]));
     settingsCard.appendChild(Utils.el('div', { class: 'grid-3' }, [
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Proteína (g)' }), proteinInput]),
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Carbos (g)' }), carbInput]),
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Grasas (g)' }), fatInput]),
     ]));
+    settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Meta de agua diaria (ml)' }), waterInput]));
 
     const saveSettingsBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Guardar ajustes' });
     saveSettingsBtn.addEventListener('click', () => {
-      DB.saveSettings({
+      const s = DB.getSettings();
+      Object.assign(s, {
         units: unitsSel.value,
         restDefault: Number(restInput.value) || 90,
         calorieGoal: Number(kcalInput.value) || 2500,
         proteinGoal: Number(proteinInput.value) || 150,
         carbGoal: Number(carbInput.value) || 280,
         fatGoal: Number(fatInput.value) || 70,
+        waterGoalMl: Number(waterInput.value) || 2500,
         onboarded: true,
       });
+      DB.saveSettings(s);
       Utils.toast('Ajustes guardados');
     });
     settingsCard.appendChild(saveSettingsBtn);
@@ -151,7 +156,7 @@ const MoreView = (() => {
     // ---- acerca de ----
     const aboutCard = Utils.el('div', { class: 'card' });
     aboutCard.appendChild(Utils.el('h3', { text: 'ℹ️ Acerca de MiGymTrack' }));
-    aboutCard.appendChild(Utils.el('p', { text: 'App personal para llevar tu progreso de gym: rutinas mensuales, registro de series con peso/reps/dificultad, cronómetro de descanso, calorías y medidas. Todo se guarda localmente en tu celular.' }));
+    aboutCard.appendChild(Utils.el('p', { text: 'App personal para llevar tu progreso de gym: rutinas mensuales, registro de series (peso/reps o duración/distancia para cardio), calentamiento dinámico, cronómetro de descanso, calorías, agua y medidas, con gráficos de progreso. Todo se guarda localmente en tu celular.' }));
     view.appendChild(aboutCard);
 
     root.appendChild(view);
