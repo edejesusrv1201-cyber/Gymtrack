@@ -21,13 +21,15 @@ const WorkoutView = (() => {
     DB.saveWorkoutLog(wl);
   }
 
-  function previousBest(exerciseId, beforeIso) {
+  function previousBest(exerciseId, beforeIso, isCardio) {
     const wl = DB.getWorkoutLog();
     const dates = Object.keys(wl).filter((d) => d < beforeIso).sort((a, b) => (a < b ? 1 : -1));
     for (const d of dates) {
       const entry = wl[d].exercises.find((e) => e.exerciseId === exerciseId);
       if (entry && entry.sets.length) {
-        const best = entry.sets.reduce((a, b) => (b.weight > a.weight ? b : a), entry.sets[0]);
+        const best = isCardio
+          ? entry.sets.reduce((a, b) => ((b.duration || 0) > (a.duration || 0) ? b : a), entry.sets[0])
+          : entry.sets.reduce((a, b) => (b.weight > a.weight ? b : a), entry.sets[0]);
         return { date: d, best, count: entry.sets.length };
       }
     }
@@ -52,6 +54,8 @@ const WorkoutView = (() => {
         routine ? Utils.el('span', { class: 'pill', style: `color:${routine.color}`, text: routine.name }) : Utils.el('span', { class: 'pill', text: 'Libre' }),
       ]),
     ]));
+
+    view.appendChild(renderWarmupCard(iso, log));
 
     const exList = Utils.el('div');
     log.exercises.forEach((entry, idx) => exList.appendChild(renderExerciseCard(iso, log, entry, idx)));
@@ -78,6 +82,7 @@ const WorkoutView = (() => {
 
   function renderExerciseCard(iso, log, entry, idx) {
     const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
+    const isCardio = !!(ex && ex.group === 'cardio');
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
     const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
     const settings = DB.getSettings();
@@ -94,17 +99,23 @@ const WorkoutView = (() => {
     ]));
     if (target) card.appendChild(Utils.el('div', { class: 'ex-target', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }));
 
-    const prev = ex ? previousBest(ex.id, iso) : null;
+    const prev = ex ? previousBest(ex.id, iso, isCardio) : null;
     if (prev) {
-      card.appendChild(Utils.el('div', { class: 'small text-dim mt-8', text: `Última vez (${Utils.friendlyDate(prev.date)}): ${prev.best.weight}${settings.units} × ${prev.best.reps} reps` }));
+      const prevLabel = isCardio
+        ? `${prev.best.duration} min${prev.best.distance ? ` · ${prev.best.distance} km` : ''}${prev.best.calories ? ` · ${prev.best.calories} kcal` : ''}`
+        : `${prev.best.weight}${settings.units} × ${prev.best.reps} reps`;
+      card.appendChild(Utils.el('div', { class: 'small text-dim mt-8', text: `Última vez (${Utils.friendlyDate(prev.date)}): ${prevLabel}` }));
     }
 
     const setsWrap = Utils.el('div', { class: 'mt-8' });
     entry.sets.forEach((set, sIdx) => {
       const feltOpt = FELT_OPTIONS.find((f) => f.key === set.felt) || FELT_OPTIONS[1];
+      const mainLabel = isCardio
+        ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}${set.calories ? ` · ${set.calories} kcal` : ''}`
+        : `${set.weight}${settings.units} × ${set.reps}`;
       const row = Utils.el('div', { class: 'list-item' }, [
         Utils.el('span', { text: `#${sIdx + 1}` }),
-        Utils.el('span', { text: `${set.weight}${settings.units} × ${set.reps}` }),
+        Utils.el('span', { text: mainLabel }),
         Utils.el('span', { text: `${feltOpt.icon} ${feltOpt.label}` }),
         Utils.el('button', { class: 'icon-btn', text: '✕', onclick: () => {
           entry.sets.splice(sIdx, 1);
@@ -116,13 +127,31 @@ const WorkoutView = (() => {
     });
     card.appendChild(setsWrap);
 
-    // formulario para nueva serie
+    // formulario para nueva serie / sesión
     const form = Utils.el('div', { class: 'mt-8' });
     const lastSet = entry.sets[entry.sets.length - 1];
-    const weightInput = Utils.el('input', { type: 'number', inputmode: 'decimal', placeholder: `Peso (${settings.units})`, step: '0.5' });
-    const repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
-    if (lastSet) { weightInput.value = lastSet.weight; }
-    else if (prev) { weightInput.value = prev.best.weight; }
+
+    let weightInput, repsInput, durationInput, distanceInput, caloriesInput;
+    if (isCardio) {
+      durationInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Duración (min)' });
+      distanceInput = Utils.el('input', { type: 'number', inputmode: 'decimal', placeholder: 'Distancia (km, opcional)', step: '0.1' });
+      caloriesInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Calorías (opcional)' });
+      if (lastSet) { durationInput.value = lastSet.duration || ''; distanceInput.value = lastSet.distance || ''; }
+      form.appendChild(Utils.el('div', { class: 'field-row' }, [
+        Utils.el('div', { class: 'field' }, [durationInput]),
+        Utils.el('div', { class: 'field' }, [distanceInput]),
+      ]));
+      form.appendChild(Utils.el('div', { class: 'field' }, [caloriesInput]));
+    } else {
+      weightInput = Utils.el('input', { type: 'number', inputmode: 'decimal', placeholder: `Peso (${settings.units})`, step: '0.5' });
+      repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
+      if (lastSet) { weightInput.value = lastSet.weight; }
+      else if (prev) { weightInput.value = prev.best.weight; }
+      form.appendChild(Utils.el('div', { class: 'field-row' }, [
+        Utils.el('div', { class: 'field' }, [weightInput]),
+        Utils.el('div', { class: 'field' }, [repsInput]),
+      ]));
+    }
 
     let feltSelected = 'normal';
     const feltRow = Utils.el('div', { class: 'felt-select mt-8' });
@@ -137,15 +166,24 @@ const WorkoutView = (() => {
       });
       feltRow.appendChild(b);
     });
-
-    form.appendChild(Utils.el('div', { class: 'field-row' }, [
-      Utils.el('div', { class: 'field' }, [weightInput]),
-      Utils.el('div', { class: 'field' }, [repsInput]),
-    ]));
     form.appendChild(feltRow);
 
-    const addSetBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: '✓ Registrar serie e iniciar descanso' });
+    const addSetBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: isCardio ? '✓ Registrar sesión de cardio' : '✓ Registrar serie e iniciar descanso' });
     addSetBtn.addEventListener('click', () => {
+      if (isCardio) {
+        const duration = parseFloat(durationInput.value);
+        if (isNaN(duration) || duration <= 0) {
+          Utils.toast('Ingresa la duración en minutos');
+          return;
+        }
+        const distance = distanceInput.value !== '' ? parseFloat(distanceInput.value) : undefined;
+        const calories = caloriesInput.value !== '' ? parseFloat(caloriesInput.value) : undefined;
+        entry.sets.push({ duration, distance, calories, felt: feltSelected });
+        saveLog(iso, log);
+        Utils.vibrate(40);
+        render(document.getElementById('viewRoot'), { date: iso });
+        return;
+      }
       const weight = parseFloat(weightInput.value);
       const reps = parseInt(repsInput.value, 10);
       if (isNaN(weight) || isNaN(reps) || reps <= 0) {
@@ -161,6 +199,34 @@ const WorkoutView = (() => {
     form.appendChild(addSetBtn);
     card.appendChild(form);
 
+    return card;
+  }
+
+  function renderWarmupCard(iso, log) {
+    const mobilityExercises = DB.getExercises().filter((e) => e.group === 'movilidad');
+    const card = Utils.el('div', { class: 'card' });
+    card.appendChild(Utils.el('h3', { text: '🔥 Calentamiento dinámico' }));
+    if (mobilityExercises.length === 0) {
+      card.appendChild(Utils.el('p', { text: 'Agrega ejercicios de movilidad en "Más → Catálogo de ejercicios" (grupo "movilidad") para verlos aquí.' }));
+      return card;
+    }
+    card.appendChild(Utils.el('p', { class: 'small', text: 'Marca lo que hiciste antes de entrenar.' }));
+    log.warmup = log.warmup || {};
+    const list = Utils.el('div');
+    mobilityExercises.forEach((ex) => {
+      const done = !!log.warmup[ex.id];
+      const row = Utils.el('div', { class: 'list-item' }, [
+        Utils.el('span', { text: ex.name, style: done ? 'color:var(--text-dim);text-decoration:line-through;' : '' }),
+        Utils.el('button', { class: 'btn-small', text: done ? '✅' : '⬜' }),
+      ]);
+      row.querySelector('button').addEventListener('click', () => {
+        log.warmup[ex.id] = !log.warmup[ex.id];
+        saveLog(iso, log);
+        render(document.getElementById('viewRoot'), { date: iso });
+      });
+      list.appendChild(row);
+    });
+    card.appendChild(list);
     return card;
   }
 

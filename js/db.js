@@ -93,6 +93,14 @@ const DB = (() => {
     { id: 'ex_elevacion_talones', name: 'Elevación de talones (gemelos)', group: 'pierna' },
     { id: 'ex_caminadora', name: 'Caminadora / trote', group: 'cardio' },
     { id: 'ex_carrera_larga', name: 'Carrera larga / fondo', group: 'cardio' },
+    { id: 'ex_mov_circulos_brazos', name: 'Círculos de brazos', group: 'movilidad' },
+    { id: 'ex_mov_balanceo_piernas', name: 'Balanceo de piernas (adelante/atrás y lateral)', group: 'movilidad' },
+    { id: 'ex_mov_sentadilla_cw', name: 'Sentadilla con peso corporal', group: 'movilidad' },
+    { id: 'ex_mov_zancada_giro', name: 'Zancada caminando con giro de tronco', group: 'movilidad' },
+    { id: 'ex_mov_cadera_90_90', name: 'Movilidad de cadera 90/90', group: 'movilidad' },
+    { id: 'ex_mov_gato_camello', name: 'Gato-camello', group: 'movilidad' },
+    { id: 'ex_mov_tobillo', name: 'Movilidad de tobillo', group: 'movilidad' },
+    { id: 'ex_mov_hombro_palo', name: 'Rotación de hombros con palo/banda', group: 'movilidad' },
   ];
 
   const DEFAULT_ROUTINES = [

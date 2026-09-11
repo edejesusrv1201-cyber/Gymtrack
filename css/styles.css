@@ -337,7 +337,7 @@ canvas.chart { width: 100%; height: 160px; display: block; }
 /* ---------- Group colors ---------- */
 .grp-pecho { color: #e0663d; } .grp-espalda { color: #3d8de0; } .grp-pierna { color: #5fbf6f; }
 .grp-hombro { color: #e0c23d; } .grp-brazo { color: #c26fe0; } .grp-core { color: #e0e0e0; }
-.grp-cardio { color: #e05a5a; } .grp-otro { color: #9aa0ac; }
+.grp-cardio { color: #e05a5a; } .grp-otro { color: #9aa0ac; } .grp-movilidad { color: #3de0c2; }
 
 .hidden { display: none !important; }
 .text-dim { color: var(--text-dim); }

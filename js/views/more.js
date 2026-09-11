@@ -3,7 +3,7 @@
    ============================================================ */
 
 const MoreView = (() => {
-  const GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'otro'];
+  const GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
 
   function render(root) {
     root.innerHTML = '';
