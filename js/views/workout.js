@@ -99,6 +99,21 @@ const WorkoutView = (() => {
     timerBtn.addEventListener('click', () => document.getElementById('restFab').click());
     view.appendChild(timerBtn);
 
+    if (log.exercises.length > 0) {
+      const finishBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: '🏁 Finalizar entrenamiento' });
+      finishBtn.addEventListener('click', () => {
+        const before = log.exercises.length;
+        log.exercises = log.exercises.filter((e) => e.sets.length > 0);
+        const removed = before - log.exercises.length;
+        saveLog(iso, log);
+        Utils.toast(removed > 0
+          ? `Entrenamiento guardado · se quitaron ${removed} ejercicio${removed === 1 ? '' : 's'} sin registro`
+          : 'Entrenamiento guardado');
+        App.navigate('hoy');
+      });
+      view.appendChild(finishBtn);
+    }
+
     root.appendChild(view);
   }
 
