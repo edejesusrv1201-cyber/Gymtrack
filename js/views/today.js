@@ -86,7 +86,7 @@ const TodayView = (() => {
           const wl = DB.getWorkoutLog();
           wl[todayIso] = {
             routineId: routine.id,
-            exercises: routine.exercises.map((re) => ({ exerciseId: re.exerciseId, sets: [] })),
+            exercises: routine.exercises.map((re) => ({ exerciseId: re.exerciseId, sets: [], fromRoutine: true })),
             notes: '',
           };
           DB.saveWorkoutLog(wl);

@@ -25,6 +25,27 @@ const WorkoutView = (() => {
     DB.saveWorkoutLog(wl);
   }
 
+  // mantiene el día sincronizado si la rutina cambió de ejercicios después
+  // de haber "iniciado" el entrenamiento: solo toca lo que aún no tiene
+  // ninguna serie registrada, así nunca se pierde lo que ya hiciste.
+  function syncRoutineExercises(log, routine) {
+    if (!routine) return false;
+    let changed = false;
+    const routineIds = new Set(routine.exercises.map((re) => re.exerciseId));
+    const before = log.exercises.length;
+    log.exercises = log.exercises.filter((e) => !(e.fromRoutine && e.sets.length === 0 && !routineIds.has(e.exerciseId)));
+    if (log.exercises.length !== before) changed = true;
+    const presentIds = new Set(log.exercises.map((e) => e.exerciseId));
+    routine.exercises.forEach((re) => {
+      if (!presentIds.has(re.exerciseId)) {
+        log.exercises.push({ exerciseId: re.exerciseId, sets: [], fromRoutine: true });
+        presentIds.add(re.exerciseId);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   function previousBest(exerciseId, beforeIso, isCardio) {
     const wl = DB.getWorkoutLog();
     const dates = Object.keys(wl).filter((d) => d < beforeIso).sort((a, b) => (a < b ? 1 : -1));
@@ -48,6 +69,7 @@ const WorkoutView = (() => {
       saveLog(iso, log);
     }
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
+    if (syncRoutineExercises(log, routine)) saveLog(iso, log);
 
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
