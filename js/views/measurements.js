@@ -8,11 +8,23 @@ const MeasurementsView = (() => {
     { key: 'chest', label: 'Pecho', unit: () => 'cm' },
     { key: 'waist', label: 'Cintura', unit: () => 'cm' },
     { key: 'hips', label: 'Cadera', unit: () => 'cm' },
+    { key: 'armL', label: 'Brazo izquierdo', unit: () => 'cm' },
+    { key: 'armR', label: 'Brazo derecho', unit: () => 'cm' },
+    { key: 'thighL', label: 'Muslo izquierdo', unit: () => 'cm' },
+    { key: 'thighR', label: 'Muslo derecho', unit: () => 'cm' },
+    { key: 'calfL', label: 'Pantorrilla izquierda', unit: () => 'cm' },
+    { key: 'calfR', label: 'Pantorrilla derecha', unit: () => 'cm' },
+    { key: 'neck', label: 'Cuello', unit: () => 'cm' },
+  ];
+  // campos antiguos (una sola medida para brazo/muslo/pantorrilla) que ya
+  // tenga guardados el usuario; se siguen mostrando en historial y gráfico
+  // pero el formulario de registro ya solo usa los campos izq/der de arriba.
+  const LEGACY_FIELDS = [
     { key: 'arm', label: 'Brazo', unit: () => 'cm' },
     { key: 'thigh', label: 'Muslo', unit: () => 'cm' },
     { key: 'calf', label: 'Pantorrilla', unit: () => 'cm' },
-    { key: 'neck', label: 'Cuello', unit: () => 'cm' },
   ];
+  const ALL_FIELDS = [...FIELDS, ...LEGACY_FIELDS];
 
   let chartField = 'weight';
 
@@ -34,14 +46,18 @@ const MeasurementsView = (() => {
       chartCard.appendChild(Utils.el('div', { class: 'flex-between' }, [
         Utils.el('h3', { class: 'mb-0', text: 'Progreso' }),
       ]));
+      const fieldsWithData = ALL_FIELDS.filter((f) => measurements.some((m) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== ''));
+      if (!fieldsWithData.some((f) => f.key === chartField)) chartField = fieldsWithData[0].key;
       const fieldSelect = Utils.el('select', {});
-      FIELDS.forEach((f) => {
-        const hasData = measurements.some((m) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== '');
-        if (hasData) fieldSelect.appendChild(Utils.el('option', { value: f.key, text: f.label, selected: f.key === chartField ? 'selected' : null }));
+      fieldsWithData.forEach((f) => {
+        fieldSelect.appendChild(Utils.el('option', { value: f.key, text: f.label, selected: f.key === chartField ? 'selected' : null }));
       });
       fieldSelect.value = chartField;
       fieldSelect.addEventListener('change', () => { chartField = fieldSelect.value; render(root); });
       chartCard.appendChild(fieldSelect);
+
+      const trend = Utils.el('div', { class: 'small mt-8' });
+      chartCard.appendChild(trend);
 
       const chartWrap = Utils.el('div', { class: 'chart-wrap mt-8' });
       const canvas = Utils.el('canvas', { class: 'chart' });
@@ -50,6 +66,7 @@ const MeasurementsView = (() => {
       const tooltip = Utils.el('div', { class: 'small text-dim mt-8', id: 'chartTooltip', text: 'Toca un punto para ver el valor' });
       chartCard.appendChild(tooltip);
       view.appendChild(chartCard);
+      renderTrend(trend, measurements, chartField);
       requestAnimationFrame(() => drawChart(canvas, measurements, chartField, tooltip));
     }
 
@@ -63,7 +80,7 @@ const MeasurementsView = (() => {
       ]));
     } else {
       [...measurements].reverse().forEach((m) => {
-        const summary = FIELDS.filter((f) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== '')
+        const summary = ALL_FIELDS.filter((f) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== '')
           .map((f) => `${f.label} ${m[f.key]}${typeof f.unit === 'function' ? f.unit() : ''}`).join(' · ');
         const row = Utils.el('div', { class: 'list-item' }, [
           Utils.el('div', {}, [
@@ -142,11 +159,31 @@ const MeasurementsView = (() => {
     const points = measurements
       .filter((m) => m[fieldKey] !== undefined && m[fieldKey] !== null && m[fieldKey] !== '')
       .map((m) => ({ x: m.date, y: m[fieldKey] }));
-    const fieldDef = FIELDS.find((f) => f.key === fieldKey);
+    const fieldDef = ALL_FIELDS.find((f) => f.key === fieldKey);
     Utils.drawLineChart(canvas, points, {
       color: '#ff6a3d',
       onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)}: ${p.y}${fieldDef.unit()}`; },
     });
+  }
+
+  // ---- indicador de tendencia: ¿subió o bajó desde el primer registro? ----
+  function renderTrend(container, measurements, fieldKey) {
+    container.innerHTML = '';
+    const points = measurements
+      .filter((m) => m[fieldKey] !== undefined && m[fieldKey] !== null && m[fieldKey] !== '')
+      .map((m) => ({ x: m.date, y: m[fieldKey] }));
+    if (points.length < 2) return;
+    const fieldDef = ALL_FIELDS.find((f) => f.key === fieldKey);
+    const first = points[0].y;
+    const last = points[points.length - 1].y;
+    const delta = Utils.round1(last - first);
+    const unit = fieldDef.unit();
+    const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '▬';
+    container.appendChild(Utils.el('span', {
+      style: 'color:var(--accent-2);font-weight:700;',
+      text: `${arrow} ${delta > 0 ? '+' : ''}${delta}${unit}`,
+    }));
+    container.appendChild(Utils.el('span', { class: 'text-dim', text: ` desde el ${Utils.friendlyDate(points[0].x)}` }));
   }
 
   return { render };
