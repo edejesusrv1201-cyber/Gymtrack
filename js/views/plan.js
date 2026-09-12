@@ -219,17 +219,36 @@ const PlanView = (() => {
     });
     body.appendChild(exList);
 
-    const addRow = Utils.el('div', { class: 'field-row mt-8' });
     const exSelect = Utils.el('select', {});
     DB.getExercises().forEach((ex) => exSelect.appendChild(Utils.el('option', { value: ex.id, text: ex.name })));
-    const setsInput = Utils.el('input', { type: 'number', placeholder: 'Series', value: '3', style: 'width:70px;' });
-    const repsInput = Utils.el('input', { type: 'text', placeholder: 'Reps (ej. 8-10)', value: '10', style: 'width:100px;' });
-    addRow.appendChild(exSelect);
+    const setsInput = Utils.el('input', { type: 'number', placeholder: 'Series', value: '3' });
+    const repsInput = Utils.el('input', { type: 'text', placeholder: 'Reps (ej. 8-10)', value: '10' });
+    const setsLabel = Utils.el('label', { text: 'Series' });
+    const repsLabel = Utils.el('label', { text: 'Reps objetivo' });
+    const setsField = Utils.el('div', { class: 'field' }, [setsLabel, setsInput]);
+    const repsField = Utils.el('div', { class: 'field' }, [repsLabel, repsInput]);
+
+    function updateFieldsForSelection() {
+      const ex = DB.getExercises().find((e) => e.id === exSelect.value);
+      const isCardio = !!(ex && ex.group === 'cardio');
+      setsField.classList.toggle('hidden', isCardio);
+      if (isCardio) {
+        setsInput.value = '1';
+        repsLabel.textContent = 'Duración / distancia objetivo';
+        repsInput.placeholder = 'ej. 20-30 min ó 5 km';
+        if (repsInput.value === '10') repsInput.value = '';
+      } else {
+        repsLabel.textContent = 'Reps objetivo';
+        repsInput.placeholder = 'Reps (ej. 8-10)';
+        if (repsInput.value === '') repsInput.value = '10';
+        if (setsInput.value === '1') setsInput.value = '3';
+      }
+    }
+    exSelect.addEventListener('change', updateFieldsForSelection);
+    updateFieldsForSelection();
+
     body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Agregar ejercicio' }), exSelect]));
-    body.appendChild(Utils.el('div', { class: 'field-row' }, [
-      Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Series' }), setsInput]),
-      Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Reps objetivo' }), repsInput]),
-    ]));
+    body.appendChild(Utils.el('div', { class: 'field-row' }, [setsField, repsField]));
     const addExBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Agregar a la rutina' });
     addExBtn.addEventListener('click', () => {
       if (!exSelect.value) return;
