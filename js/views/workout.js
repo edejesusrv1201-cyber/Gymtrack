@@ -46,6 +46,31 @@ const WorkoutView = (() => {
     return changed;
   }
 
+  // ---- récord histórico (máximo y mínimo) para servir de guía al entrenar ----
+  function exerciseRecords(exerciseId, isCardio) {
+    const wl = DB.getWorkoutLog();
+    let max = null;
+    let min = null;
+    Object.keys(wl).forEach((d) => {
+      const entry = wl[d].exercises.find((e) => e.exerciseId === exerciseId);
+      if (!entry) return;
+      entry.sets.forEach((set) => {
+        const value = isCardio ? set.duration : set.weight;
+        if (value === undefined || value === null) return;
+        if (!max || value > (isCardio ? max.set.duration : max.set.weight)) max = { set, date: d };
+        if (!min || value < (isCardio ? min.set.duration : min.set.weight)) min = { set, date: d };
+      });
+    });
+    if (!max) return null;
+    return { max, min };
+  }
+
+  function formatRecordSet(set, isCardio, units) {
+    return isCardio
+      ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}`
+      : `${set.weight}${units} × ${set.reps}`;
+  }
+
   function previousBest(exerciseId, beforeIso, isCardio) {
     const wl = DB.getWorkoutLog();
     const dates = Object.keys(wl).filter((d) => d < beforeIso).sort((a, b) => (a < b ? 1 : -1));
@@ -161,6 +186,15 @@ const WorkoutView = (() => {
       headerBtns,
     ]));
     if (target) card.appendChild(Utils.el('div', { class: 'ex-target', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }));
+
+    const records = ex ? exerciseRecords(ex.id, isCardio) : null;
+    if (records) {
+      const sameSet = records.max.date === records.min.date && records.max.set === records.min.set;
+      const recordText = sameSet
+        ? `🏆 Récord: ${formatRecordSet(records.max.set, isCardio, settings.units)} (${Utils.friendlyDate(records.max.date)})`
+        : `🏆 Máx: ${formatRecordSet(records.max.set, isCardio, settings.units)} (${Utils.friendlyDate(records.max.date)}) · Mín: ${formatRecordSet(records.min.set, isCardio, settings.units)} (${Utils.friendlyDate(records.min.date)})`;
+      card.appendChild(Utils.el('div', { class: 'small mt-8', style: 'color:var(--accent);font-weight:600;', text: recordText }));
+    }
 
     const prev = ex ? previousBest(ex.id, iso, isCardio) : null;
     if (prev) {
@@ -295,12 +329,15 @@ const WorkoutView = (() => {
 
   function renderPendingRow(iso, log, entry, key, onExpand) {
     const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
+    const isCardio = !!(ex && ex.group === 'cardio');
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
     const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
+    const records = ex ? exerciseRecords(ex.id, isCardio) : null;
     const row = Utils.el('div', { class: 'list-item' }, [
       Utils.el('div', {}, [
         Utils.el('div', { text: ex ? ex.name : '(ejercicio eliminado)' }),
         target ? Utils.el('div', { class: 'meta', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }) : null,
+        records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent);', text: `🏆 ${formatRecordSet(records.max.set, isCardio, DB.getSettings().units)}` }) : null,
       ]),
       Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
     ]);
@@ -388,5 +425,5 @@ const WorkoutView = (() => {
     Modal.open('Agregar ejercicio', body);
   }
 
-  return { render };
+  return { render, exerciseRecords, formatRecordSet };
 })();

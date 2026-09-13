@@ -100,6 +100,32 @@ const MoreView = (() => {
     exCard.appendChild(addExBtn);
     view.appendChild(exCard);
 
+    // ---- récords personales ----
+    const recordsCard = Utils.el('div', { class: 'card' });
+    recordsCard.appendChild(Utils.el('h3', { text: '🏆 Récords personales' }));
+    const recordRows = DB.getExercises()
+      .map((ex) => ({ ex, rec: WorkoutView.exerciseRecords(ex.id, ex.group === 'cardio') }))
+      .filter((r) => r.rec)
+      .sort((a, b) => a.ex.name.localeCompare(b.ex.name));
+    if (recordRows.length === 0) {
+      recordsCard.appendChild(Utils.el('p', { text: 'Aún no tienes marcas registradas. En cuanto anotes series de un ejercicio, tu récord (máximo y mínimo) aparecerá aquí y como guía cuando vayas a entrenarlo.' }));
+    } else {
+      recordRows.forEach(({ ex, rec }) => {
+        const isCardio = ex.group === 'cardio';
+        recordsCard.appendChild(Utils.el('div', { class: 'list-item' }, [
+          Utils.el('div', {}, [
+            Utils.el('div', { text: ex.name }),
+            Utils.el('div', { class: `meta grp-${ex.group}`, text: ex.group }),
+          ]),
+          Utils.el('div', { style: 'text-align:right;' }, [
+            Utils.el('div', { style: 'font-weight:700;color:var(--accent);', text: WorkoutView.formatRecordSet(rec.max.set, isCardio, settings.units) }),
+            Utils.el('div', { class: 'meta', text: Utils.friendlyDate(rec.max.date) }),
+          ]),
+        ]));
+      });
+    }
+    view.appendChild(recordsCard);
+
     // ---- respaldo ----
     const backupCard = Utils.el('div', { class: 'card' });
     backupCard.appendChild(Utils.el('h3', { text: '💾 Copia de seguridad' }));
