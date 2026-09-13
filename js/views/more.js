@@ -142,6 +142,35 @@ const MoreView = (() => {
     });
     backupCard.appendChild(importLabel);
 
+    const exportXlsxBtn = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '📊 Exportar a Excel (.xlsx)' });
+    exportXlsxBtn.addEventListener('click', () => {
+      try {
+        ExcelBackup.exportAll();
+      } catch (e) {
+        console.error('Error exportando a Excel', e);
+        Utils.toast('No se pudo generar el Excel');
+      }
+    });
+    backupCard.appendChild(exportXlsxBtn);
+
+    const importXlsxLabel = Utils.el('label', { class: 'btn-secondary btn-block mt-8', style: 'display:block;text-align:center;', text: '📊 Importar Excel (.xlsx)' });
+    const importXlsxInput = Utils.el('input', { type: 'file', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', class: 'hidden' });
+    importXlsxLabel.appendChild(importXlsxInput);
+    importXlsxInput.addEventListener('change', () => {
+      const file = importXlsxInput.files[0];
+      if (!file) return;
+      if (!Utils.confirmDialog('Esto reemplazará tus datos actuales con los del Excel. ¿Continuar?')) { importXlsxInput.value = ''; return; }
+      ExcelBackup.importFile(file, () => {
+        Utils.toast('Datos restaurados desde Excel');
+        render(root);
+      }, () => {
+        Utils.toast('El archivo no es un respaldo de Excel válido');
+        importXlsxInput.value = '';
+      });
+    });
+    backupCard.appendChild(importXlsxLabel);
+    backupCard.appendChild(Utils.el('p', { class: 'small mt-8', text: 'El Excel trae todos tus datos en varias hojas (rutinas, series, medidas, calorías...). Útil para revisarlos o para pasarlos a otro celular igual que el respaldo .json.' }));
+
     const wipeBtn = Utils.el('button', { class: 'btn-danger btn-block mt-8', text: '🗑️ Borrar todos los datos' });
     wipeBtn.addEventListener('click', () => {
       if (!Utils.confirmDialog('Esto borrará TODOS tus registros de esta app permanentemente. ¿Seguro?')) return;
