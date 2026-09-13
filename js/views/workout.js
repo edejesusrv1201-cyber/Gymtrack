@@ -185,7 +185,17 @@ const WorkoutView = (() => {
       Utils.el('h3', { class: 'mb-0', text: ex ? ex.name : '(ejercicio eliminado)' }),
       headerBtns,
     ]));
-    if (target) card.appendChild(Utils.el('div', { class: 'ex-target', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }));
+    if (target) {
+      const done = entry.sets.length;
+      const complete = done >= target.targetSets;
+      card.appendChild(Utils.el('div', {
+        class: 'ex-target',
+        style: complete ? 'color:var(--green);font-weight:700;' : '',
+        text: `${done} de ${target.targetSets} series · ${target.targetReps}${complete ? ' ✓' : ''}`,
+      }));
+    } else if (entry.sets.length > 0) {
+      card.appendChild(Utils.el('div', { class: 'ex-target', text: `${entry.sets.length} serie${entry.sets.length === 1 ? '' : 's'} registrada${entry.sets.length === 1 ? '' : 's'}` }));
+    }
 
     const records = ex ? exerciseRecords(ex.id, isCardio) : null;
     if (records) {
@@ -336,7 +346,7 @@ const WorkoutView = (() => {
     const row = Utils.el('div', { class: 'list-item' }, [
       Utils.el('div', {}, [
         Utils.el('div', { text: ex ? ex.name : '(ejercicio eliminado)' }),
-        target ? Utils.el('div', { class: 'meta', text: `Meta: ${target.targetSets} series · ${target.targetReps}` }) : null,
+        target ? Utils.el('div', { class: 'meta', text: `0 de ${target.targetSets} series · ${target.targetReps}` }) : null,
         records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent);', text: `🏆 ${formatRecordSet(records.max.set, isCardio, DB.getSettings().units)}` }) : null,
       ]),
       Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
