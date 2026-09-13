@@ -5,6 +5,43 @@
 const MoreView = (() => {
   const GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
 
+  let volumePeriod = 'semana';
+
+  function volumeRange(period) {
+    const today = new Date();
+    if (period === 'mes') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return { start: Utils.toISODate(start), end: Utils.toISODate(end) };
+    }
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { start: Utils.toISODate(start), end: Utils.toISODate(end) };
+  }
+
+  function volumeByGroup(startIso, endIso) {
+    const wl = DB.getWorkoutLog();
+    const byId = {};
+    DB.getExercises().forEach((e) => { byId[e.id] = e; });
+    const result = {};
+    Object.keys(wl).forEach((d) => {
+      if (d < startIso || d > endIso) return;
+      (wl[d].exercises || []).forEach((entry) => {
+        const ex = byId[entry.exerciseId];
+        const group = ex ? ex.group : 'otro';
+        result[group] = result[group] || { sets: 0, volume: 0, minutes: 0 };
+        (entry.sets || []).forEach((set) => {
+          result[group].sets += 1;
+          if (set.weight !== undefined) result[group].volume += (set.weight || 0) * (set.reps || 0);
+          if (set.duration !== undefined) result[group].minutes += set.duration || 0;
+        });
+      });
+    });
+    return result;
+  }
+
   function render(root) {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
@@ -125,6 +162,41 @@ const MoreView = (() => {
       });
     }
     view.appendChild(recordsCard);
+
+    // ---- volumen de entrenamiento por grupo muscular ----
+    const volumeCard = Utils.el('div', { class: 'card' });
+    volumeCard.appendChild(Utils.el('h3', { text: '📊 Volumen por grupo muscular' }));
+    const periodRow = Utils.el('div', { class: 'grid-2' });
+    const semanaBtn = Utils.el('button', { class: volumePeriod === 'semana' ? 'btn-primary' : 'btn-secondary', text: 'Esta semana' });
+    const mesBtn = Utils.el('button', { class: volumePeriod === 'mes' ? 'btn-primary' : 'btn-secondary', text: 'Este mes' });
+    semanaBtn.addEventListener('click', () => { volumePeriod = 'semana'; render(root); });
+    mesBtn.addEventListener('click', () => { volumePeriod = 'mes'; render(root); });
+    periodRow.appendChild(semanaBtn);
+    periodRow.appendChild(mesBtn);
+    volumeCard.appendChild(periodRow);
+
+    const range = volumeRange(volumePeriod);
+    const volumeData = volumeByGroup(range.start, range.end);
+    const groupsWithData = GROUPS
+      .filter((g) => volumeData[g] && volumeData[g].sets > 0)
+      .sort((a, b) => (volumeData[b].volume + volumeData[b].minutes) - (volumeData[a].volume + volumeData[a].minutes));
+    if (groupsWithData.length === 0) {
+      volumeCard.appendChild(Utils.el('p', { class: 'mt-8', text: 'No hay series registradas en este período.' }));
+    } else {
+      groupsWithData.forEach((g) => {
+        const d = volumeData[g];
+        const isCardioGroup = g === 'cardio';
+        const valueText = isCardioGroup ? `${Math.round(d.minutes)} min` : `${Utils.round1(d.volume)} ${settings.units}`;
+        volumeCard.appendChild(Utils.el('div', { class: 'list-item' }, [
+          Utils.el('span', { class: `grp-${g}`, style: 'font-weight:600;', text: g }),
+          Utils.el('div', { style: 'text-align:right;' }, [
+            Utils.el('div', { style: 'font-weight:700;', text: valueText }),
+            Utils.el('div', { class: 'meta', text: `${d.sets} serie${d.sets === 1 ? '' : 's'}` }),
+          ]),
+        ]));
+      });
+    }
+    view.appendChild(volumeCard);
 
     // ---- respaldo ----
     const backupCard = Utils.el('div', { class: 'card' });
