@@ -181,9 +181,50 @@ const Metrics = (() => {
     return null;
   }
 
+  // ¿Esta serie rompe un récord? Se llama ANTES de guardarla.
+  // Devuelve [] si no hay récord (o si aún no hay historial para comparar).
+  //  - fuerza: peso nuevo > mejor peso previo ('peso'), o más repeticiones que
+  //    la mejor marca previa con ese peso o más ('reps'). Solo series normales.
+  //  - cardio: más duración ('tiempo') o más distancia ('distancia').
+  function detectPR(exerciseId, isCardio, set) {
+    const wl = DB.getWorkoutLog();
+    const prior = [];
+    Object.keys(wl).forEach((d) => {
+      const entry = (wl[d].exercises || []).find((e) => e.exerciseId === exerciseId);
+      if (!entry) return;
+      entry.sets.forEach((x) => { if (isCardio || isNormal(x)) prior.push(x); });
+    });
+    if (prior.length === 0) return [];
+    const max = (arr) => arr.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
+    const prs = [];
+
+    if (isCardio) {
+      const dur = Number(set.duration) || 0;
+      const prevDur = max(prior.map((x) => x.duration));
+      if (dur > prevDur && prevDur > 0) prs.push({ kind: 'tiempo', value: dur, prev: prevDur });
+      const dist = Number(set.distance) || 0;
+      const prevDist = max(prior.map((x) => x.distance));
+      if (dist > prevDist && prevDist > 0) prs.push({ kind: 'distancia', value: dist, prev: prevDist });
+      return prs;
+    }
+
+    if (!isNormal(set)) return [];
+    const w = Number(set.weight) || 0;
+    const r = Number(set.reps) || 0;
+    const prevW = max(prior.map((x) => x.weight));
+    if (w > prevW) {
+      prs.push({ kind: 'peso', value: w, reps: r, prev: prevW });
+    } else {
+      const heavier = prior.filter((x) => (Number(x.weight) || 0) >= w);
+      const prevR = max(heavier.map((x) => x.reps));
+      if (heavier.length && r > prevR) prs.push({ kind: 'reps', value: r, weight: w, prev: prevR });
+    }
+    return prs;
+  }
+
   return {
     isWarmup, isDrop, isNormal, volumeOfSet, e1rm,
     weekRange, monthRange, totals, weeklySeries, dayLevels,
-    exerciseSessions, exerciseRecords, formatSet, previousBest,
+    exerciseSessions, exerciseRecords, formatSet, previousBest, detectPR,
   };
 })();

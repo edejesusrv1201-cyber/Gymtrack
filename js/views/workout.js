@@ -323,6 +323,7 @@ const WorkoutView = (() => {
       setsWrap.appendChild(Utils.el('div', { class: 'set-line' }, [
         badge,
         Utils.el('span', { class: 'set-main', text: mainLabel }),
+        set.pr ? Utils.el('span', { title: `Récord de ${set.pr.replace(',', ' y ')}`, text: '🏆' }) : null,
         Metrics.isWarmup(set) ? Utils.el('span', { class: 'set-felt', text: 'aprox.' }) : Utils.el('span', { class: 'set-felt', text: `${feltOpt.icon} ${feltOpt.label}` }),
         Utils.el('button', { class: 'icon-btn', text: '✕', onclick: () => {
           entry.sets.splice(sIdx, 1);
@@ -430,10 +431,14 @@ const WorkoutView = (() => {
         }
         const distance = distanceInput.value !== '' ? parseFloat(distanceInput.value) : undefined;
         const calories = caloriesInput.value !== '' ? parseFloat(caloriesInput.value) : undefined;
-        entry.sets.push({ duration, distance, calories, felt: feltSelected });
+        const cardioSet = { duration, distance, calories, felt: feltSelected };
+        const prs = Metrics.detectPR(entry.exerciseId, true, cardioSet);
+        if (prs.length) cardioSet.pr = prs.map((x) => x.kind).join(',');
+        entry.sets.push(cardioSet);
         saveLog(iso, log);
         Utils.vibrate(40);
         rerender();
+        Celebrate.record(prs, ex ? ex.name : '');
         return;
       }
       const weight = parseFloat(weightInput.value);
@@ -444,6 +449,8 @@ const WorkoutView = (() => {
       }
       const set = { weight, reps, felt: typeSelected === 'warmup' ? 'normal' : feltSelected };
       if (typeSelected !== 'normal') set.type = typeSelected;
+      const prs = Metrics.detectPR(entry.exerciseId, false, set);
+      if (prs.length) set.pr = prs.map((x) => x.kind).join(',');
       entry.sets.push(set);
       saveLog(iso, log);
       Utils.vibrate(40);
@@ -452,6 +459,7 @@ const WorkoutView = (() => {
       // descanso solo tras una serie efectiva (las aproximaciones y los drops van seguidos)
       if (typeSelected === 'normal') RestTimer.quickStart(DB.getSettings().restDefault);
       rerender();
+      Celebrate.record(prs, ex ? ex.name : '');
     });
     form.appendChild(addSetBtn);
     card.appendChild(form);

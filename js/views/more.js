@@ -61,6 +61,18 @@ const MoreView = (() => {
       (k) => save({ themeIntensity: k }),
       true,
     ));
+
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Celebrar récords 🎆' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'on', label: 'Activada' }, { key: 'off', label: 'Desactivada' }],
+      Celebrate.enabled() ? 'on' : 'off',
+      (k) => save({ celebrate: k === 'on' }),
+      true,
+    ));
+    const testBtn = Utils.el('button', { class: 'btn-secondary', text: '🎆 Ver la animación' });
+    testBtn.addEventListener('click', () => Celebrate.preview());
+    card.appendChild(testBtn);
+    card.appendChild(Utils.el('p', { class: 'small mt-8', text: Celebrate.reducedMotion() && DB.getSettings().celebrate !== true ? 'Tu teléfono pide reducir animaciones, así que solo verás el aviso. Toca "Activada" para ver también los fuegos artificiales.' : 'Se activa al romper tu marca de peso, repeticiones o, en cardio, tiempo o distancia.' }));
     return card;
   }
 
