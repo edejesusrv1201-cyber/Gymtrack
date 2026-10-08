@@ -127,7 +127,8 @@ const MoreView = (() => {
     const unitsSel = Utils.el('select', {});
     ['kg', 'lb'].forEach((u) => unitsSel.appendChild(Utils.el('option', { value: u, text: u, selected: u === settings.units ? 'selected' : null })));
     unitsSel.value = settings.units;
-    settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Unidad de peso' }), unitsSel]));
+    settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Ver los pesos en' }), unitsSel]));
+    settingsCard.appendChild(Utils.el('p', { class: 'small', style: 'margin:-4px 0 12px;', text: 'Al registrar una serie o tu peso puedes escribirlo en kg o lb (botón junto al campo, útil según la máquina). Aquí eliges en qué unidad se muestra todo; los datos se guardan siempre en kg.' }));
 
     const restInput = Utils.el('input', { type: 'number', value: settings.restDefault });
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Descanso por defecto entre series (segundos)' }), restInput]));
@@ -137,6 +138,8 @@ const MoreView = (() => {
     const carbInput = Utils.el('input', { type: 'number', value: settings.carbGoal });
     const fatInput = Utils.el('input', { type: 'number', value: settings.fatGoal });
     const waterInput = Utils.el('input', { type: 'number', value: settings.waterGoalMl || 2500 });
+    const setsMinInput = Utils.el('input', { type: 'number', value: settings.weeklySetsMin || 10 });
+    const setsMaxInput = Utils.el('input', { type: 'number', value: settings.weeklySetsMax || 20 });
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Meta de calorías diarias (kcal)' }), kcalInput]));
     settingsCard.appendChild(Utils.el('div', { class: 'grid-3' }, [
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Proteína (g)' }), proteinInput]),
@@ -144,6 +147,11 @@ const MoreView = (() => {
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Grasas (g)' }), fatInput]),
     ]));
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Meta de agua diaria (ml)' }), waterInput]));
+    settingsCard.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 6px;', text: 'Series por semana en cada grupo muscular' }));
+    settingsCard.appendChild(Utils.el('div', { class: 'field-row' }, [
+      Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Mínimo' }), setsMinInput]),
+      Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Máximo' }), setsMaxInput]),
+    ]));
 
     const saveSettingsBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Guardar ajustes' });
     saveSettingsBtn.addEventListener('click', () => {
@@ -156,6 +164,8 @@ const MoreView = (() => {
         carbGoal: Number(carbInput.value) || 280,
         fatGoal: Number(fatInput.value) || 70,
         waterGoalMl: Number(waterInput.value) || 2500,
+        weeklySetsMin: Math.max(1, Number(setsMinInput.value) || 10),
+        weeklySetsMax: Math.max(Number(setsMinInput.value) || 10, Number(setsMaxInput.value) || 20),
         onboarded: true,
       });
       DB.saveSettings(s);

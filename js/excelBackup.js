@@ -248,7 +248,8 @@ const ExcelBackup = (() => {
   // ---------------- hoja: Resumen ----------------
   function summarySheet() {
     const settings = DB.getSettings();
-    const units = settings.units;
+    const units = Units.current();
+    const goal = Metrics.weeklyGoal();
     const acc = accentHex();
     const tint = mix(acc, 0.12);
     const sh = makeSheet();
@@ -291,14 +292,15 @@ const ExcelBackup = (() => {
     }
     tile(r, 1, 'Entrenos', all.days, `últimos 30 días: ${t30.days}`, '#,##0');
     tile(r, 3, 'Series', all.sets, `últimos 30 días: ${t30.sets}`, '#,##0');
-    tile(r, 5, `Volumen (${units})`, Math.round(all.volume), `últimos 30 días: ${Math.round(t30.volume).toLocaleString('es')}`, '#,##0');
+    tile(r, 5, `Volumen (${units})`, Math.round(Units.fromKg(all.volume)), `últimos 30 días: ${Math.round(Units.fromKg(t30.volume)).toLocaleString('es')}`, '#,##0');
     tile(r, 7, 'Récords rotos', prCount, 'series con marca nueva', '#,##0');
     r += 4;
     const firstW = meas.length ? meas[0].weight : null;
     const lastW = meas.length ? meas[meas.length - 1].weight : null;
     tile(r, 1, 'Cardio (min)', Math.round(all.minutes), `últimos 30 días: ${Math.round(t30.minutes)}`, '#,##0');
-    tile(r, 3, 'Peso actual', lastW !== null ? `${lastW} ${units}` : '—',
-      lastW !== null && meas.length > 1 ? `${lastW - firstW >= 0 ? '+' : ''}${Utils.round1(lastW - firstW)} ${units} desde el inicio` : 'sin registros');
+    const dW = lastW !== null ? Utils.round1(Units.fromKg(lastW) - Units.fromKg(firstW)) : 0;
+    tile(r, 3, 'Peso actual', lastW !== null ? `${Units.num(lastW)} ${units}` : '—',
+      lastW !== null && meas.length > 1 ? `${dW >= 0 ? '+' : ''}${dW} ${units} desde el inicio` : 'sin registros');
     const streak = streakWeeks();
     tile(r, 5, 'Racha', `${streak} sem`, 'semanas seguidas entrenando');
     tile(r, 7, 'Calorías / día', kcalAvg ? Math.round(kcalAvg) : '—', `meta ${settings.calorieGoal} kcal · últimos 7 días`, '#,##0');
@@ -330,7 +332,7 @@ const ExcelBackup = (() => {
     [
       ['Entrenos', tw.days, tp.days],
       ['Series', tw.sets, tp.sets],
-      [`Volumen (${units})`, Math.round(tw.volume), Math.round(tp.volume)],
+      [`Volumen (${units})`, Math.round(Units.fromKg(tw.volume)), Math.round(Units.fromKg(tp.volume))],
       ['Cardio (min)', Math.round(tw.minutes), Math.round(tp.minutes)],
     ].forEach((row, i) => {
       const d = deltaText(row[1], row[2]);
@@ -352,13 +354,40 @@ const ExcelBackup = (() => {
     weeks.forEach((w, i) => {
       const isNow = i === weeks.length - 1;
       sh.set(r, 1, w.label, body(i, { bold: isNow }));
-      sh.set(r, 2, Math.round(w.volume), body(i, { h: 'right', bold: isNow }), '#,##0');
+      sh.set(r, 2, Math.round(Units.fromKg(w.volume)), body(i, { h: 'right', bold: isNow }), '#,##0');
       sh.set(r, 3, w.sets, body(i, { h: 'right' }), '#,##0');
       sh.set(r, 4, w.days, body(i, { h: 'right' }));
       sh.merge(r, 5, r, 8, bar(w.volume, maxVol, 34), body(i, { sz: 10, color: isNow ? acc : mix(acc, 0.55) }));
       r += 1;
     });
     r += 1;
+
+    // --- series por grupo muscular y semana ---
+    section(r, 'Series por grupo muscular y semana', `meta ${goal.min}–${goal.max} · últimas 7`);
+    r += 1;
+    const w7 = Metrics.weeklySeries(7);
+    head(r, ['Grupo'].concat(w7.map((w) => { const d = Utils.parseISO(w.start); return `${d.getDate()}/${d.getMonth() + 1}`; })));
+    r += 1;
+    const mgroups = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro']
+      .filter((g) => Metrics.STRENGTH_GROUPS.includes(g) || w7.some((w) => w.byGroup[g] && w.byGroup[g].sets > 0));
+    mgroups.forEach((g, i) => {
+      const gc = hex6(Utils.GROUP_COLORS[g] || '#8d95a8');
+      sh.set(r, 1, g.charAt(0).toUpperCase() + g.slice(1), body(i, { bold: true, color: gc }));
+      w7.forEach((w, wi) => {
+        const n = w.byGroup[g] ? w.byGroup[g].sets : 0;
+        let bg = i % 2 ? PAL.zebra : PAL.white;
+        let color = PAL.dim;
+        if (n > 0 && Metrics.STRENGTH_GROUPS.includes(g)) {
+          if (n < goal.min) { bg = 'FFF1CC'; color = '9A6B00'; }
+          else if (n > goal.max) { bg = 'DCE6FF'; color = '2F54B8'; }
+          else { bg = 'D6F5E8'; color = '0E7A52'; }
+        } else if (n > 0) { bg = PAL.empty; color = PAL.text; }
+        sh.set(r, 2 + wi, n || '', st({ bg, color, bold: n > 0, h: 'center', border: bd('bottom', 'thin', PAL.line) }));
+      });
+      r += 1;
+    });
+    sh.merge(r, 1, r, 8, 'Amarillo: por debajo de la meta · Verde: dentro de la meta · Azul: por encima.', st({ sz: 9, italic: true, color: PAL.dim }));
+    r += 2;
 
     // --- series por grupo muscular ---
     section(r, 'Por grupo muscular', 'últimos 30 días');
@@ -376,7 +405,7 @@ const ExcelBackup = (() => {
         const gc = hex6(Utils.GROUP_COLORS[g] || '#8d95a8');
         sh.set(r, 1, g.charAt(0).toUpperCase() + g.slice(1), body(i, { bold: true, color: gc }));
         sh.set(r, 2, d.sets, body(i, { h: 'right' }), '#,##0');
-        sh.set(r, 3, Math.round(d.volume), body(i, { h: 'right' }), '#,##0');
+        sh.set(r, 3, Math.round(Units.fromKg(d.volume)), body(i, { h: 'right' }), '#,##0');
         sh.set(r, 4, Math.round(d.minutes), body(i, { h: 'right' }), '#,##0');
         sh.merge(r, 5, r, 8, bar(d.sets, maxSets, 34), body(i, { sz: 10, color: gc }));
         r += 1;
@@ -425,10 +454,11 @@ const ExcelBackup = (() => {
         const f = pts[0];
         const l = pts[pts.length - 1];
         const unit = k === 'weight' ? units : 'cm';
-        const d = Utils.round1(l[k] - f[k]);
+        const conv = (v) => (k === 'weight' ? Units.fromKg(v) : v);
+        const d = Utils.round1(conv(l[k]) - conv(f[k]));
         sh.set(r, 1, label, body(i, { bold: true }));
-        sh.set(r, 2, f[k], body(i, { h: 'right', color: PAL.dim }), '0.0');
-        sh.set(r, 3, l[k], body(i, { h: 'right' }), '0.0');
+        sh.set(r, 2, Utils.round1(conv(f[k])), body(i, { h: 'right', color: PAL.dim }), '0.0');
+        sh.set(r, 3, Utils.round1(conv(l[k])), body(i, { h: 'right' }), '0.0');
         sh.set(r, 4, pts.length > 1 ? `${d > 0 ? '▲ +' : d < 0 ? '▼ ' : ''}${d} ${unit}` : '—', body(i, { h: 'center', bold: true, color: PAL.ink }));
         sh.set(r, 5, pts.length > 1 ? Utils.shortDate(f.date) : '—', body(i, { h: 'center', color: PAL.dim }));
         r += 1;
@@ -444,7 +474,7 @@ const ExcelBackup = (() => {
 
   // ---------------- hoja: Entrenamientos (un renglón por serie) ----------------
   function workoutsSheet() {
-    const units = DB.getSettings().units;
+    const units = Units.current();
     // días de más reciente a más antiguo; dentro de cada día, las series en su orden
     const ordered = allSets().map((x, i) => ({ x, i }))
       .sort((a, b) => (a.x.date < b.x.date ? 1 : a.x.date > b.x.date ? -1 : a.i - b.i))
@@ -465,14 +495,14 @@ const ExcelBackup = (() => {
         { v: x.ex ? x.ex.group : '', s: { color: gc, bold: true } },
         { v: warm ? 'Aproximación' : Metrics.isDrop(s) ? 'Dropset' : 'Normal', s: grey },
         { v: x.label, s: Object.assign({ h: 'center' }, grey) },
-        { v: s.weight !== undefined && s.weight !== null && s.weight !== '' ? Number(s.weight) : '', s: grey, z: '0.0' },
+        { v: s.weight !== undefined && s.weight !== null && s.weight !== '' ? Units.num(s.weight) : '', s: grey, z: '0.0' },
         { v: s.reps !== undefined && s.reps !== null && s.reps !== '' ? Number(s.reps) : '', s: grey },
         { v: s.duration !== undefined ? Number(s.duration) : '', s: grey, z: '0.0' },
         { v: s.distance ? Number(s.distance) : '', s: grey, z: '0.00' },
         { v: s.calories ? Number(s.calories) : '', s: grey },
         { v: warm ? '' : FELT[s.felt] || '', s: grey },
-        { v: vol > 0 ? Math.round(vol) : '', z: '#,##0' },
-        { v: e1 > 0 ? Utils.round1(e1) : '', z: '0.0' },
+        { v: vol > 0 ? Math.round(Units.fromKg(vol)) : '', z: '#,##0' },
+        { v: e1 > 0 ? Units.num(e1) : '', z: '0.0' },
         { v: s.pr ? `🏆 ${String(s.pr).replace(',', ' y ')}` : '', s: { bold: true, color: accentHex() } },
       ];
     });
@@ -485,7 +515,7 @@ const ExcelBackup = (() => {
 
   // ---------------- hoja: Récords ----------------
   function recordsSheet() {
-    const units = DB.getSettings().units;
+    const units = Units.current();
     const rows = DB.getExercises()
       .map((ex) => {
         const isCardio = ex.group === 'cardio';
@@ -500,7 +530,7 @@ const ExcelBackup = (() => {
           { v: x.ex.group, s: { color: gc, bold: true } },
           { v: Metrics.formatSet(x.rec.max.set, x.isCardio, units), s: { bold: true, color: accentHex() } },
           { v: excelDate(x.rec.max.date), z: 'dd/mm/yyyy', s: { h: 'center' } },
-          { v: !x.isCardio && x.rec.e1rm > 0 ? Utils.round1(x.rec.e1rm) : '', z: '0.0' },
+          { v: !x.isCardio && x.rec.e1rm > 0 ? Units.num(x.rec.e1rm) : '', z: '0.0' },
           { v: Metrics.formatSet(x.rec.min.set, x.isCardio, units), s: { color: PAL.dim } },
           { v: x.sessions },
         ];
@@ -568,14 +598,14 @@ const ExcelBackup = (() => {
 
   // ---------------- hoja: Medidas ----------------
   function measurementsSheet() {
-    const units = DB.getSettings().units;
+    const units = Units.current();
     const ms = DB.getMeasurements();
     const fields = MEAS.filter(([k]) => ms.some((m) => m[k] !== undefined && m[k] !== null && m[k] !== ''));
     const headers = ['Fecha', 'Día'].concat(fields.map(([k, l]) => (k === 'weight' ? `${l} (${units})` : `${l} (cm)`)));
     const rows = [...ms].sort((a, b) => (a.date < b.date ? 1 : -1)).map((m) => [
       { v: excelDate(m.date), z: 'dd/mm/yyyy' },
       { v: dow(m.date), s: { h: 'center' } },
-      ...fields.map(([k]) => ({ v: m[k] !== undefined && m[k] !== null ? Number(m[k]) : '', z: '0.0', s: k === 'weight' ? { bold: true } : {} })),
+      ...fields.map(([k]) => ({ v: m[k] !== undefined && m[k] !== null ? (k === 'weight' ? Units.num(m[k]) : Number(m[k])) : '', z: '0.0', s: k === 'weight' ? { bold: true } : {} })),
     ]);
     return tableSheet(headers, rows, [{ w: 12 }, { w: 6, h: 'center' }, ...fields.map(() => ({ w: 13 }))]);
   }
@@ -910,6 +940,7 @@ const ExcelBackup = (() => {
     DB.saveCalorieLog(calorieLog);
     DB.saveWaterLog(waterLog);
     DB.saveWorkoutLog(workoutLog);
+    DB.migrateWeightUnits();
   }
 
   function importFile(file, onDone, onError) {

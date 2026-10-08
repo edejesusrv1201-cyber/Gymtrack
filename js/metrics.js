@@ -8,6 +8,17 @@
    ============================================================ */
 
 const Metrics = (() => {
+  // grupos musculares de fuerza (los que cuentan para la meta semanal de series)
+  const STRENGTH_GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core'];
+
+  // meta de series por semana en cada grupo (se cambia en Más > Ajustes)
+  function weeklyGoal() {
+    const st = DB.getSettings();
+    const min = Math.max(1, Number(st.weeklySetsMin) || 10);
+    const max = Math.max(min, Number(st.weeklySetsMax) || 20);
+    return { min, max };
+  }
+
   const isWarmup = (s) => s.type === 'warmup';
   const isDrop = (s) => s.type === 'drop';
   const isNormal = (s) => !s.type || s.type === 'normal';
@@ -161,7 +172,7 @@ const Metrics = (() => {
   function formatSet(set, isCardio, units) {
     return isCardio
       ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}`
-      : `${set.weight}${units} × ${set.reps}`;
+      : `${Units.label(set.weight)} × ${set.reps}`;
   }
 
   // última sesión anterior a una fecha (para "Última vez")
@@ -223,7 +234,7 @@ const Metrics = (() => {
   }
 
   return {
-    isWarmup, isDrop, isNormal, volumeOfSet, e1rm,
+    STRENGTH_GROUPS, weeklyGoal, isWarmup, isDrop, isNormal, volumeOfSet, e1rm,
     weekRange, monthRange, totals, weeklySeries, dayLevels,
     exerciseSessions, exerciseRecords, formatSet, previousBest, detectPR,
   };

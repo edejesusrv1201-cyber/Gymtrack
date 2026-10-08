@@ -4,7 +4,7 @@
 
 const MeasurementsView = (() => {
   const FIELDS = [
-    { key: 'weight', label: 'Peso', unit: () => DB.getSettings().units, required: true },
+    { key: 'weight', label: 'Peso', unit: () => Units.current(), required: true },
     { key: 'chest', label: 'Pecho', unit: () => 'cm' },
     { key: 'waist', label: 'Cintura', unit: () => 'cm' },
     { key: 'hips', label: 'Cadera', unit: () => 'cm' },
@@ -85,7 +85,7 @@ const MeasurementsView = (() => {
     } else {
       [...measurements].reverse().forEach((m) => {
         const summary = ALL_FIELDS.filter((f) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== '')
-          .map((f) => `${f.label} ${m[f.key]}${typeof f.unit === 'function' ? f.unit() : ''}`).join(' · ');
+          .map((f) => `${f.label} ${f.key === 'weight' ? Units.num(m[f.key]) : m[f.key]}${typeof f.unit === 'function' ? f.unit() : ''}`).join(' · ');
         const row = Utils.el('div', { class: 'list-item' }, [
           Utils.el('div', {}, [
             Utils.el('div', { text: Utils.friendlyDate(m.date) }),
@@ -118,14 +118,34 @@ const MeasurementsView = (() => {
     const dateInput = Utils.el('input', { type: 'date', value: existing ? existing.date : Utils.todayISO() });
     wrap.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Fecha' }), dateInput]));
 
+    // el peso se guarda en kg; se puede escribir en kg o lb (se recuerda la última unidad usada)
+    const savedUnit = DB.getSettings().bodyWeightUnit;
+    let bodyUnit = savedUnit === 'lb' || savedUnit === 'kg' ? savedUnit : Units.current();
+
     const inputs = {};
     FIELDS.forEach((f) => {
-      const inp = Utils.el('input', { type: 'number', step: '0.1', placeholder: f.required ? `Peso (${DB.getSettings().units})` : `${f.label} (cm)` });
-      if (existing && existing[f.key] !== undefined) inp.value = existing[f.key];
+      const inp = Utils.el('input', { type: 'number', step: 'any', inputmode: 'decimal', placeholder: f.required ? `Peso (${bodyUnit})` : `${f.label} (cm)` });
+      if (existing && existing[f.key] !== undefined && existing[f.key] !== null) {
+        inp.value = f.key === 'weight' ? Units.num(existing[f.key], bodyUnit) : existing[f.key];
+      }
       inputs[f.key] = inp;
     });
 
-    wrap.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: `Peso (${DB.getSettings().units}) *` }), inputs.weight]));
+    const weightLabel = Utils.el('label', { text: `Peso (${bodyUnit}) *` });
+    const unitBtn = Utils.el('button', { class: 'unit-btn', type: 'button', title: 'Cambiar entre kg y lb', text: bodyUnit });
+    unitBtn.addEventListener('click', () => {
+      const next = bodyUnit === 'kg' ? 'lb' : 'kg';
+      const typed = parseFloat(inputs.weight.value);
+      if (!isNaN(typed)) inputs.weight.value = Math.round(Units.fromKg(Units.toKg(typed, bodyUnit), next) * 10) / 10;
+      bodyUnit = next;
+      const st = DB.getSettings();
+      st.bodyWeightUnit = next;
+      DB.saveSettings(st);
+      unitBtn.textContent = next;
+      weightLabel.textContent = `Peso (${next}) *`;
+      inputs.weight.placeholder = `Peso (${next})`;
+    });
+    wrap.appendChild(Utils.el('div', { class: 'field' }, [weightLabel, Utils.el('div', { class: 'input-unit' }, [inputs.weight, unitBtn])]));
     const grid = Utils.el('div', { class: 'grid-2' });
     FIELDS.filter((f) => !f.required).forEach((f) => {
       grid.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: f.label }), inputs[f.key]]));
@@ -146,7 +166,8 @@ const MeasurementsView = (() => {
       record.date = dateInput.value || Utils.todayISO();
       FIELDS.forEach((f) => {
         const v = inputs[f.key].value;
-        record[f.key] = v === '' ? undefined : parseFloat(v);
+        if (v === '') record[f.key] = undefined;
+        else record[f.key] = f.key === 'weight' ? Units.toKg(parseFloat(v), bodyUnit) : parseFloat(v);
       });
       measurements.sort((a, b) => (a.date > b.date ? 1 : -1));
       DB.saveMeasurements(measurements);
@@ -161,7 +182,7 @@ const MeasurementsView = (() => {
   function fieldPoints(measurements, fieldKey) {
     return measurements
       .filter((m) => m[fieldKey] !== undefined && m[fieldKey] !== null && m[fieldKey] !== '')
-      .map((m) => ({ x: m.date, y: m[fieldKey] }));
+      .map((m) => ({ x: m.date, y: fieldKey === 'weight' ? Units.fromKg(m[fieldKey]) : m[fieldKey] }));
   }
 
   // ---- gráfico suave con degradado ----
@@ -172,7 +193,7 @@ const MeasurementsView = (() => {
     Utils.drawLineChart(canvas, points, {
       color: Utils.accent().main,
       format: (v) => `${Utils.round1(v)}${unit}`,
-      onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)} · ${p.y}${unit}`; },
+      onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)} · ${Utils.round1(p.y)}${unit}`; },
     });
   }
 

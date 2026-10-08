@@ -56,7 +56,11 @@ const DB = (() => {
 
   // ---- Defaults / seed data (solo la primera vez) ----
   const DEFAULT_SETTINGS = {
-    units: 'kg',
+    units: 'kg',            // unidad para VER los pesos (se guardan siempre en kg)
+    weightsInKg: true,
+    exerciseUnits: {},      // unidad con la que se escribe cada ejercicio (kg o lb)
+    weeklySetsMin: 10,      // meta de series por semana y grupo muscular
+    weeklySetsMax: 20,
     restDefault: 90, // segundos
     calorieGoal: 2500,
     proteinGoal: 160,
@@ -196,6 +200,30 @@ const DB = (() => {
     },
   ];
 
+  // Antes la unidad elegida (kg/lb) solo cambiaba la etiqueta y los números se
+  // guardaban tal cual. Ahora todo se guarda en kg: si alguien usaba lb, se
+  // convierte una sola vez (la marca weightsInKg evita repetirlo).
+  function migrateWeightUnits() {
+    const s = read(KEYS.settings, null);
+    if (!s || s.weightsInKg) return;
+    if (s.units === 'lb') {
+      const f = 0.45359237;
+      const wl = read(KEYS.workoutLog, {});
+      Object.keys(wl).forEach((d) => {
+        (wl[d].exercises || []).forEach((e) => (e.sets || []).forEach((set) => {
+          if (typeof set.weight === 'number') set.weight = Math.round(set.weight * f * 10000) / 10000;
+        }));
+      });
+      write(KEYS.workoutLog, wl);
+      const ms = read(KEYS.measurements, []);
+      ms.forEach((m) => { if (typeof m.weight === 'number') m.weight = Math.round(m.weight * f * 10000) / 10000; });
+      write(KEYS.measurements, ms);
+      if (typeof s.calcWeightKg === 'number') s.calcWeightKg = Math.round(s.calcWeightKg * f * 10000) / 10000;
+    }
+    s.weightsInKg = true;
+    write(KEYS.settings, s);
+  }
+
   function ensureSeed() {
     if (read(KEYS.settings, null) === null) write(KEYS.settings, DEFAULT_SETTINGS);
     if (read(KEYS.exercises, null) === null) write(KEYS.exercises, DEFAULT_EXERCISES);
@@ -206,10 +234,11 @@ const DB = (() => {
     if (read(KEYS.monthlyPlans, null) === null) write(KEYS.monthlyPlans, {});
     if (read(KEYS.workoutLog, null) === null) write(KEYS.workoutLog, {});
     if (read(KEYS.waterLog, null) === null) write(KEYS.waterLog, {});
+    migrateWeightUnits();
   }
 
   return {
-    KEYS, read, write, uid, ensureSeed,
+    KEYS, read, write, uid, ensureSeed, migrateWeightUnits,
     // Settings
     getSettings: () => read(KEYS.settings, DEFAULT_SETTINGS),
     saveSettings: (s) => write(KEYS.settings, s),
@@ -272,6 +301,7 @@ const DB = (() => {
       Object.values(KEYS).forEach((k) => {
         if (data[k] !== undefined) write(k, data[k]);
       });
+      migrateWeightUnits();
     },
     wipeAll() {
       Object.values(KEYS).forEach((k) => localStorage.removeItem(k));

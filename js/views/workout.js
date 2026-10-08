@@ -101,13 +101,17 @@ const WorkoutView = (() => {
     view.appendChild(renderHeader(iso, log, routine, rerender));
     view.appendChild(renderWarmupCard(iso, log, rerender));
 
+    // series de la semana por grupo muscular (de la semana del día que se está viendo)
+    const weekR = Metrics.weekRange(0, Utils.parseISO(iso));
+    const weekGroups = Metrics.totals(weekR.start, weekR.end).byGroup;
+
     const exList = Utils.el('div');
     const pendingItems = Utils.el('div');
     let pendingCount = 0;
     log.exercises.forEach((entry, idx) => {
       const key = `${iso}:${entry.exerciseId}`;
       if (entry.sets.length > 0 || expandedSet.has(key)) {
-        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender));
+        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups));
       } else {
         pendingCount += 1;
         pendingItems.appendChild(renderPendingRow(log, entry, key, rerender));
@@ -232,7 +236,7 @@ const WorkoutView = (() => {
   }
 
   // ---------- tarjeta de ejercicio ----------
-  function renderExerciseCard(iso, log, entry, idx, rerender) {
+  function renderExerciseCard(iso, log, entry, idx, rerender, weekGroups) {
     const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
     const isCardio = !!(ex && ex.group === 'cardio');
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
@@ -270,6 +274,18 @@ const WorkoutView = (() => {
       headerBtns,
     ]));
 
+    // --- series de este grupo muscular en la semana ---
+    if (ex && Metrics.STRENGTH_GROUPS.includes(ex.group)) {
+      const goal = Metrics.weeklyGoal();
+      const n = weekGroups && weekGroups[ex.group] ? weekGroups[ex.group].sets : 0;
+      const st = n < goal.min ? 'low' : n > goal.max ? 'high' : 'ok';
+      card.appendChild(Utils.el('div', {
+        class: 'wk-line',
+        style: `color:${{ low: 'var(--yellow)', ok: 'var(--green)', high: 'var(--accent-2)' }[st]}`,
+        text: `Esta semana en ${ex.group}: ${n} serie${n === 1 ? '' : 's'} · meta ${goal.min}–${goal.max}`,
+      }));
+    }
+
     // --- meta + extras (aproximaciones / dropsets) ---
     const extras = `${warmN ? ` · +${warmN} aprox.` : ''}${dropN ? ` · +${dropN} drop` : ''}`;
     if (target) {
@@ -292,17 +308,17 @@ const WorkoutView = (() => {
       const guide = Utils.el('div', { class: 'guide' });
       if (records) {
         const sameSet = records.max.date === records.min.date && records.max.set === records.min.set;
-        const fmt = (set) => Metrics.formatSet(set, isCardio, settings.units);
+        const fmt = (set) => Metrics.formatSet(set, isCardio);
         let text = sameSet
           ? `🏆 Récord: ${fmt(records.max.set)} (${Utils.shortDate(records.max.date)})`
           : `🏆 Máx: ${fmt(records.max.set)} (${Utils.shortDate(records.max.date)}) · Mín: ${fmt(records.min.set)} (${Utils.shortDate(records.min.date)})`;
-        if (!isCardio && records.e1rm > 0) text += ` · 1RM est. ${Utils.round1(records.e1rm)}${settings.units}`;
+        if (!isCardio && records.e1rm > 0) text += ` · 1RM est. ${Units.label(records.e1rm)}`;
         guide.appendChild(Utils.el('div', { text }));
       }
       if (prev) {
         guide.appendChild(Utils.el('div', {
           style: 'color:var(--text-dim);font-weight:600;margin-top:3px;',
-          text: `Última vez (${Utils.shortDate(prev.date)}): ${Metrics.formatSet(prev.best, isCardio, settings.units)}`,
+          text: `Última vez (${Utils.shortDate(prev.date)}): ${Metrics.formatSet(prev.best, isCardio)}`,
         }));
       }
       card.appendChild(guide);
@@ -315,7 +331,7 @@ const WorkoutView = (() => {
       const feltOpt = FELT_OPTIONS.find((f) => f.key === set.felt) || FELT_OPTIONS[1];
       const mainLabel = isCardio
         ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}${set.calories ? ` · ${set.calories} kcal` : ''}`
-        : `${set.weight}${settings.units} × ${set.reps}`;
+        : `${Units.label(set.weight)} × ${set.reps}`;
       let badge;
       if (Metrics.isWarmup(set)) badge = Utils.el('span', { class: 'set-badge warm', title: 'Aproximación', text: 'A' });
       else if (Metrics.isDrop(set)) badge = Utils.el('span', { class: 'set-badge drop', title: 'Dropset', text: '↓' });
@@ -343,18 +359,25 @@ const WorkoutView = (() => {
     let typeSelected = isCardio ? 'normal' : (typeMemory[key] || 'normal');
     const feltWrap = Utils.el('div', { class: 'mt-8' });
 
+    // unidad con la que se escribe el peso de este ejercicio (cada máquina es distinta)
+    let inputUnit = isCardio ? Units.current() : Units.inputUnitFor(entry.exerciseId);
+
+    // sugerencias de peso, ya convertidas a la unidad de captura
     function suggestWeight(type) {
+      const asInput = (kg) => Units.fromKg(kg, inputUnit);
       if (type === 'drop') {
-        const base = lastSet && lastSet.weight !== undefined ? Number(lastSet.weight) : 0;
-        return base > 0 ? Math.round(base * 0.8 * 2) / 2 : '';
+        const base = lastSet && lastSet.weight !== undefined ? asInput(lastSet.weight) : 0;
+        const st = Units.step(inputUnit);
+        return base > 0 ? Math.round((base * 0.8) / st) * st : '';
       }
       if (type === 'warmup') {
-        if (lastSet && Metrics.isWarmup(lastSet)) return lastSet.weight;
-        const base = prev ? Number(prev.best.weight) : lastWork ? Number(lastWork.weight) : 0;
-        return base > 0 ? Math.round((base * 0.5) / 2.5) * 2.5 : '';
+        if (lastSet && Metrics.isWarmup(lastSet)) return Units.num(lastSet.weight, inputUnit);
+        const baseKg = prev ? Number(prev.best.weight) : lastWork ? Number(lastWork.weight) : 0;
+        const st = Units.step(inputUnit, true);
+        return baseKg > 0 ? Math.round((asInput(baseKg) * 0.5) / st) * st : '';
       }
-      if (lastWork) return lastWork.weight;
-      if (prev) return prev.best.weight;
+      if (lastWork) return Units.num(lastWork.weight, inputUnit);
+      if (prev) return Units.num(prev.best.weight, inputUnit);
       return '';
     }
 
@@ -377,7 +400,17 @@ const WorkoutView = (() => {
       form.appendChild(Utils.el('div', { class: 'field' }, [caloriesInput]));
       addSetBtn.textContent = '✓ Registrar sesión de cardio';
     } else {
-      weightInput = Utils.el('input', { type: 'number', inputmode: 'decimal', placeholder: `Peso (${settings.units})`, step: '0.5' });
+      weightInput = Utils.el('input', { type: 'number', inputmode: 'decimal', placeholder: `Peso (${inputUnit})`, step: 'any' });
+      const unitBtn = Utils.el('button', { class: 'unit-btn', type: 'button', title: 'Cambiar entre kg y lb', text: inputUnit });
+      unitBtn.addEventListener('click', () => {
+        const next = inputUnit === 'kg' ? 'lb' : 'kg';
+        const typed = parseFloat(weightInput.value);
+        if (!isNaN(typed)) weightInput.value = Math.round(Units.fromKg(Units.toKg(typed, inputUnit), next) * 10) / 10;
+        inputUnit = next;
+        Units.rememberInputUnit(entry.exerciseId, next);
+        unitBtn.textContent = next;
+        weightInput.placeholder = `Peso (${next})`;
+      });
       repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
       weightInput.value = suggestWeight(typeSelected);
 
@@ -398,7 +431,7 @@ const WorkoutView = (() => {
       });
       form.appendChild(typeRow);
       form.appendChild(Utils.el('div', { class: 'field-row' }, [
-        Utils.el('div', { class: 'field' }, [weightInput]),
+        Utils.el('div', { class: 'field' }, [Utils.el('div', { class: 'input-unit' }, [weightInput, unitBtn])]),
         Utils.el('div', { class: 'field' }, [repsInput]),
       ]));
       addSetBtn.textContent = BTN_TEXT[typeSelected];
@@ -441,9 +474,10 @@ const WorkoutView = (() => {
         Celebrate.record(prs, ex ? ex.name : '');
         return;
       }
-      const weight = parseFloat(weightInput.value);
+      const entered = parseFloat(weightInput.value);
+      const weight = Units.toKg(entered, inputUnit);
       const reps = parseInt(repsInput.value, 10);
-      if (isNaN(weight) || isNaN(reps) || reps <= 0) {
+      if (isNaN(entered) || isNaN(reps) || reps <= 0) {
         Utils.toast('Ingresa peso y repeticiones válidas');
         return;
       }
@@ -478,7 +512,7 @@ const WorkoutView = (() => {
       Utils.el('div', {}, [
         Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
         target ? Utils.el('div', { class: 'meta', text: `0 de ${target.targetSets} series · ${target.targetReps}` }) : null,
-        records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent-light);', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio, DB.getSettings().units)}` }) : null,
+        records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent-light);', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio)}` }) : null,
       ]),
       Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
     ]);

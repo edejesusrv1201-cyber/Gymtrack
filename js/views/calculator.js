@@ -16,7 +16,8 @@ const CalculatorView = (() => {
     card.appendChild(Utils.el('h3', { text: '🧮 Calculadora de mantenimiento' }));
     card.appendChild(Utils.el('p', { text: 'Calcula tu gasto calórico total (TDEE) y compara déficit, mantenimiento o superávit para elegir tu meta diaria.' }));
 
-    const weightInput = Utils.el('input', { type: 'number', step: '0.1', value: settings.calcWeightKg || lastWeight || '' });
+    const savedKg = settings.calcWeightKg || lastWeight || '';
+    const weightInput = Utils.el('input', { type: 'number', step: '0.1', value: savedKg ? Units.num(savedKg) : '' });
     const heightInput = Utils.el('input', { type: 'number', value: settings.heightCm || '' });
     const ageInput = Utils.el('input', { type: 'number', value: settings.age || '' });
     const sexSel = Utils.el('select', {});
@@ -26,7 +27,7 @@ const CalculatorView = (() => {
     Object.entries(Nutrition.ACTIVITY_MULTIPLIERS).forEach(([key, def]) => activitySel.appendChild(Utils.el('option', { value: key, text: def.label })));
     activitySel.value = settings.activityLevel || 'moderado';
 
-    card.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: `Peso a usar (${settings.units})` }), weightInput]));
+    card.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: `Peso a usar (${Units.current()})` }), weightInput]));
     card.appendChild(Utils.el('div', { class: 'field-row' }, [
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Estatura (cm)' }), heightInput]),
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Edad' }), ageInput]),
@@ -41,10 +42,10 @@ const CalculatorView = (() => {
       const heightCm = Number(heightInput.value);
       const age = Number(ageInput.value);
       if (!weightRaw || !heightCm || !age) { Utils.toast('Completa peso, estatura y edad'); return; }
-      const weightKg = settings.units === 'lb' ? weightRaw * 0.4536 : weightRaw;
+      const weightKg = Units.toKg(weightRaw, Units.current());
 
       const s = DB.getSettings();
-      Object.assign(s, { calcWeightKg: weightRaw, heightCm, age, sex: sexSel.value, activityLevel: activitySel.value });
+      Object.assign(s, { calcWeightKg: weightKg, heightCm, age, sex: sexSel.value, activityLevel: activitySel.value });
       DB.saveSettings(s);
 
       const bmrVal = Nutrition.bmr({ sex: sexSel.value, weightKg, heightCm, age });

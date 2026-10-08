@@ -192,8 +192,8 @@ const Celebrate = (() => {
     const kinds = prs.map((p) => titles[p.kind]);
     const title = `¡Nuevo récord de ${kinds.join(' y ')}!`;
     let sub = '';
-    if (first.kind === 'peso') sub = `${first.value}${units}${first.reps ? ` × ${first.reps}` : ''} · antes ${first.prev}${units}`;
-    else if (first.kind === 'reps') sub = `${first.value} reps con ${first.weight}${units} · antes ${first.prev}`;
+    if (first.kind === 'peso') sub = `${Units.label(first.value)}${first.reps ? ` × ${first.reps}` : ''} · antes ${Units.label(first.prev)}`;
+    else if (first.kind === 'reps') sub = `${first.value} reps con ${Units.label(first.weight)} · antes ${first.prev}`;
     else if (first.kind === 'tiempo') sub = `${first.value} min · antes ${first.prev} min`;
     else sub = `${Utils.round1(first.value)} km · antes ${Utils.round1(first.prev)} km`;
     if (prs[1] && prs[1].kind === 'distancia') sub += ` · ${Utils.round1(prs[1].value)} km`;

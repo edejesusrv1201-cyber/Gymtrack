@@ -62,9 +62,9 @@ const StatsView = (() => {
         { key: 'distance', label: 'Distancia', get: (s) => s.distance, fmt: (v) => `${Utils.round1(v)} km`, color: '#3de0c2' },
       ]
       : [
-        { key: 'weight', label: 'Peso máx.', get: (s) => s.weight, fmt: (v) => `${Utils.round1(v)}${settings.units}`, color: '#5b8cff' },
-        { key: 'e1rm', label: '1RM est.', get: (s) => s.e1rm, fmt: (v) => `${Utils.round1(v)}${settings.units}`, color: Utils.accent().main },
-        { key: 'volume', label: 'Volumen', get: (s) => s.volume, fmt: (v) => `${Utils.compact(v)}${settings.units}`, color: '#35d49a' },
+        { key: 'weight', label: 'Peso máx.', get: (s) => Units.fromKg(s.weight), fmt: (v) => `${Utils.round1(v)}${Units.current()}`, color: '#5b8cff' },
+        { key: 'e1rm', label: '1RM est.', get: (s) => Units.fromKg(s.e1rm), fmt: (v) => `${Utils.round1(v)}${Units.current()}`, color: Utils.accent().main },
+        { key: 'volume', label: 'Volumen', get: (s) => Units.fromKg(s.volume), fmt: (v) => `${Utils.compact(v)}${Units.current()}`, color: '#35d49a' },
       ];
     let current = metrics[0].key;
 
@@ -106,7 +106,7 @@ const StatsView = (() => {
             const s = sessions[i];
             note.textContent = isCardio
               ? `${Utils.friendlyDate(s.date)} · ${Utils.round1(s.duration)} min${s.distance ? ` · ${Utils.round1(s.distance)} km` : ''}`
-              : `${Utils.friendlyDate(s.date)} · ${s.weight}${settings.units} × ${s.reps} · ${s.sets} serie${s.sets === 1 ? '' : 's'}`;
+              : `${Utils.friendlyDate(s.date)} · ${Units.label(s.weight)} × ${s.reps} · ${s.sets} serie${s.sets === 1 ? '' : 's'}`;
           },
         });
       });
@@ -117,6 +117,91 @@ const StatsView = (() => {
   // =========================================================
   //  ENTRENO
   // =========================================================
+  // ---------- series por grupo muscular ----------
+  const STATUS_COLOR = { low: '#ffc247', ok: '#35d49a', high: '#5b8cff' };
+  const weeklyStatus = (n, goal) => (n < goal.min ? 'low' : n > goal.max ? 'high' : 'ok');
+  const setsOf = (w, g) => (w.byGroup[g] && w.byGroup[g].sets ? w.byGroup[g].sets : 0);
+
+  function weeklyGroupsCard() {
+    const goal = Metrics.weeklyGoal();
+    const weeks = Metrics.weeklySeries(8);
+    const cur = weeks[weeks.length - 1];
+    const barGroups = GROUP_ORDER.filter((g) => Metrics.STRENGTH_GROUPS.includes(g) || setsOf(cur, g) > 0);
+    const inGoal = Metrics.STRENGTH_GROUPS.filter((g) => weeklyStatus(setsOf(cur, g), goal) === 'ok').length;
+
+    const c = card('Series por grupo muscular', `Esta semana · meta ${goal.min}–${goal.max}`);
+    c.appendChild(Utils.el('p', { class: 'small', style: 'margin:-2px 0 8px;', text: `${inGoal} de ${Metrics.STRENGTH_GROUPS.length} grupos dentro de la meta semanal.` }));
+
+    const scale = Math.max(goal.max * 1.25, ...barGroups.map((g) => setsOf(cur, g) + 2));
+    barGroups.forEach((g) => {
+      const n = setsOf(cur, g);
+      const strength = Metrics.STRENGTH_GROUPS.includes(g);
+      const st = weeklyStatus(n, goal);
+      const color = strength ? STATUS_COLOR[st] : Utils.GROUP_COLORS[g];
+      const track = Utils.el('div', { class: 'hb-track' });
+      if (strength) {
+        track.appendChild(Utils.el('div', { class: 'hb-band', style: `left:${(goal.min / scale) * 100}%;width:${((goal.max - goal.min) / scale) * 100}%;` }));
+      }
+      if (n > 0) {
+        track.appendChild(Utils.el('div', { class: 'hb-fill', style: `width:${Math.max(4, (n / scale) * 100)}%;background:linear-gradient(90deg,${color}aa,${color})` }));
+      }
+      let note = '';
+      if (strength) note = st === 'low' ? `faltan ${goal.min - n}` : st === 'ok' ? 'en meta ✓' : `+${n - goal.max} sobre meta`;
+      c.appendChild(Utils.el('div', { class: 'hbar' }, [
+        Utils.el('span', { class: 'hb-label', style: `color:${Utils.GROUP_COLORS[g]}`, text: g }),
+        track,
+        Utils.el('span', { class: 'hb-val' }, [`${n} serie${n === 1 ? '' : 's'}`, Utils.el('small', { text: note })]),
+      ]));
+    });
+
+    // conteo semana por semana
+    c.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:18px 0 8px;', text: 'Últimas 8 semanas' }));
+    const matrixGroups = GROUP_ORDER.filter((g) => Metrics.STRENGTH_GROUPS.includes(g) || weeks.some((w) => setsOf(w, g) > 0));
+    const grid = Utils.el('div', { class: 'sets-matrix' });
+    grid.appendChild(Utils.el('span', {}));
+    weeks.forEach((w, i) => {
+      const d = Utils.parseISO(w.start);
+      grid.appendChild(Utils.el('span', { class: `sm-head${i === weeks.length - 1 ? ' now' : ''}`, text: `${d.getDate()}/${d.getMonth() + 1}` }));
+    });
+    matrixGroups.forEach((g) => {
+      const strength = Metrics.STRENGTH_GROUPS.includes(g);
+      grid.appendChild(Utils.el('span', { class: 'sm-label', style: `color:${Utils.GROUP_COLORS[g]}`, text: g }));
+      weeks.forEach((w, i) => {
+        const n = setsOf(w, g);
+        const cls = n === 0 ? 'zero' : strength ? weeklyStatus(n, goal) : 'other';
+        grid.appendChild(Utils.el('span', { class: `sm-cell ${cls}${i === weeks.length - 1 ? ' now' : ''}`, text: n ? String(n) : '·' }));
+      });
+    });
+    c.appendChild(Utils.el('div', { style: 'overflow-x:auto;' }, [grid]));
+    c.appendChild(Utils.el('div', { class: 'legend' }, [
+      Utils.el('span', {}, [Utils.el('i', { style: `background:${STATUS_COLOR.low}` }), `menos de ${goal.min}`]),
+      Utils.el('span', {}, [Utils.el('i', { style: `background:${STATUS_COLOR.ok}` }), `${goal.min}–${goal.max} (meta)`]),
+      Utils.el('span', {}, [Utils.el('i', { style: `background:${STATUS_COLOR.high}` }), `más de ${goal.max}`]),
+    ]));
+    return c;
+  }
+
+  function monthlyGroupsCard(t) {
+    const groupCard = card('Por grupo muscular', 'Este mes');
+    const groups = GROUP_ORDER.filter((g) => t.byGroup[g] && t.byGroup[g].sets > 0)
+      .sort((a, b) => t.byGroup[b].sets - t.byGroup[a].sets);
+    if (groups.length === 0) {
+      groupCard.appendChild(emptyNote('No hay series registradas en este período.'));
+    } else {
+      const maxSets = Math.max(...groups.map((g) => t.byGroup[g].sets));
+      groups.forEach((g) => {
+        const d = t.byGroup[g];
+        const sub = d.volume > 0 ? `${Utils.compact(Units.fromKg(d.volume))} ${Units.current()}` : d.minutes > 0 ? `${Math.round(d.minutes)} min` : 'peso corporal';
+        groupCard.appendChild(Utils.el('div', { class: 'hbar' }, [
+          Utils.el('span', { class: 'hb-label', style: `color:${Utils.GROUP_COLORS[g]}`, text: g }),
+          Utils.el('div', { class: 'hb-track' }, [Utils.el('div', { class: 'hb-fill', style: `width:${Math.max(6, Math.round((d.sets / maxSets) * 100))}%;background:linear-gradient(90deg,${Utils.GROUP_COLORS[g]}aa,${Utils.GROUP_COLORS[g]})` })]),
+          Utils.el('span', { class: 'hb-val' }, [`${d.sets} serie${d.sets === 1 ? '' : 's'}`, Utils.el('small', { text: sub })]),
+        ]));
+      });
+    }
+    return groupCard;
+  }
+
   function renderTraining(container) {
     container.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
@@ -138,7 +223,7 @@ const StatsView = (() => {
     view.appendChild(Utils.el('div', { class: 'kpi-grid' }, [
       kpi('Entrenos', String(t.days), t.days === 1 ? 'día' : 'días', t.days, p.days, vs),
       kpi('Series', String(t.sets), '', t.sets, p.sets, vs),
-      kpi('Volumen', Utils.compact(t.volume), settings.units, t.volume, p.volume, vs),
+      kpi('Volumen', Utils.compact(Units.fromKg(t.volume)), Units.current(), t.volume, p.volume, vs),
       kpi('Cardio', String(Math.round(t.minutes)), 'min', t.minutes, p.minutes, vs),
     ]));
 
@@ -155,39 +240,22 @@ const StatsView = (() => {
       const note = Utils.el('div', { class: 'chart-note' });
       volCard.appendChild(note);
       requestAnimationFrame(() => {
-        Utils.drawBarChart(canvas, weeks.map((w, i) => ({ label: w.label, value: w.volume, highlight: i === weeks.length - 1 })), {
+        Utils.drawBarChart(canvas, weeks.map((w, i) => ({ label: w.label, value: Units.fromKg(w.volume), highlight: i === weeks.length - 1 })), {
           color: Utils.accent().main,
           format: (v) => Utils.compact(v),
           onBarClick: (b, i) => {
             const w = weeks[i];
-            note.textContent = `Semana del ${Utils.shortDate(w.start)}: ${Utils.round1(w.volume)} ${settings.units} · ${w.sets} series · ${w.days} día${w.days === 1 ? '' : 's'}`;
+            note.textContent = `Semana del ${Utils.shortDate(w.start)}: ${Utils.round1(Units.fromKg(w.volume))} ${Units.current()} · ${w.sets} series · ${w.days} día${w.days === 1 ? '' : 's'}`;
           },
         });
         const w = weeks[weeks.length - 1];
-        note.textContent = `Semana del ${Utils.shortDate(w.start)}: ${Utils.round1(w.volume)} ${settings.units} · ${w.sets} series · ${w.days} día${w.days === 1 ? '' : 's'}`;
+        note.textContent = `Semana del ${Utils.shortDate(w.start)}: ${Utils.round1(Units.fromKg(w.volume))} ${Units.current()} · ${w.sets} series · ${w.days} día${w.days === 1 ? '' : 's'}`;
       });
     }
     view.appendChild(volCard);
 
     // ---- series por grupo muscular ----
-    const groupCard = card('Por grupo muscular', trainPeriod === 'mes' ? 'Este mes' : 'Esta semana');
-    const groups = GROUP_ORDER.filter((g) => t.byGroup[g] && t.byGroup[g].sets > 0)
-      .sort((a, b) => t.byGroup[b].sets - t.byGroup[a].sets);
-    if (groups.length === 0) {
-      groupCard.appendChild(emptyNote('No hay series registradas en este período.'));
-    } else {
-      const maxSets = Math.max(...groups.map((g) => t.byGroup[g].sets));
-      groups.forEach((g) => {
-        const d = t.byGroup[g];
-        const sub = d.volume > 0 ? `${Utils.compact(d.volume)} ${settings.units}` : d.minutes > 0 ? `${Math.round(d.minutes)} min` : 'peso corporal';
-        groupCard.appendChild(Utils.el('div', { class: 'hbar' }, [
-          Utils.el('span', { class: 'hb-label', style: `color:${Utils.GROUP_COLORS[g]}`, text: g }),
-          Utils.el('div', { class: 'hb-track' }, [Utils.el('div', { class: 'hb-fill', style: `width:${Math.max(6, Math.round((d.sets / maxSets) * 100))}%;background:linear-gradient(90deg,${Utils.GROUP_COLORS[g]}aa,${Utils.GROUP_COLORS[g]})` })]),
-          Utils.el('span', { class: 'hb-val' }, [`${d.sets} serie${d.sets === 1 ? '' : 's'}`, Utils.el('small', { text: sub })]),
-        ]));
-      });
-    }
-    view.appendChild(groupCard);
+    view.appendChild(trainPeriod === 'semana' ? weeklyGroupsCard() : monthlyGroupsCard(t));
 
     // ---- constancia (mapa de calor 12 semanas) ----
     const heatStart = Metrics.weekRange(-11).start;
@@ -256,8 +324,8 @@ const StatsView = (() => {
             Utils.el('div', { class: `meta grp-${ex.group}`, text: ex.group }),
           ]),
           Utils.el('div', { style: 'text-align:right;' }, [
-            Utils.el('div', { style: 'font-weight:800;color:var(--accent-light);', text: Metrics.formatSet(rec.max.set, isCardio, settings.units) }),
-            Utils.el('div', { class: 'meta', text: `${Utils.shortDate(rec.max.date)}${!isCardio && rec.e1rm > 0 ? ` · 1RM ${Utils.round1(rec.e1rm)}${settings.units}` : ''}` }),
+            Utils.el('div', { style: 'font-weight:800;color:var(--accent-light);', text: Metrics.formatSet(rec.max.set, isCardio) }),
+            Utils.el('div', { class: 'meta', text: `${Utils.shortDate(rec.max.date)}${!isCardio && rec.e1rm > 0 ? ` · 1RM ${Units.label(rec.e1rm)}` : ''}` }),
           ]),
         ]));
       });
