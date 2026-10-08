@@ -81,6 +81,8 @@ const App = (() => {
 
   function init() {
     DB.ensureSeed();
+    // pide al navegador (Safari incluido) que no borre los datos si hay poco espacio
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     Theme.init();
     initNav();
     RestTimer.init();

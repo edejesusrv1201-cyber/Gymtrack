@@ -117,7 +117,9 @@ const ExcelBackup = (() => {
     add(seriesRows, SHEETS.series);
     add(warmupRows, SHEETS.calentamiento);
 
-    XLSX.writeFile(wb, `migymtrack-backup-${Utils.todayISO()}.xlsx`);
+    const data = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    Utils.saveFile(blob, `migymtrack-backup-${Utils.todayISO()}.xlsx`);
   }
 
   // ---------------- importar ----------------

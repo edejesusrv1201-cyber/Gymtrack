@@ -270,6 +270,21 @@ const TodayView = (() => {
     const settings = DB.getSettings();
     const rerender = () => render(root);
 
+    // en Safari (iPhone/iPad) sin instalar: una pista de cómo añadirla a la pantalla de inicio
+    let hintDismissed = false;
+    try { hintDismissed = localStorage.getItem('gt_hint_ios') === '1'; } catch (e) { /* sin almacenamiento */ }
+    if (Utils.isIOS() && !Utils.isStandalone() && !hintDismissed) {
+      const gotIt = Utils.el('button', { class: 'btn-small', text: 'Entendido' });
+      gotIt.addEventListener('click', () => {
+        try { localStorage.setItem('gt_hint_ios', '1'); } catch (e) { /* sin almacenamiento */ }
+        rerender();
+      });
+      view.appendChild(Utils.el('div', { class: 'banner' }, [
+        Utils.el('span', { text: '📲 Para usarla como app: toca Compartir ⬆️ y elige «Añadir a pantalla de inicio».' }),
+        gotIt,
+      ]));
+    }
+
     view.appendChild(renderHero(todayIso, routine, log, rerender));
     if (routine && routine.exercises.length > 0) view.appendChild(renderExerciseList(todayIso, routine, log));
 

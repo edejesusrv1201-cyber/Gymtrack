@@ -95,12 +95,30 @@ const MoreView = (() => {
     return card;
   }
 
+  // ---------- cómo instalar la app ----------
+  function buildInstallCard() {
+    const card = Utils.el('div', { class: 'card' });
+    card.appendChild(Utils.el('h3', { text: '📲 Instalar en tu celular' }));
+    if (Utils.isStandalone()) {
+      card.appendChild(Utils.el('p', { text: '✅ Ya la tienes instalada: estás usando MiGymTrack como app.' }));
+    }
+    const step = (title, lines) => Utils.el('div', { style: 'margin-top:10px;' }, [
+      Utils.el('div', { class: 'eyebrow', text: title }),
+      Utils.el('p', { class: 'mt-8', text: lines }),
+    ]);
+    card.appendChild(step('iPhone / iPad (Safari)', '1) Abre la página en Safari. 2) Toca el botón Compartir (el cuadrado con la flecha hacia arriba). 3) Elige "Añadir a pantalla de inicio" y toca Añadir.'));
+    card.appendChild(step('Android (Chrome)', 'Toca el menú ⋮ y elige "Instalar app" o "Añadir a pantalla de inicio".'));
+    card.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:10px;', text: 'Importante: la app instalada guarda sus datos aparte de los del navegador. Si ya la usabas en el navegador, exporta tu respaldo aquí abajo e impórtalo en la app instalada.' }));
+    return card;
+  }
+
   function render(root) {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
     const settings = DB.getSettings();
 
     view.appendChild(buildThemeCard());
+    view.appendChild(buildInstallCard());
 
     // ---- ajustes ----
     const settingsCard = Utils.el('div', { class: 'card' });
@@ -201,14 +219,7 @@ const MoreView = (() => {
     exportBtn.addEventListener('click', () => {
       const data = DB.exportAll();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `migymtrack-backup-${Utils.todayISO()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      Utils.saveFile(blob, `migymtrack-backup-${Utils.todayISO()}.json`);
     });
     backupCard.appendChild(exportBtn);
 
@@ -262,6 +273,10 @@ const MoreView = (() => {
     });
     backupCard.appendChild(importXlsxLabel);
     backupCard.appendChild(Utils.el('p', { class: 'small mt-8', text: 'El Excel trae todos tus datos en varias hojas (rutinas, series, medidas, calorías...). Útil para revisarlos o para pasarlos a otro celular igual que el respaldo .json.' }));
+
+    if (Utils.isIOS()) {
+      backupCard.appendChild(Utils.el('p', { class: 'small', text: 'En iPhone se abre la hoja Compartir: elige "Guardar en Archivos" (o envíatelo por correo/WhatsApp). Para restaurar, usa "Importar" y escoge ese archivo.' }));
+    }
 
     const wipeBtn = Utils.el('button', { class: 'btn-danger btn-block mt-8', text: '🗑️ Borrar todos los datos' });
     wipeBtn.addEventListener('click', () => {

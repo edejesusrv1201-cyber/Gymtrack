@@ -20,9 +20,18 @@ const RestTimer = (() => {
     else localStorage.removeItem(STATE_KEY);
   }
 
+  // iOS solo deja sonar el audio si se "desbloquea" con un toque de la persona
+  function unlockAudio() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* audio no disponible */ }
+  }
+
   function beep() {
     try {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       const now = audioCtx.currentTime;
       [0, 0.25, 0.5].forEach((offset) => {
         const osc = audioCtx.createOscillator();
@@ -221,6 +230,7 @@ const RestTimer = (() => {
 
   function init() {
     if (document.getElementById('restWidget')) return;
+    ['touchend', 'click'].forEach((ev) => document.addEventListener(ev, unlockAudio, { passive: true }));
     buildWidget();
     ensureTicking();
     const st = loadState();

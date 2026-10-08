@@ -82,6 +82,42 @@ const Utils = (() => {
     return { main: g('--accent', '#ff6a3d'), a: g('--acc-a', '#ff5a36'), c: g('--acc-c', '#ffb347'), light: g('--accent-light', '#ffb08a') };
   }
 
+  // ---- plataforma ----
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function isStandalone() {
+    return window.navigator.standalone === true
+      || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  }
+
+  // Guarda un archivo. En iPhone/iPad (sobre todo con la app instalada) las
+  // descargas por enlace no funcionan bien, así que se abre la hoja
+  // "Compartir" para guardarlo en Archivos, mandarlo por correo, etc.
+  async function saveFile(blob, filename) {
+    if (isIOS() && navigator.canShare && typeof File === 'function') {
+      try {
+        const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename });
+          return;
+        }
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;   // la persona cerró la hoja
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
   function vibrate(pattern) {
     if (navigator.vibrate) {
       try { navigator.vibrate(pattern); } catch (e) { /* ignore */ }
@@ -505,7 +541,7 @@ const Utils = (() => {
 
   return {
     DIAS, DIAS_CORTOS, MESES, GROUP_COLORS, pad, toISODate, todayISO, monthKey, parseISO,
-    friendlyDate, shortDate, daysInMonth, el, round1, compact, accent, vibrate, toast, confirmDialog,
+    friendlyDate, shortDate, daysInMonth, el, round1, compact, accent, isIOS, isStandalone, saveFile, vibrate, toast, confirmDialog,
     segmented, ring, drawLineChart, drawBarChart,
   };
 })();

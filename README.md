@@ -36,6 +36,17 @@ Como es una app web (PWA), no necesitas Play Store. Tienes dos caminos:
 6. Abre esa URL en Chrome desde tu Samsung.
 7. Toca el menú (⋮) de Chrome → **"Instalar app"** (o "Añadir a pantalla de inicio"). Se instalará como una app normal, con su ícono, y funcionará sin internet después de abrirla la primera vez.
 
+### iPhone / iPad
+
+1. Abre la URL de GitHub Pages en **Safari** (no en Chrome ni dentro de otra app).
+2. Toca **Compartir** (cuadrado con flecha hacia arriba) → **Añadir a pantalla de inicio** → Añadir.
+3. Ábrela desde el ícono nuevo. Funciona sin internet después de la primera vez.
+
+Notas de iOS:
+- La app instalada guarda sus datos **aparte** de los de Safari. Si ya usabas la web, exporta el respaldo (Más → Copia de seguridad) e impórtalo en la app instalada.
+- Los respaldos se guardan con la hoja *Compartir* ("Guardar en Archivos").
+- iOS no deja vibrar y el sonido del cronómetro solo suena con la app abierta; si la bloqueas, te avisa al volver a abrirla.
+
 ### Opción rápida sin subir nada a internet
 
 1. Copia la carpeta `gymtrack` completa a tu celular (por cable, o súbela a tu Drive/Google Fotos... mejor por cable o un cable USB / Compartir por WhatsApp Web como zip y descomprimirla con un administrador de archivos como "Files" de Samsung).
