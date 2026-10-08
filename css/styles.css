@@ -46,17 +46,28 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-body::before {
-  content: "";
+/* Fondo: 3 manchas de color desenfocadas. Los colores los pone theme.js */
+:root { --g1: #ff6a3d; --g2: #5b8cff; --g3: #a384ff; --glow-opacity: 0.5; }
+.bg-glow {
   position: fixed;
   inset: 0;
   z-index: -1;
+  overflow: hidden;
   pointer-events: none;
-  background:
-    radial-gradient(700px 420px at 8% -6%, rgba(255, 106, 61, 0.16), transparent 62%),
-    radial-gradient(640px 420px at 108% 4%, rgba(91, 140, 255, 0.13), transparent 60%),
-    radial-gradient(520px 380px at 50% 112%, rgba(163, 132, 255, 0.09), transparent 62%);
 }
+.bg-glow i {
+  position: absolute;
+  width: min(125vw, 640px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(95px);
+  opacity: var(--glow-opacity);
+  transform: translateZ(0);
+  transition: background-color .9s ease, opacity .5s ease;
+}
+.bg-glow i:nth-child(1) { top: -22%; left: -32%; background-color: var(--g1); }
+.bg-glow i:nth-child(2) { top: -12%; right: -48%; background-color: var(--g2); opacity: calc(var(--glow-opacity) * 0.8); }
+.bg-glow i:nth-child(3) { bottom: -30%; left: 8%; background-color: var(--g3); opacity: calc(var(--glow-opacity) * 0.7); }
 
 button, input, select, textarea {
   font-family: inherit;
@@ -661,3 +672,30 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .small { font-size: 0.8rem; }
 .link-btn { background: none; color: var(--accent-2); padding: 4px; font-weight: 700; }
+
+/* ---------- Personalización ---------- */
+.swatches { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 14px; }
+.swatch {
+  width: 44px; height: 44px; padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+.swatch.active { border-color: #fff; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16), 0 6px 16px rgba(0, 0, 0, 0.4); }
+.swatch.active::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+.theme-now {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  font-size: 0.84rem;
+}
+.theme-now .blobs { display: flex; flex: none; }
+.theme-now .blobs i { width: 16px; height: 16px; border-radius: 50%; margin-left: -5px; border: 2px solid var(--bg-elev); }
+.theme-now .blobs i:first-child { margin-left: 0; }

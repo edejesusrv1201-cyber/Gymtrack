@@ -63,6 +63,9 @@ const DB = (() => {
     carbGoal: 280,
     fatGoal: 70,
     waterGoalMl: 2500,
+    themeMode: 'auto',      // 'auto' = color de la rutina del día · 'fijo'
+    themePreset: 'brasa',
+    themeIntensity: 'media',
     onboarded: false,
     // perfil para la calculadora de mantenimiento (Nutrition)
     calcWeightKg: null,

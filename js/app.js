@@ -38,6 +38,7 @@ const App = (() => {
     const mod = VIEW_MODULES[viewName];
     if (!mod) return;
     mod.render(root, params);
+    Theme.apply(viewName === 'workout' && params.date ? params.date : undefined);
     updateChrome();
     window.scrollTo(0, 0);
   }
@@ -80,6 +81,7 @@ const App = (() => {
 
   function init() {
     DB.ensureSeed();
+    Theme.init();
     initNav();
     RestTimer.init();
     navigate('hoy');

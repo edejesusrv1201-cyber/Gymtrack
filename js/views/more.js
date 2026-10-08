@@ -5,10 +5,71 @@
 const MoreView = (() => {
   const GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
 
+  // ---------- personalización del fondo ----------
+  function buildThemeCard() {
+    const card = Utils.el('div', { class: 'card' });
+    const cfg = Theme.settings();
+    const res = Theme.resolve();
+
+    function save(patch) {
+      const s = DB.getSettings();
+      Object.assign(s, patch);
+      DB.saveSettings(s);
+      Theme.apply();
+      card.replaceWith(buildThemeCard());
+    }
+
+    card.appendChild(Utils.el('h3', { text: '🎨 Personalización' }));
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: 'Fondo' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'auto', label: 'Color del día' }, { key: 'fijo', label: 'Color fijo' }],
+      cfg.mode,
+      (k) => save({ themeMode: k }),
+      true,
+    ));
+
+    // qué está mostrando ahora
+    const now = Utils.el('div', { class: 'theme-now' });
+    now.appendChild(Utils.el('div', { class: 'blobs' }, res.colors.map((c) => Utils.el('i', { style: `background:${c}` }))));
+    let nowText;
+    if (cfg.mode !== 'auto') nowText = `Fijo: ${cfg.preset.label}.`;
+    else if (res.source === 'rutina') nowText = `Hoy toca ${res.routine.name}: el fondo toma su color.`;
+    else if (res.source === 'descanso') nowText = 'Hoy es descanso: fondo azul calmado.';
+    else nowText = `Hoy no hay rutina: usa el color base (${cfg.preset.label}).`;
+    now.appendChild(Utils.el('span', { text: nowText }));
+    card.appendChild(now);
+
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: cfg.mode === 'auto' ? 'Color base (cuando no hay rutina)' : 'Color' }));
+    const swatches = Utils.el('div', { class: 'swatches' });
+    Theme.PRESETS.forEach((p) => {
+      const b = Utils.el('button', {
+        class: 'swatch' + (p.key === cfg.preset.key ? ' active' : ''),
+        type: 'button',
+        title: p.label,
+        'aria-label': p.label,
+        style: `background:linear-gradient(135deg,${p.colors[0]},${p.colors[1]} 60%,${p.colors[2]});`,
+      });
+      b.addEventListener('click', () => save({ themePreset: p.key }));
+      swatches.appendChild(b);
+    });
+    card.appendChild(swatches);
+
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: 'Intensidad del brillo' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'suave', label: 'Suave' }, { key: 'media', label: 'Media' }, { key: 'intensa', label: 'Intensa' }],
+      cfg.intensity,
+      (k) => save({ themeIntensity: k }),
+      true,
+    ));
+    return card;
+  }
+
   function render(root) {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
     const settings = DB.getSettings();
+
+    view.appendChild(buildThemeCard());
 
     // ---- ajustes ----
     const settingsCard = Utils.el('div', { class: 'card' });
