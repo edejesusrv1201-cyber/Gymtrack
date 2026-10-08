@@ -75,6 +75,13 @@ const Utils = (() => {
     return `${Math.round(n)}`;
   }
 
+  // colores de acento actuales (los pone theme.js como variables CSS)
+  function accent() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = (n, d) => cs.getPropertyValue(n).trim() || d;
+    return { main: g('--accent', '#ff6a3d'), a: g('--acc-a', '#ff5a36'), c: g('--acc-c', '#ffb347'), light: g('--accent-light', '#ffb08a') };
+  }
+
   function vibrate(pattern) {
     if (navigator.vibrate) {
       try { navigator.vibrate(pattern); } catch (e) { /* ignore */ }
@@ -126,7 +133,7 @@ const Utils = (() => {
     svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
     svg.innerHTML = `
       <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="${opts.from || '#ff5a36'}"/><stop offset="100%" stop-color="${opts.to || '#ffb347'}"/>
+        <stop offset="0%" stop-color="${opts.from || accent().a}"/><stop offset="100%" stop-color="${opts.to || accent().c}"/>
       </linearGradient></defs>
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="${stroke}"/>
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${stroke}"
@@ -253,7 +260,7 @@ const Utils = (() => {
   // opts: color, height, format(valor) -> texto, onPointClick(p, i)
   function drawLineChart(canvas, points, opts = {}) {
     if (points.length < 2) return;
-    const color = opts.color || '#ff6a3d';
+    const color = opts.color || accent().main;
     const fmt = opts.format || ((v) => String(round1(v)));
     const { ctx, w, h } = setupCanvas(canvas, opts.height || 176);
 
@@ -391,7 +398,7 @@ const Utils = (() => {
   // opts: color, height, goal, format(valor), onBarClick(bar, i)
   function drawBarChart(canvas, bars, opts = {}) {
     if (!bars.length) return;
-    const color = opts.color || '#ff6a3d';
+    const color = opts.color || accent().main;
     const fmt = opts.format || ((v) => compact(v));
     const { ctx, w, h } = setupCanvas(canvas, opts.height || 176);
 
@@ -498,7 +505,7 @@ const Utils = (() => {
 
   return {
     DIAS, DIAS_CORTOS, MESES, GROUP_COLORS, pad, toISODate, todayISO, monthKey, parseISO,
-    friendlyDate, shortDate, daysInMonth, el, round1, compact, vibrate, toast, confirmDialog,
+    friendlyDate, shortDate, daysInMonth, el, round1, compact, accent, vibrate, toast, confirmDialog,
     segmented, ring, drawLineChart, drawBarChart,
   };
 })();

@@ -39,7 +39,7 @@ const MoreView = (() => {
     now.appendChild(Utils.el('span', { text: nowText }));
     card.appendChild(now);
 
-    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: cfg.mode === 'auto' ? 'Color base (cuando no hay rutina)' : 'Color' }));
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: `${cfg.mode === 'auto' ? 'Color base (cuando no hay rutina)' : 'Color'} · ${cfg.preset.label}` }));
     const swatches = Utils.el('div', { class: 'swatches' });
     Theme.PRESETS.forEach((p) => {
       const b = Utils.el('button', {
@@ -59,6 +59,25 @@ const MoreView = (() => {
       [{ key: 'suave', label: 'Suave' }, { key: 'media', label: 'Media' }, { key: 'intensa', label: 'Intensa' }],
       cfg.intensity,
       (k) => save({ themeIntensity: k }),
+      true,
+    ));
+
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Efecto lava (fondo en movimiento)' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'lava', label: 'Activado' }, { key: 'quieto', label: 'Quieto' }],
+      cfg.motion,
+      (k) => save({ themeMotion: k }),
+      true,
+    ));
+    if (Theme.reducedMotion() && DB.getSettings().themeMotion !== 'lava') {
+      card.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:-4px;', text: 'Tu teléfono pide reducir animaciones, por eso viene quieto. Toca "Activado" para ver la lava.' }));
+    }
+
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Botones y detalles' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'tema', label: 'Color del fondo' }, { key: 'app', label: 'Naranja' }],
+      cfg.accent,
+      (k) => save({ themeAccent: k }),
       true,
     ));
 

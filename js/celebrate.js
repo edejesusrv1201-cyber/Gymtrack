@@ -35,7 +35,7 @@ const Celebrate = (() => {
   function palette() {
     const cs = getComputedStyle(document.documentElement);
     const theme = ['--g1', '--g2', '--g3'].map((v) => cs.getPropertyValue(v).trim()).filter(Boolean);
-    return ['#ffd24a', '#ffffff', '#ff7a3d', ...theme];
+    return ['#ffd24a', '#ffffff', Utils.accent().main, ...theme];
   }
 
   function fireworks() {

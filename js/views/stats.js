@@ -63,7 +63,7 @@ const StatsView = (() => {
       ]
       : [
         { key: 'weight', label: 'Peso máx.', get: (s) => s.weight, fmt: (v) => `${Utils.round1(v)}${settings.units}`, color: '#5b8cff' },
-        { key: 'e1rm', label: '1RM est.', get: (s) => s.e1rm, fmt: (v) => `${Utils.round1(v)}${settings.units}`, color: '#ff6a3d' },
+        { key: 'e1rm', label: '1RM est.', get: (s) => s.e1rm, fmt: (v) => `${Utils.round1(v)}${settings.units}`, color: Utils.accent().main },
         { key: 'volume', label: 'Volumen', get: (s) => s.volume, fmt: (v) => `${Utils.compact(v)}${settings.units}`, color: '#35d49a' },
       ];
     let current = metrics[0].key;
@@ -156,7 +156,7 @@ const StatsView = (() => {
       volCard.appendChild(note);
       requestAnimationFrame(() => {
         Utils.drawBarChart(canvas, weeks.map((w, i) => ({ label: w.label, value: w.volume, highlight: i === weeks.length - 1 })), {
-          color: '#ff6a3d',
+          color: Utils.accent().main,
           format: (v) => Utils.compact(v),
           onBarClick: (b, i) => {
             const w = weeks[i];
@@ -256,7 +256,7 @@ const StatsView = (() => {
             Utils.el('div', { class: `meta grp-${ex.group}`, text: ex.group }),
           ]),
           Utils.el('div', { style: 'text-align:right;' }, [
-            Utils.el('div', { style: 'font-weight:800;color:#ffb08a;', text: Metrics.formatSet(rec.max.set, isCardio, settings.units) }),
+            Utils.el('div', { style: 'font-weight:800;color:var(--accent-light);', text: Metrics.formatSet(rec.max.set, isCardio, settings.units) }),
             Utils.el('div', { class: 'meta', text: `${Utils.shortDate(rec.max.date)}${!isCardio && rec.e1rm > 0 ? ` · 1RM ${Utils.round1(rec.e1rm)}${settings.units}` : ''}` }),
           ]),
         ]));
@@ -356,7 +356,7 @@ const StatsView = (() => {
         Utils.drawBarChart(canvas, rows.map((r, i) => ({
           label: labelFor(r.iso),
           value: r.kcal,
-          color: r.kcal > goal * 1.1 ? '#ff5d73' : '#ff6a3d',
+          color: r.kcal > goal * 1.1 ? '#ff5d73' : Utils.accent().main,
           highlight: i === rows.length - 1,
         })), {
           goal,

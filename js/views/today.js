@@ -291,7 +291,7 @@ const TodayView = (() => {
       return t;
     }
     view.appendChild(Utils.el('div', { class: 'tiles' }, [
-      tile('Calorías', `${Math.round(kcalToday)}`, `de ${settings.calorieGoal} kcal`, kcalToday / (settings.calorieGoal || 1), 'linear-gradient(90deg,#ff5a36,#ffb347)', { view: 'calorias' }),
+      tile('Calorías', `${Math.round(kcalToday)}`, `de ${settings.calorieGoal} kcal`, kcalToday / (settings.calorieGoal || 1), 'linear-gradient(90deg,var(--acc-a),var(--acc-c))', { view: 'calorias' }),
       tile('Agua', `${Utils.round1(waterMl / 1000)} L`, `de ${Utils.round1(waterGoal / 1000)} L`, waterMl / waterGoal, 'linear-gradient(90deg,#5b8cff,#3de0c2)', { view: 'calorias' }),
       tile('Semana', `${weekDays}`, weekDays === 1 ? 'día entrenado' : 'días entrenados', weekDays / 5, 'linear-gradient(90deg,#35d49a,#3de0c2)', { view: 'progreso', params: { section: 'entreno' } }),
     ]));

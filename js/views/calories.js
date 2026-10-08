@@ -40,7 +40,7 @@ const CaloriesView = (() => {
     const pctKcal = settings.calorieGoal ? totals.kcal / settings.calorieGoal : 0;
     const over = pctKcal > 1.1;
     summary.appendChild(Utils.el('div', { style: 'display:flex;align-items:center;gap:16px;margin-bottom:8px;' }, [
-      Utils.ring(pctKcal, { size: 98, stroke: 10, label: `${Math.round(totals.kcal)}`, sub: 'kcal', from: over ? '#ff5d73' : '#ff5a36', to: over ? '#ff9aa8' : '#ffb347' }),
+      Utils.ring(pctKcal, { size: 98, stroke: 10, label: `${Math.round(totals.kcal)}`, sub: 'kcal', from: over ? '#ff5d73' : Utils.accent().a, to: over ? '#ff9aa8' : Utils.accent().c }),
       Utils.el('div', { style: 'flex:1;' }, [
         Utils.el('div', { class: 'eyebrow', text: over ? 'Te pasaste' : 'Restantes' }),
         Utils.el('div', { style: 'font-size:1.9rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1;', text: `${Math.abs(Math.round(settings.calorieGoal - totals.kcal))}` }),

@@ -170,7 +170,7 @@ const MeasurementsView = (() => {
     const fieldDef = ALL_FIELDS.find((f) => f.key === fieldKey);
     const unit = fieldDef.unit();
     Utils.drawLineChart(canvas, points, {
-      color: '#ff6a3d',
+      color: Utils.accent().main,
       format: (v) => `${Utils.round1(v)}${unit}`,
       onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)} · ${p.y}${unit}`; },
     });

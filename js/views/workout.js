@@ -478,7 +478,7 @@ const WorkoutView = (() => {
       Utils.el('div', {}, [
         Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
         target ? Utils.el('div', { class: 'meta', text: `0 de ${target.targetSets} series · ${target.targetReps}` }) : null,
-        records ? Utils.el('div', { class: 'meta', style: 'color:#ffb08a;', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio, DB.getSettings().units)}` }) : null,
+        records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent-light);', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio, DB.getSettings().units)}` }) : null,
       ]),
       Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
     ]);
