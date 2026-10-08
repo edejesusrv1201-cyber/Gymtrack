@@ -245,7 +245,7 @@ const MoreView = (() => {
     });
     backupCard.appendChild(importLabel);
 
-    const exportXlsxBtn = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '📊 Exportar a Excel (.xlsx)' });
+    const exportXlsxBtn = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '📊 Exportar reporte en Excel (.xlsx)' });
     exportXlsxBtn.addEventListener('click', () => {
       try {
         ExcelBackup.exportAll();
@@ -272,7 +272,7 @@ const MoreView = (() => {
       });
     });
     backupCard.appendChild(importXlsxLabel);
-    backupCard.appendChild(Utils.el('p', { class: 'small mt-8', text: 'El Excel trae todos tus datos en varias hojas (rutinas, series, medidas, calorías...). Útil para revisarlos o para pasarlos a otro celular igual que el respaldo .json.' }));
+    backupCard.appendChild(Utils.el('p', { class: 'small mt-8', text: 'El Excel trae un resumen con tus métricas (volumen, grupos musculares, récords, nutrición, cuerpo), tu historial de series, un mapa de constancia y más. También guarda tus datos en hojas ocultas, así que sirve igual para pasarlos a otro celular con "Importar Excel".' }));
 
     if (Utils.isIOS()) {
       backupCard.appendChild(Utils.el('p', { class: 'small', text: 'En iPhone se abre la hoja Compartir: elige "Guardar en Archivos" (o envíatelo por correo/WhatsApp). Para restaurar, usa "Importar" y escoge ese archivo.' }));

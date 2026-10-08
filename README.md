@@ -9,6 +9,7 @@ App personal (offline, sin servidor) para llevar tu progreso de gym:
 - **Cronómetro de descanso**: al registrar una serie se inicia solo un cronómetro de descanso (widget flotante, con vibración y sonido al terminar). También lo puedes abrir manualmente con presets (30s, 60s, 90s, 2:00, 3:00) o un tiempo personalizado.
 - **Calorías**: guarda tus alimentos frecuentes (con calorías y macros) y regístralos rápido por comida (desayuno/almuerzo/cena/snacks). Ves el total del día contra tu meta.
 - **Medidas corporales**: peso, cintura, pecho, brazo, muslo, etc., con fecha y un gráfico simple de progreso.
+- **Reporte en Excel**: Más → "Exportar reporte en Excel" genera un .xlsx con formato: Resumen (métricas y barras), Entrenamientos (una fila por serie, con filtros), Récords, Constancia (mapa de calor), Medidas, Nutrición, Comidas y Rutinas. Incluye hojas ocultas `_datos_*` para restaurar todo al importarlo en otro celular.
 - **Todo tus datos se guardan en tu propio celular** (no hay servidor ni internet involucrado). Puedes exportar/importar un respaldo en JSON desde "Más".
 
 ## Cómo probarla ahora mismo (en tu computadora)
