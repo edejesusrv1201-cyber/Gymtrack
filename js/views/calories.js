@@ -37,14 +37,14 @@ const CaloriesView = (() => {
     }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
 
     const summary = Utils.el('div', { class: 'card mt-8' });
-    summary.appendChild(Utils.el('div', { class: 'grid-2' }, [
-      Utils.el('div', { class: 'stat-box' }, [
-        Utils.el('div', { class: 'val', text: `${Math.round(totals.kcal)}` }),
-        Utils.el('div', { class: 'lbl', text: `de ${settings.calorieGoal} kcal` }),
-      ]),
-      Utils.el('div', { class: 'stat-box' }, [
-        Utils.el('div', { class: 'val', text: `${Math.max(0, settings.calorieGoal - Math.round(totals.kcal))}` }),
-        Utils.el('div', { class: 'lbl', text: 'kcal restantes' }),
+    const pctKcal = settings.calorieGoal ? totals.kcal / settings.calorieGoal : 0;
+    const over = pctKcal > 1.1;
+    summary.appendChild(Utils.el('div', { style: 'display:flex;align-items:center;gap:16px;margin-bottom:8px;' }, [
+      Utils.ring(pctKcal, { size: 98, stroke: 10, label: `${Math.round(totals.kcal)}`, sub: 'kcal', from: over ? '#ff5d73' : '#ff5a36', to: over ? '#ff9aa8' : '#ffb347' }),
+      Utils.el('div', { style: 'flex:1;' }, [
+        Utils.el('div', { class: 'eyebrow', text: over ? 'Te pasaste' : 'Restantes' }),
+        Utils.el('div', { style: 'font-size:1.9rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1;', text: `${Math.abs(Math.round(settings.calorieGoal - totals.kcal))}` }),
+        Utils.el('div', { class: 'small text-dim', text: `meta ${settings.calorieGoal} kcal` }),
       ]),
     ]));
     [['Proteína', totals.protein, settings.proteinGoal, '#c26fe0'],
@@ -136,7 +136,7 @@ const CaloriesView = (() => {
     card.appendChild(quickRow);
 
     const customInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'ml personalizado' });
-    const customBtn = Utils.el('button', { class: 'btn-secondary', text: '➕' });
+    const customBtn = Utils.el('button', { class: 'btn-secondary', style: 'width:64px;flex:none;height:46px;', text: '➕' });
     customBtn.addEventListener('click', () => {
       const v = Number(customInput.value);
       if (v > 0) { addWater(v); customInput.value = ''; }

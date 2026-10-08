@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v4';
+const CACHE_NAME = 'migymtrack-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const ASSETS = [
   './js/lib/xlsx.full.min.js',
   './js/db.js',
   './js/utils.js',
+  './js/metrics.js',
   './js/timer.js',
   './js/modal.js',
   './js/nutrition.js',
@@ -22,6 +23,8 @@ const ASSETS = [
   './js/views/workout.js',
   './js/views/calories.js',
   './js/views/measurements.js',
+  './js/views/stats.js',
+  './js/views/progress.js',
   './js/views/more.js',
   './js/views/calculator.js',
   './icons/icon-192.png',
@@ -56,6 +59,6 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
         return resp;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request, { ignoreSearch: true }))
   );
 });

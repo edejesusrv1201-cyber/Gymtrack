@@ -113,6 +113,7 @@ const RestTimer = (() => {
   function togglePanel(force) {
     const show = force !== undefined ? force : !els.panel.classList.contains('open');
     els.panel.classList.toggle('open', show);
+    showWidget();
   }
 
   function refreshUI(remaining, total, paused) {
@@ -145,11 +146,12 @@ const RestTimer = (() => {
     refreshUI(remaining, st.total, false);
   }
 
-  function start(seconds) {
+  function start(seconds, opts = {}) {
     const st = { total: seconds, endsAt: Date.now() + seconds * 1000, paused: false, remainingAtPause: null };
     saveState(st);
     Utils.toast(`Descanso iniciado: ${fmt(seconds)}`, 1400);
-    togglePanel(true);
+    if (opts.openPanel !== false) togglePanel(true);
+    showWidget(true);
     ensureTicking();
     tick();
   }
@@ -186,6 +188,7 @@ const RestTimer = (() => {
     saveState(null);
     refreshUI(0, 0, false);
     togglePanel(false);
+    showWidget();
   }
 
   function finish() {
@@ -195,12 +198,25 @@ const RestTimer = (() => {
     beep();
     Utils.toast('⏱ ¡Descanso terminado! A seguir entrenando 💪', 3500);
     els.fab.classList.add('done-flash');
-    setTimeout(() => els.fab.classList.remove('done-flash'), 1500);
+    setTimeout(() => { els.fab.classList.remove('done-flash'); showWidget(); }, 1600);
   }
 
   function ensureTicking() {
     if (tickHandle) return;
     tickHandle = setInterval(tick, 250);
+  }
+
+  // el botón flotante solo se ve en el entrenamiento o mientras corre un descanso
+  function showWidget(force) {
+    if (!els.wrap) return;
+    const running = !!loadState();
+    const panelOpen = els.panel.classList.contains('open');
+    els.wrap.classList.toggle('hidden', !(force || running || panelOpen));
+  }
+
+  function openPanel() {
+    showWidget(true);
+    togglePanel(true);
   }
 
   function init() {
@@ -209,12 +225,13 @@ const RestTimer = (() => {
     ensureTicking();
     const st = loadState();
     if (st) tick(); else refreshUI(0, 0, false);
+    showWidget();
   }
 
   // API pública: permite iniciar el descanso desde el registro de series
   function quickStart(seconds) {
-    start(seconds || (DB.getSettings().restDefault || 90));
+    start(seconds || (DB.getSettings().restDefault || 90), { openPanel: false });
   }
 
-  return { init, start, quickStart, cancel };
+  return { init, start, quickStart, cancel, showWidget, openPanel };
 })();

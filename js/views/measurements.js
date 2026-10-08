@@ -31,20 +31,20 @@ const MeasurementsView = (() => {
   function render(root) {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
-
-    // ---- formulario rápido ----
-    const addCard = Utils.el('div', { class: 'card' });
-    addCard.appendChild(Utils.el('h3', { text: 'Registrar medidas de hoy' }));
-    addCard.appendChild(buildForm(null, () => render(root)));
-    view.appendChild(addCard);
-
     const measurements = DB.getMeasurements();
+
+    const addBtn = Utils.el('button', { class: 'btn-primary', style: 'margin-bottom:14px;', text: '➕ Registrar medidas de hoy' });
+    addBtn.addEventListener('click', () => {
+      Modal.open('Registrar medidas', buildForm(null, () => { Modal.close(); render(root); }));
+    });
+    view.appendChild(addBtn);
 
     // ---- gráfico de progreso ----
     if (measurements.length >= 2) {
       const chartCard = Utils.el('div', { class: 'card' });
-      chartCard.appendChild(Utils.el('div', { class: 'flex-between' }, [
-        Utils.el('h3', { class: 'mb-0', text: 'Progreso' }),
+      chartCard.appendChild(Utils.el('div', { class: 'card-title-row' }, [
+        Utils.el('h3', { text: 'Progreso' }),
+        Utils.el('span', { class: 'eyebrow', text: `${measurements.length} registros` }),
       ]));
       const fieldsWithData = ALL_FIELDS.filter((f) => measurements.some((m) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== ''));
       if (!fieldsWithData.some((f) => f.key === chartField)) chartField = fieldsWithData[0].key;
@@ -56,18 +56,22 @@ const MeasurementsView = (() => {
       fieldSelect.addEventListener('change', () => { chartField = fieldSelect.value; render(root); });
       chartCard.appendChild(fieldSelect);
 
-      const trend = Utils.el('div', { class: 'small mt-8' });
-      chartCard.appendChild(trend);
+      const kpis = Utils.el('div', { class: 'grid-3 mt-12' });
+      chartCard.appendChild(kpis);
 
-      const chartWrap = Utils.el('div', { class: 'chart-wrap mt-8' });
+      const chartWrap = Utils.el('div', { class: 'chart-wrap mt-12' });
       const canvas = Utils.el('canvas', { class: 'chart' });
       chartWrap.appendChild(canvas);
       chartCard.appendChild(chartWrap);
-      const tooltip = Utils.el('div', { class: 'small text-dim mt-8', id: 'chartTooltip', text: 'Toca un punto para ver el valor' });
+      const tooltip = Utils.el('div', { class: 'chart-note', id: 'chartTooltip' });
       chartCard.appendChild(tooltip);
       view.appendChild(chartCard);
-      renderTrend(trend, measurements, chartField);
+      renderKpis(kpis, measurements, chartField);
       requestAnimationFrame(() => drawChart(canvas, measurements, chartField, tooltip));
+    } else if (measurements.length === 1) {
+      view.appendChild(Utils.el('div', { class: 'card' }, [
+        Utils.el('p', { text: 'Registra otra medida más y aquí aparecerá tu gráfico de progreso con la tendencia.' }),
+      ]));
     }
 
     // ---- historial ----
@@ -154,36 +158,48 @@ const MeasurementsView = (() => {
     return wrap;
   }
 
-  // ---- gráfico simple en canvas (una sola serie: magnitud en el tiempo) ----
-  function drawChart(canvas, measurements, fieldKey, tooltipEl) {
-    const points = measurements
+  function fieldPoints(measurements, fieldKey) {
+    return measurements
       .filter((m) => m[fieldKey] !== undefined && m[fieldKey] !== null && m[fieldKey] !== '')
       .map((m) => ({ x: m.date, y: m[fieldKey] }));
+  }
+
+  // ---- gráfico suave con degradado ----
+  function drawChart(canvas, measurements, fieldKey, tooltipEl) {
+    const points = fieldPoints(measurements, fieldKey);
     const fieldDef = ALL_FIELDS.find((f) => f.key === fieldKey);
+    const unit = fieldDef.unit();
     Utils.drawLineChart(canvas, points, {
       color: '#ff6a3d',
-      onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)}: ${p.y}${fieldDef.unit()}`; },
+      format: (v) => `${Utils.round1(v)}${unit}`,
+      onPointClick: (p) => { tooltipEl.textContent = `${Utils.friendlyDate(p.x)} · ${p.y}${unit}`; },
     });
   }
 
-  // ---- indicador de tendencia: ¿subió o bajó desde el primer registro? ----
-  function renderTrend(container, measurements, fieldKey) {
+  // ---- KPIs: valor actual, cambio total y cambio de los últimos 30 días ----
+  function renderKpis(container, measurements, fieldKey) {
     container.innerHTML = '';
-    const points = measurements
-      .filter((m) => m[fieldKey] !== undefined && m[fieldKey] !== null && m[fieldKey] !== '')
-      .map((m) => ({ x: m.date, y: m[fieldKey] }));
-    if (points.length < 2) return;
+    const points = fieldPoints(measurements, fieldKey);
+    if (points.length === 0) return;
     const fieldDef = ALL_FIELDS.find((f) => f.key === fieldKey);
-    const first = points[0].y;
-    const last = points[points.length - 1].y;
-    const delta = Utils.round1(last - first);
     const unit = fieldDef.unit();
-    const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '▬';
-    container.appendChild(Utils.el('span', {
-      style: 'color:var(--accent-2);font-weight:700;',
-      text: `${arrow} ${delta > 0 ? '+' : ''}${delta}${unit}`,
-    }));
-    container.appendChild(Utils.el('span', { class: 'text-dim', text: ` desde el ${Utils.friendlyDate(points[0].x)}` }));
+    const last = points[points.length - 1];
+    const first = points[0];
+    const cutoff = Utils.parseISO(last.x);
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffIso = Utils.toISODate(cutoff);
+    let base = first;
+    points.forEach((p) => { if (p.x <= cutoffIso) base = p; });
+
+    const fmtDelta = (d) => `${d > 0 ? '▲ +' : d < 0 ? '▼ ' : ''}${Utils.round1(d)}${unit}`;
+    const box = (label, value, sub) => Utils.el('div', { class: 'stat-box' }, [
+      Utils.el('div', { class: 'val', style: 'font-size:1.1rem;', text: value }),
+      Utils.el('div', { class: 'lbl', text: label }),
+      sub ? Utils.el('div', { class: 'small text-dim', style: 'margin-top:2px;font-size:0.66rem;', text: sub }) : null,
+    ]);
+    container.appendChild(box('Actual', `${Utils.round1(last.y)}${unit}`, Utils.shortDate(last.x)));
+    container.appendChild(box('Total', fmtDelta(Utils.round1(last.y - first.y)), `desde ${Utils.shortDate(first.x)}`));
+    container.appendChild(box('30 días', fmtDelta(Utils.round1(last.y - base.y)), base === first && first.x > cutoffIso ? 'desde el inicio' : `desde ${Utils.shortDate(base.x)}`));
   }
 
   return { render };

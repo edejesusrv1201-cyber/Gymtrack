@@ -4,6 +4,8 @@ App personal (offline, sin servidor) para llevar tu progreso de gym:
 
 - **Plan mensual**: define rutinas (Push, Pull, Piernas, Descanso, o las que quieras) y asígnalas a cada día del mes. La pantalla "Hoy" te dice automáticamente qué toca entrenar.
 - **Registro de entrenamiento**: por cada ejercicio anotas peso, repeticiones y si te costó (😃 fácil / 🙂 normal / 😖 costó / ❌ fallé). Muestra tu última marca en ese ejercicio como referencia.
+- **Series normales, aproximaciones y dropsets**: al registrar una serie eliges su tipo. Solo las normales cuentan para la meta de la rutina y los récords; las aproximaciones no suman volumen y los dropsets suman volumen pero no la meta.
+- **Pestaña Progreso**: métricas y gráficas de entreno (volumen semanal, series por grupo muscular, constancia, progreso por ejercicio con 1RM estimado, récords), cuerpo (medidas) y nutrición (calorías, macros y agua).
 - **Cronómetro de descanso**: al registrar una serie se inicia solo un cronómetro de descanso (widget flotante, con vibración y sonido al terminar). También lo puedes abrir manualmente con presets (30s, 60s, 90s, 2:00, 3:00) o un tiempo personalizado.
 - **Calorías**: guarda tus alimentos frecuentes (con calorías y macros) y regístralos rápido por comida (desayuno/almuerzo/cena/snacks). Ves el total del día contra tu meta.
 - **Medidas corporales**: peso, cintura, pecho, brazo, muslo, etc., con fecha y un gráfico simple de progreso.
@@ -59,7 +61,8 @@ gymtrack/
 ├── icons/                # íconos de la app
 └── js/
     ├── db.js             # capa de datos (localStorage) + datos de ejemplo
-    ├── utils.js           # helpers de fecha/formato/DOM
+    ├── utils.js           # helpers de fecha/formato/DOM + gráficas en canvas
+    ├── metrics.js         # cálculos de volumen, 1RM, récords y semanas
     ├── modal.js           # hoja modal reutilizable
     ├── timer.js           # cronómetro de descanso (widget flotante)
     ├── app.js             # router principal / navegación
@@ -75,3 +78,8 @@ gymtrack/
 Es JavaScript plano (sin frameworks ni pasos de compilación), así que puedes abrir cualquier archivo y modificarlo directamente. Ideas para seguir mejorándola: agregar gráficas de progreso por ejercicio, un modo claro, recordatorios/notificaciones, o sincronizar el respaldo automáticamente a un Google Drive.
 
 ¡A entrenar! 💪
+
+
+## Publicar una actualización
+
+Si cambias archivos .js o .css, sube el número `?v=` de las etiquetas en `index.html` (y el `CACHE_NAME` de `sw.js`) para que los celulares descarguen la versión nueva en cuanto abran la app con internet.

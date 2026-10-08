@@ -104,7 +104,7 @@ const ExcelBackup = (() => {
           entry.sets.forEach((set, sIdx) => {
             seriesRows.push({
               date, orden: idx, exerciseId: entry.exerciseId, fromRoutine: !!entry.fromRoutine, setIndex: sIdx,
-              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt,
+              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type,
             });
           });
         }
@@ -215,6 +215,7 @@ const ExcelBackup = (() => {
       }
       if (r.setIndex !== '' && r.setIndex !== undefined) {
         const set = { felt: r.felt || 'normal' };
+        if (r.type === 'warmup' || r.type === 'drop') set.type = r.type;
         if (r.duration !== undefined && r.duration !== '') {
           set.duration = num(r.duration);
           if (r.distance !== '') set.distance = num(r.distance);

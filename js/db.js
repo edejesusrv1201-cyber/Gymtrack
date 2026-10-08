@@ -235,6 +235,28 @@ const DB = (() => {
     getWaterLog: () => read(KEYS.waterLog, {}),
     saveWaterLog: (obj) => write(KEYS.waterLog, obj),
 
+    // Asigna (o quita con null) la rutina planeada de un día. Si ese día ya
+    // tenía un entrenamiento abierto pero sin ninguna serie registrada, lo
+    // reasigna también para que no se quede con la rutina anterior.
+    setPlannedRoutine(iso, routineId) {
+      const [y, m, d] = iso.split('-');
+      const mk = `${y}-${m}`;
+      const plans = read(KEYS.monthlyPlans, {});
+      plans[mk] = plans[mk] || { days: {} };
+      plans[mk].days = plans[mk].days || {};
+      const dayKey = String(Number(d));
+      if (routineId) plans[mk].days[dayKey] = routineId;
+      else delete plans[mk].days[dayKey];
+      write(KEYS.monthlyPlans, plans);
+
+      const wl = read(KEYS.workoutLog, {});
+      const log = wl[iso];
+      if (log && !(log.exercises || []).some((e) => (e.sets || []).length > 0)) {
+        log.routineId = routineId || null;
+        write(KEYS.workoutLog, wl);
+      }
+    },
+
     // Export / import (backup completo)
     exportAll() {
       const data = {};

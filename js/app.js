@@ -3,12 +3,12 @@
    ============================================================ */
 
 const App = (() => {
-  const PRIMARY_VIEWS = ['hoy', 'plan', 'calorias', 'medidas', 'mas'];
+  const PRIMARY_VIEWS = ['hoy', 'plan', 'calorias', 'progreso', 'mas'];
   const VIEW_MODULES = {
     hoy: TodayView,
     plan: PlanView,
     calorias: CaloriesView,
-    medidas: MeasurementsView,
+    progreso: ProgressView,
     mas: MoreView,
     workout: WorkoutView,
     calculadora: CalculatorView,
@@ -17,7 +17,7 @@ const App = (() => {
     hoy: ['MiGymTrack', 'Tu progreso de hoy'],
     plan: ['Plan mensual', 'Organiza tus rutinas por día'],
     calorias: ['Calorías', 'Registro diario de comidas'],
-    medidas: ['Medidas', 'Peso y medidas corporales'],
+    progreso: ['Progreso', 'Entreno, cuerpo y nutrición'],
     mas: ['Más', 'Ajustes, ejercicios y respaldo'],
     workout: ['Entrenamiento', ''],
     calculadora: ['Calculadora', 'Mantenimiento, déficit y superávit'],
@@ -29,6 +29,9 @@ const App = (() => {
   let currentParams = {};
 
   function navigate(viewName, params = {}) {
+    // la antigua pestaña "Medidas" ahora vive dentro de Progreso
+    if (viewName === 'medidas') { viewName = 'progreso'; params = { section: 'cuerpo' }; }
+    if (typeof Modal !== 'undefined') Modal.close();
     currentView = viewName;
     currentParams = params;
     const root = document.getElementById('viewRoot');
@@ -52,6 +55,8 @@ const App = (() => {
       if (isSub) navigate(backTarget);
       else navigate('mas');
     };
+
+    RestTimer.showWidget();
 
     const activeTab = isSub ? backTarget : currentView;
     document.querySelectorAll('.nav-btn').forEach((btn) => {

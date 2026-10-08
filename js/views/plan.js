@@ -6,12 +6,6 @@ const PlanView = (() => {
   let cursor = new Date(); // mes que se está viendo
   const COLORS = ['#e0663d', '#3d8de0', '#5fbf6f', '#e0c23d', '#c26fe0', '#e05a5a', '#7a7a85', '#3de0c2'];
 
-  function getPlan(mk) {
-    const plans = DB.getMonthlyPlans();
-    if (!plans[mk]) plans[mk] = { days: {} };
-    return plans[mk];
-  }
-  function savePlans(plans) { DB.saveMonthlyPlans(plans); }
 
   function render(root, params) {
     if (params && params.focusDate) cursor = Utils.parseISO(params.focusDate);
@@ -81,23 +75,16 @@ const PlanView = (() => {
     routines.forEach((r) => {
       const row = Utils.el('button', { class: 'btn-secondary btn-block mt-8', style: `border-left:4px solid ${r.color}` }, [r.name]);
       row.addEventListener('click', () => {
-        const plans = DB.getMonthlyPlans();
-        const plan = getPlan(mk);
-        plans[mk] = plan;
-        plan.days[String(day)] = r.id;
-        savePlans(plans);
+        DB.setPlannedRoutine(iso, r.id);
         Modal.close();
+        Utils.toast(`${r.name} asignada`);
         onDone();
       });
       body.appendChild(row);
     });
     const clearBtn = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: 'Quitar asignación' });
     clearBtn.addEventListener('click', () => {
-      const plans = DB.getMonthlyPlans();
-      const plan = getPlan(mk);
-      plans[mk] = plan;
-      delete plan.days[String(day)];
-      savePlans(plans);
+      DB.setPlannedRoutine(iso, null);
       Modal.close();
       onDone();
     });
@@ -125,16 +112,11 @@ const PlanView = (() => {
       const [year, month1] = mk.split('-').map(Number);
       const month0 = month1 - 1;
       const totalDays = Utils.daysInMonth(year, month0);
-      const plans = DB.getMonthlyPlans();
-      const plan = getPlan(mk);
-      plans[mk] = plan;
       for (let day = 1; day <= totalDays; day++) {
         const dow = new Date(year, month0, day).getDay();
         const val = selects[dow].value;
-        if (val) plan.days[String(day)] = val;
-        else delete plan.days[String(day)];
+        DB.setPlannedRoutine(`${year}-${Utils.pad(month1)}-${Utils.pad(day)}`, val || null);
       }
-      savePlans(plans);
       Modal.close();
       Utils.toast('Plantilla aplicada a todo el mes');
       onDone();
