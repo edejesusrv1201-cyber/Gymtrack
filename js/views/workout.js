@@ -331,7 +331,7 @@ const WorkoutView = (() => {
       const feltOpt = FELT_OPTIONS.find((f) => f.key === set.felt) || FELT_OPTIONS[1];
       const mainLabel = isCardio
         ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}${set.calories ? ` · ${set.calories} kcal` : ''}`
-        : `${Units.label(set.weight)} × ${set.reps}`;
+        : `${Units.label(set.weight)}${set.uni ? ' /lado' : ''} × ${set.reps}`;
       let badge;
       if (Metrics.isWarmup(set)) badge = Utils.el('span', { class: 'set-badge warm', title: 'Aproximación', text: 'A' });
       else if (Metrics.isDrop(set)) badge = Utils.el('span', { class: 'set-badge drop', title: 'Dropset', text: '↓' });
@@ -354,6 +354,8 @@ const WorkoutView = (() => {
     const form = Utils.el('div', { class: 'mt-8' });
     const lastSet = entry.sets[entry.sets.length - 1];
     const lastWork = [...entry.sets].reverse().find(Metrics.isNormal);
+    // unilateral: el peso es por lado (se recuerda en el ejercicio)
+    let uniSelected = !!(ex && ex.unilateral);
 
     let weightInput, repsInput, durationInput, distanceInput, caloriesInput;
     let typeSelected = isCardio ? 'normal' : (typeMemory[key] || 'normal');
@@ -372,12 +374,12 @@ const WorkoutView = (() => {
       }
       if (type === 'warmup') {
         if (lastSet && Metrics.isWarmup(lastSet)) return Units.num(lastSet.weight, inputUnit);
-        const baseKg = prev ? Number(prev.best.weight) : lastWork ? Number(lastWork.weight) : 0;
+        const baseKg = prev && !!prev.best.uni === uniSelected ? Number(prev.best.weight) : lastWork && !!lastWork.uni === uniSelected ? Number(lastWork.weight) : 0;
         const st = Units.step(inputUnit, true);
         return baseKg > 0 ? Math.round((asInput(baseKg) * 0.5) / st) * st : '';
       }
-      if (lastWork) return Units.num(lastWork.weight, inputUnit);
-      if (prev) return Units.num(prev.best.weight, inputUnit);
+      if (lastWork && !!lastWork.uni === uniSelected) return Units.num(lastWork.weight, inputUnit);
+      if (prev && !!prev.best.uni === uniSelected) return Units.num(prev.best.weight, inputUnit);
       return '';
     }
 
@@ -409,7 +411,7 @@ const WorkoutView = (() => {
         inputUnit = next;
         Units.rememberInputUnit(entry.exerciseId, next);
         unitBtn.textContent = next;
-        weightInput.placeholder = `Peso (${next})`;
+        weightInput.placeholder = uniSelected ? `Peso por lado (${next})` : `Peso (${next})`;
       });
       repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
       weightInput.value = suggestWeight(typeSelected);
@@ -430,6 +432,29 @@ const WorkoutView = (() => {
         typeRow.appendChild(b);
       });
       form.appendChild(typeRow);
+
+      // bilateral / unilateral (peso por lado)
+      const uniRow = Utils.el('div', { class: 'seg small' });
+      const paintUni = () => {
+        uniRow.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', (b.dataset.u === '1') === uniSelected));
+        weightInput.placeholder = uniSelected ? `Peso por lado (${inputUnit})` : `Peso (${inputUnit})`;
+      };
+      [['0', 'Bilateral'], ['1', 'Unilateral · peso por lado']].forEach(([v, t]) => {
+        const b = Utils.el('button', { class: 'seg-btn', type: 'button', 'data-u': v, text: t });
+        b.addEventListener('click', () => {
+          uniSelected = v === '1';
+          if (ex) {
+            const all = DB.getExercises();
+            const target = all.find((e) => e.id === ex.id);
+            if (target) { target.unilateral = uniSelected; DB.saveExercises(all); }
+          }
+          weightInput.value = suggestWeight(typeSelected);
+          paintUni();
+        });
+        uniRow.appendChild(b);
+      });
+      form.appendChild(uniRow);
+      form.paintUni = paintUni;
       form.appendChild(Utils.el('div', { class: 'field-row' }, [
         Utils.el('div', { class: 'field' }, [Utils.el('div', { class: 'input-unit' }, [weightInput, unitBtn])]),
         Utils.el('div', { class: 'field' }, [repsInput]),
@@ -454,6 +479,7 @@ const WorkoutView = (() => {
     feltWrap.appendChild(feltRow);
     form.appendChild(feltWrap);
     if (form.refreshType) form.refreshType();
+    if (form.paintUni) form.paintUni();
 
     addSetBtn.addEventListener('click', () => {
       if (isCardio) {
@@ -483,6 +509,7 @@ const WorkoutView = (() => {
       }
       const set = { weight, reps, felt: typeSelected === 'warmup' ? 'normal' : feltSelected };
       if (typeSelected !== 'normal') set.type = typeSelected;
+      if (uniSelected) set.uni = true;
       const prs = Metrics.detectPR(entry.exerciseId, false, set);
       if (prs.length) set.pr = prs.map((x) => x.kind).join(',');
       entry.sets.push(set);
@@ -530,34 +557,175 @@ const WorkoutView = (() => {
     Modal.open(`📈 ${ex.name}`, body);
   }
 
+  // ---------- agregar ejercicio al día: buscador, grupos, recientes y crear nuevo ----------
   function openAddExercise(iso, log, onDone) {
     const body = Utils.el('div');
-    const existingIds = new Set(log.exercises.map((e) => e.exerciseId));
-    const groups = {};
-    DB.getExercises().forEach((ex) => {
-      if (existingIds.has(ex.id)) return;
-      (groups[ex.group] = groups[ex.group] || []).push(ex);
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const GROUP_ORDER = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
+    const added = new Set();
+    let filter = null; // 'recientes' | nombre de grupo | 'todos'
+    let query = '';
+
+    // ejercicios más hechos en las últimas 8 semanas
+    const freq = {};
+    const wl = DB.getWorkoutLog();
+    const since = Utils.toISODate(new Date(Date.now() - 56 * 86400000));
+    Object.keys(wl).filter((d) => d >= since).forEach((d) => {
+      (wl[d].exercises || []).forEach((e) => { if (e.sets && e.sets.length) freq[e.exerciseId] = (freq[e.exerciseId] || 0) + 1; });
     });
-    Object.keys(groups).forEach((g) => {
-      body.appendChild(Utils.el('div', { class: `eyebrow grp-${g}`, style: 'margin-top:12px;', text: g }));
-      groups[g].forEach((ex) => {
-        const row = Utils.el('div', { class: 'list-item' }, [
-          Utils.el('span', { text: ex.name }),
-          Utils.el('button', { class: 'btn-small', text: '+' }),
-        ]);
-        row.querySelector('button').addEventListener('click', () => {
-          log.exercises.push({ exerciseId: ex.id, sets: [] });
-          saveLog(iso, log);
-          expandedSet.add(`${iso}:${ex.id}`);
-          Modal.close();
-          onDone();
-        });
-        body.appendChild(row);
-      });
-    });
-    if (Object.keys(groups).length === 0) {
-      body.appendChild(Utils.el('p', { text: 'Ya agregaste todos los ejercicios de tu catálogo. Crea uno nuevo en "Más → Catálogo".' }));
+
+    const search = Utils.el('input', { type: 'search', placeholder: '🔎 Buscar ejercicio…', class: 'ax-search' });
+    const chipsRow = Utils.el('div', { class: 'rt-chips' });
+    const listWrap = Utils.el('div');
+    const createWrap = Utils.el('div');
+
+    const inLog = () => new Set(log.exercises.map((e) => e.exerciseId));
+
+    function available() {
+      const used = inLog();
+      return DB.getExercises().filter((e) => !used.has(e.id) || added.has(e.id));
     }
+
+    function chipList() {
+      const present = new Set(available().map((e) => e.group));
+      const groups = GROUP_ORDER.filter((g) => present.has(g)).concat([...present].filter((g) => !GROUP_ORDER.includes(g)));
+      const hasRecent = available().some((e) => freq[e.id]);
+      return (hasRecent ? ['recientes'] : []).concat(['todos'], groups);
+    }
+
+    function paintChips() {
+      const chips = chipList();
+      if (!filter || !chips.includes(filter)) filter = chips[0];
+      chipsRow.innerHTML = '';
+      chips.forEach((g) => {
+        const color = g === 'recientes' || g === 'todos' ? 'var(--accent-light)' : (Utils.GROUP_COLORS[g] || '#8d95a8');
+        const chip = Utils.el('button', { type: 'button', class: `rt-chip${g === filter ? ' active' : ''}`, style: `--gc:${color}`, text: g === 'recientes' ? '⭐ recientes' : g });
+        chip.addEventListener('click', () => { filter = g; paintChips(); paintList(); });
+        chipsRow.appendChild(chip);
+      });
+    }
+
+    function addToDay(ex, row, btn) {
+      log.exercises.push({ exerciseId: ex.id, sets: [] });
+      saveLog(iso, log);
+      expandedSet.add(`${iso}:${ex.id}`);
+      added.add(ex.id);
+      btn.textContent = '✓';
+      btn.disabled = true;
+      row.classList.add('ax-added');
+      onDone();
+      doneBtn.textContent = `Listo (${added.size} agregado${added.size === 1 ? '' : 's'})`;
+    }
+
+    function exRow(ex) {
+      const isCardio = ex.group === 'cardio';
+      const best = Metrics.previousBest(ex.id, '9999-12-31', isCardio);
+      const isAdded = added.has(ex.id);
+      const btn = Utils.el('button', { class: 'btn-small', text: isAdded ? '✓' : '+' });
+      btn.disabled = isAdded;
+      const row = Utils.el('div', { class: `list-item${isAdded ? ' ax-added' : ''}` }, [
+        Utils.el('div', { style: 'min-width:0;' }, [
+          Utils.el('div', { style: 'font-weight:700;' }, [ex.name, ex.unilateral ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
+          Utils.el('div', { class: `meta grp-${ex.group}`, text: best ? `${ex.group} · última vez ${Metrics.formatSet(best.best, isCardio)}` : `${ex.group} · sin registros` }),
+        ]),
+        btn,
+      ]);
+      btn.addEventListener('click', () => addToDay(ex, row, btn));
+      return row;
+    }
+
+    function paintList() {
+      listWrap.innerHTML = '';
+      const q = norm(query);
+      let items = available();
+      if (q) items = items.filter((e) => norm(e.name).includes(q) || norm(e.group).includes(q));
+      else if (filter === 'recientes') items = items.filter((e) => freq[e.id]).sort((a, b) => freq[b.id] - freq[a.id]);
+      else if (filter !== 'todos') items = items.filter((e) => e.group === filter);
+
+      if (!items.length) {
+        listWrap.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: q ? `No hay ejercicios que coincidan con "${query}". Puedes crearlo abajo.` : 'No hay ejercicios en esta lista.' }));
+        return;
+      }
+      if (filter === 'todos' || q) {
+        // agrupados por músculo, en orden fijo
+        GROUP_ORDER.concat([...new Set(items.map((e) => e.group))].filter((g) => !GROUP_ORDER.includes(g))).forEach((g) => {
+          const inGroup = items.filter((e) => e.group === g).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+          if (!inGroup.length) return;
+          listWrap.appendChild(Utils.el('div', { class: `eyebrow grp-${g}`, style: 'margin-top:12px;', text: g }));
+          inGroup.forEach((ex) => listWrap.appendChild(exRow(ex)));
+        });
+      } else {
+        const sorted = filter === 'recientes' ? items : items.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        sorted.forEach((ex) => listWrap.appendChild(exRow(ex)));
+      }
+    }
+
+    // crear uno nuevo sin salir del entrenamiento
+    function paintCreate(open) {
+      createWrap.innerHTML = '';
+      if (!open) {
+        const b = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '➕ Crear ejercicio nuevo' });
+        b.addEventListener('click', () => paintCreate(true));
+        createWrap.appendChild(b);
+        return;
+      }
+      const nameIn = Utils.el('input', { type: 'text', placeholder: 'Nombre del ejercicio', value: query || '' });
+      const groupSel = Utils.el('select', {});
+      GROUP_ORDER.forEach((g) => groupSel.appendChild(Utils.el('option', { value: g, text: g })));
+      if (filter && GROUP_ORDER.includes(filter)) groupSel.value = filter;
+      let uni = false;
+      const seg = Utils.el('div', { class: 'seg small' });
+      const paintSeg = () => seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', (x.dataset.u === '1') === uni));
+      [['0', 'Bilateral'], ['1', 'Unilateral (peso por lado)']].forEach(([v, t]) => {
+        const x = Utils.el('button', { type: 'button', class: 'seg-btn', 'data-u': v, text: t });
+        x.addEventListener('click', () => { uni = v === '1'; paintSeg(); });
+        seg.appendChild(x);
+      });
+      paintSeg();
+      const create = Utils.el('button', { class: 'btn-primary btn-block', text: 'Crear y agregar al día' });
+      create.addEventListener('click', () => {
+        const name = nameIn.value.trim();
+        if (!name) { Utils.toast('Escribe el nombre del ejercicio'); return; }
+        const exercises = DB.getExercises();
+        const ex = { id: DB.uid(), name, group: groupSel.value };
+        if (uni) ex.unilateral = true;
+        exercises.push(ex);
+        DB.saveExercises(exercises);
+        log.exercises.push({ exerciseId: ex.id, sets: [] });
+        saveLog(iso, log);
+        expandedSet.add(`${iso}:${ex.id}`);
+        added.add(ex.id);
+        onDone();
+        query = '';
+        search.value = '';
+        doneBtn.textContent = `Listo (${added.size} agregado${added.size === 1 ? '' : 's'})`;
+        paintChips();
+        paintList();
+        paintCreate(false);
+        Utils.toast(`"${name}" creado y agregado`);
+      });
+      createWrap.appendChild(Utils.el('div', { class: 'ax-create' }, [
+        Utils.el('div', { class: 'small text-dim', text: 'NUEVO EJERCICIO' }),
+        Utils.el('div', { class: 'field mt-8' }, [nameIn]),
+        Utils.el('div', { class: 'field' }, [groupSel]),
+        seg,
+        create,
+      ]));
+    }
+
+    const doneBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Listo' });
+    doneBtn.addEventListener('click', () => { Modal.close(); onDone(); });
+
+    search.addEventListener('input', () => { query = search.value.trim(); paintList(); });
+
+    body.appendChild(search);
+    body.appendChild(chipsRow);
+    body.appendChild(listWrap);
+    body.appendChild(createWrap);
+    body.appendChild(doneBtn);
+    paintChips();
+    paintList();
+    paintCreate(false);
     Modal.open('Agregar ejercicio', body);
   }
 

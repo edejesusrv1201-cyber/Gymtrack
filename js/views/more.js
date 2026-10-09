@@ -188,9 +188,19 @@ const MoreView = (() => {
             Utils.el('div', { text: ex.name }),
             Utils.el('div', { class: `meta grp-${ex.group}`, text: ex.group }),
           ]),
-          Utils.el('button', { class: 'icon-btn', text: '🗑️' }),
+          Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;' }, [
+            ex.group === 'cardio' ? null : Utils.el('button', { class: `uni-toggle${ex.unilateral ? ' on' : ''}`, type: 'button', title: 'Unilateral: el peso se anota por lado', text: ex.unilateral ? 'Unilateral' : 'Bilateral' }),
+            Utils.el('button', { class: 'icon-btn', text: '🗑️' }),
+          ]),
         ]);
-        row.querySelector('button').addEventListener('click', () => {
+        const uniBtn = row.querySelector('.uni-toggle');
+        if (uniBtn) uniBtn.addEventListener('click', () => {
+          const all = DB.getExercises();
+          const t = all.find((x) => x.id === ex.id);
+          if (t) { t.unilateral = !t.unilateral; DB.saveExercises(all); }
+          refreshExList();
+        });
+        row.querySelector('.icon-btn').addEventListener('click', () => {
           if (!Utils.confirmDialog(`¿Eliminar "${ex.name}" del catálogo? Tu historial ya registrado se conserva.`)) return;
           DB.saveExercises(DB.getExercises().filter((x) => x.id !== ex.id));
           refreshExList();

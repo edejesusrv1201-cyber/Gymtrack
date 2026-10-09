@@ -296,7 +296,7 @@ const PlanView = (() => {
       exSelect.innerHTML = '';
       DB.getExercises().filter((e) => e.group === group)
         .sort((a, b) => a.name.localeCompare(b.name, 'es'))
-        .forEach((ex) => exSelect.appendChild(Utils.el('option', { value: ex.id, text: used.has(ex.id) ? `${ex.name}  ✓ ya está` : ex.name })));
+        .forEach((ex) => exSelect.appendChild(Utils.el('option', { value: ex.id, text: (ex.unilateral ? `${ex.name} (unilateral)` : ex.name) + (used.has(ex.id) ? '  ✓ ya está' : '') })));
       const isCardio = group === 'cardio';
       setsField.classList.toggle('hidden', isCardio);
       if (isCardio) {

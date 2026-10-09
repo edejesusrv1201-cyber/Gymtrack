@@ -493,7 +493,7 @@ const ExcelBackup = (() => {
         { v: x.routine ? x.routine.name : 'Libre', s: grey },
         { v: x.ex ? x.ex.name : '(ejercicio eliminado)', s: Object.assign({ bold: !warm }, grey) },
         { v: x.ex ? x.ex.group : '', s: { color: gc, bold: true } },
-        { v: warm ? 'Aproximación' : Metrics.isDrop(s) ? 'Dropset' : 'Normal', s: grey },
+        { v: (warm ? 'Aproximación' : Metrics.isDrop(s) ? 'Dropset' : 'Normal') + (s.uni ? ' · unilateral' : ''), s: grey },
         { v: x.label, s: Object.assign({ h: 'center' }, grey) },
         { v: s.weight !== undefined && s.weight !== null && s.weight !== '' ? Units.num(s.weight) : '', s: grey, z: '0.0' },
         { v: s.reps !== undefined && s.reps !== null && s.reps !== '' ? Number(s.reps) : '', s: grey },
@@ -507,9 +507,9 @@ const ExcelBackup = (() => {
       ];
     });
     return tableSheet(
-      ['Fecha', 'Día', 'Rutina', 'Ejercicio', 'Grupo', 'Tipo', 'Serie', `Peso (${units})`, 'Reps', 'Duración (min)', 'Distancia (km)', 'Calorías', 'Sensación', `Volumen (${units})`, `1RM est. (${units})`, 'Récord'],
+      ['Fecha', 'Día', 'Rutina', 'Ejercicio', 'Grupo', 'Tipo', 'Serie', `Peso (${units}, por lado si es unilateral)`, 'Reps', 'Duración (min)', 'Distancia (km)', 'Calorías', 'Sensación', `Volumen (${units})`, `1RM est. (${units})`, 'Récord'],
       rows,
-      [{ w: 12 }, { w: 6, h: 'center' }, { w: 22 }, { w: 32 }, { w: 12 }, { w: 14 }, { w: 7 }, { w: 11 }, { w: 7 }, { w: 12 }, { w: 12 }, { w: 10 }, { w: 12 }, { w: 13 }, { w: 13 }, { w: 22 }],
+      [{ w: 12 }, { w: 6, h: 'center' }, { w: 22 }, { w: 32 }, { w: 12 }, { w: 22 }, { w: 7 }, { w: 11 }, { w: 7 }, { w: 12 }, { w: 12 }, { w: 10 }, { w: 12 }, { w: 13 }, { w: 13 }, { w: 22 }],
     );
   }
 
@@ -787,7 +787,7 @@ const ExcelBackup = (() => {
           entry.sets.forEach((set, sIdx) => {
             seriesRows.push({
               date, orden: idx, exerciseId: entry.exerciseId, fromRoutine: !!entry.fromRoutine, setIndex: sIdx,
-              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type, pr: set.pr,
+              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type, pr: set.pr, uni: set.uni ? 1 : undefined,
             });
           });
         }
@@ -839,7 +839,11 @@ const ExcelBackup = (() => {
       });
     }
 
-    const exercises = rows('ejercicios').map((r) => ({ id: String(r.id), name: r.name, group: r.group }));
+    const exercises = rows('ejercicios').map((r) => {
+      const ex = { id: String(r.id), name: r.name, group: r.group };
+      if (r.unilateral === true || r.unilateral === 'true' || r.unilateral === 1 || r.unilateral === '1') ex.unilateral = true;
+      return ex;
+    });
 
     const routinesMap = {};
     rows('rutinas').forEach((r) => { routinesMap[r.id] = { id: String(r.id), name: r.name, color: r.color, exercises: [] }; });
@@ -909,6 +913,7 @@ const ExcelBackup = (() => {
         const set = { felt: r.felt || 'normal' };
         if (r.type === 'warmup' || r.type === 'drop') set.type = r.type;
         if (r.pr) set.pr = String(r.pr);
+        if (r.uni === 1 || r.uni === '1' || r.uni === true) set.uni = true;
         if (r.duration !== undefined && r.duration !== '') {
           set.duration = num(r.duration);
           if (r.distance !== '') set.distance = num(r.distance);

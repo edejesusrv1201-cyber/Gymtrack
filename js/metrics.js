@@ -26,7 +26,8 @@ const Metrics = (() => {
   function volumeOfSet(s) {
     if (isWarmup(s)) return 0;
     if (s.weight === undefined || s.weight === null) return 0;
-    return (Number(s.weight) || 0) * (Number(s.reps) || 0);
+    // unilateral: el peso es por lado, así que se levantó dos veces (izquierda y derecha)
+    return (Number(s.weight) || 0) * (Number(s.reps) || 0) * (s.uni ? 2 : 1);
   }
 
   // 1RM estimado (Epley)
@@ -172,7 +173,7 @@ const Metrics = (() => {
   function formatSet(set, isCardio, units) {
     return isCardio
       ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}`
-      : `${Units.label(set.weight)} × ${set.reps}`;
+      : `${Units.label(set.weight)}${set.uni ? ' /lado' : ''} × ${set.reps}`;
   }
 
   // última sesión anterior a una fecha (para "Última vez")
