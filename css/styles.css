@@ -621,8 +621,8 @@ button.pill { cursor: pointer; }
   font-size: 0.78rem; font-weight: 600; color: var(--accent-light);
 }
 
-.action-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-.action-row button { padding: 12px 6px; font-size: 0.82rem; font-weight: 700; border-radius: 14px; background: rgba(255,255,255,0.045); border: 1px solid var(--border-strong); }
+.action-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.action-row button { padding: 12px 2px; font-size: 0.76rem; font-weight: 700; border-radius: 14px; background: rgba(255,255,255,0.045); border: 1px solid var(--border-strong); }
 
 /* ---------- Comidas / macros ---------- */
 .meal-group { margin-bottom: 14px; }
@@ -888,3 +888,13 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 .uni-pill { margin-left: 6px; font-size: 0.62rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-light); vertical-align: middle; }
 .uni-toggle { padding: 6px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(255, 255, 255, 0.06); color: var(--text-dim); border: 1px solid var(--border-strong); }
 .uni-toggle.on { background: var(--accent-soft); color: var(--accent-light); border-color: rgba(var(--accent-rgb), 0.4); }
+
+/* ---------- Entrenamiento: orden estable ---------- */
+.ex-num { display: inline-grid; place-items: center; min-width: 22px; height: 22px; margin-right: 8px; padding: 0 6px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; background: var(--bg-elev-3); color: var(--text-dim); vertical-align: middle; flex: none; }
+.ex-current { box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb), 0.6); }
+.ex-current .ex-num { background: var(--accent-grad); color: var(--on-accent); }
+.ex-pending { padding: 12px 14px; }
+.ex-pending-body { display: flex; align-items: center; gap: 8px; }
+.ex-pending .meta { font-size: 0.76rem; color: var(--text-dim); margin-top: 1px; }
+.ex-collapsed { cursor: pointer; opacity: 0.92; }
+.ex-collapsed.done .ex-num { background: rgba(53, 212, 154, 0.2); color: var(--green); }

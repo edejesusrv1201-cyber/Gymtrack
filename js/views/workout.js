@@ -23,6 +23,8 @@ const WorkoutView = (() => {
   const expandedSet = new Set();
   // si la última serie de un ejercicio fue dropset, la siguiente sugiere dropset
   const typeMemory = {};
+  // ejercicios con series que el usuario contrajo para despejar la pantalla
+  const collapsedSet = new Set();
   let warmupOpen = false;
   let notesOpen = false;
 
@@ -105,38 +107,38 @@ const WorkoutView = (() => {
     const weekR = Metrics.weekRange(0, Utils.parseISO(iso));
     const weekGroups = Metrics.totals(weekR.start, weekR.end).byGroup;
 
-    const exList = Utils.el('div');
-    const pendingItems = Utils.el('div');
-    let pendingCount = 0;
+    // Todos los ejercicios van en un solo listado y SIEMPRE en el mismo orden (el de la rutina).
+    // Cada uno se muestra abierto, contraído (si ya tiene series) o como fila pendiente, pero nunca cambia de lugar.
+    const exList = Utils.el('div', { class: 'ex-flow' });
+    const incomplete = (entry) => {
+      const t = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
+      return !!t && workingCount(entry) < (Number(t.targetSets) || 0);
+    };
+    const currentIdx = log.exercises.findIndex(incomplete);
     log.exercises.forEach((entry, idx) => {
       const key = `${iso}:${entry.exerciseId}`;
-      if (entry.sets.length > 0 || expandedSet.has(key)) {
-        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups));
+      const started = entry.sets.length > 0;
+      const opts = { num: idx + 1, total: log.exercises.length, current: idx === currentIdx, key };
+      if (started && collapsedSet.has(key)) {
+        exList.appendChild(renderCollapsedRow(log, entry, opts, rerender));
+      } else if (started || expandedSet.has(key)) {
+        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups, opts));
       } else {
-        pendingCount += 1;
-        pendingItems.appendChild(renderPendingRow(log, entry, key, rerender));
+        exList.appendChild(renderPendingRow(log, entry, key, rerender, opts));
       }
     });
     view.appendChild(exList);
 
-    if (pendingCount > 0) {
-      const pendingCard = Utils.el('div', { class: 'card' });
-      pendingCard.appendChild(Utils.el('div', { class: 'card-title-row' }, [
-        Utils.el('h3', { text: '📋 Pendientes' }),
-        Utils.el('span', { class: 'eyebrow', text: `${pendingCount}` }),
-      ]));
-      pendingCard.appendChild(pendingItems);
-      view.appendChild(pendingCard);
-    }
-
     // ---- acciones compactas ----
     const addBtn = Utils.el('button', { type: 'button', text: '➕ Ejercicio' });
     addBtn.addEventListener('click', () => openAddExercise(iso, log, rerender));
+    const orderBtn = Utils.el('button', { type: 'button', text: '↕ Orden' });
+    orderBtn.addEventListener('click', () => openReorder(iso, log, rerender));
     const notesBtn = Utils.el('button', { type: 'button', text: log.notes ? '📝 Notas •' : '📝 Notas' });
     notesBtn.addEventListener('click', () => { notesOpen = !notesOpen; rerender(); });
     const timerBtn = Utils.el('button', { type: 'button', text: '⏱ Descanso' });
     timerBtn.addEventListener('click', () => RestTimer.openPanel());
-    view.appendChild(Utils.el('div', { class: 'action-row' }, [addBtn, notesBtn, timerBtn]));
+    view.appendChild(Utils.el('div', { class: 'action-row' }, [addBtn, orderBtn, notesBtn, timerBtn]));
 
     if (notesOpen) {
       const notesCard = Utils.el('div', { class: 'card' });
@@ -236,7 +238,7 @@ const WorkoutView = (() => {
   }
 
   // ---------- tarjeta de ejercicio ----------
-  function renderExerciseCard(iso, log, entry, idx, rerender, weekGroups) {
+  function renderExerciseCard(iso, log, entry, idx, rerender, weekGroups, opts = {}) {
     const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
     const isCardio = !!(ex && ex.group === 'cardio');
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
@@ -248,7 +250,7 @@ const WorkoutView = (() => {
     const warmN = entry.sets.filter(Metrics.isWarmup).length;
     const dropN = entry.sets.filter(Metrics.isDrop).length;
 
-    const card = Utils.el('div', { class: 'card exercise-card' });
+    const card = Utils.el('div', { class: 'card exercise-card' + (opts.current ? ' ex-current' : '') });
 
     // --- cabecera: nombre, contador y acciones ---
     const complete = !!(target && workingN >= target.targetSets);
@@ -259,6 +261,7 @@ const WorkoutView = (() => {
     const headerBtns = Utils.el('div', { style: 'display:flex;align-items:center;gap:2px;flex:none;' }, [
       counterChip,
       ex ? Utils.el('button', { class: 'icon-btn', text: '📈', title: 'Ver progreso', onclick: () => openProgressModal(ex, isCardio) }) : null,
+      entry.sets.length > 0 ? Utils.el('button', { class: 'icon-btn', text: '⌃', title: 'Contraer', onclick: () => { collapsedSet.add(opts.key || key); rerender(); } }) : null,
       Utils.el('button', { class: 'icon-btn', text: '🗑️', onclick: () => {
         if (!Utils.confirmDialog('¿Quitar este ejercicio del día?')) return;
         log.exercises.splice(idx, 1);
@@ -268,8 +271,8 @@ const WorkoutView = (() => {
     ]);
     card.appendChild(Utils.el('div', { class: 'ex-header' }, [
       Utils.el('div', { style: 'min-width:0;' }, [
-        Utils.el('h3', { class: 'mb-0', text: ex ? ex.name : '(ejercicio eliminado)' }),
-        ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: ex.group }) : null,
+        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: String(opts.num) }) : null, ex ? ex.name : '(ejercicio eliminado)']),
+        ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: opts.current ? `${ex.group} · ahora` : ex.group }) : null,
       ]),
       headerBtns,
     ]));
@@ -642,26 +645,96 @@ const WorkoutView = (() => {
     Modal.open(`Editar serie · ${ex ? ex.name : ''}`, body);
   }
 
-  // ---------- fila compacta de un ejercicio pendiente ----------
-  function renderPendingRow(log, entry, key, rerender) {
+  // ---------- fila compacta de un ejercicio pendiente (en su mismo lugar) ----------
+  function renderPendingRow(log, entry, key, rerender, opts = {}) {
     const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
     const isCardio = !!(ex && ex.group === 'cardio');
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
     const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
     const records = ex ? Metrics.exerciseRecords(ex.id, isCardio) : null;
-    const row = Utils.el('div', { class: 'list-item' }, [
-      Utils.el('div', {}, [
-        Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
-        target ? Utils.el('div', { class: 'meta', text: `0 de ${target.targetSets} series · ${target.targetReps}` }) : null,
-        records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent-light);', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio)}` }) : null,
+    const row = Utils.el('div', { class: 'card ex-pending' + (opts.current ? ' ex-current' : '') }, [
+      Utils.el('div', { class: 'ex-pending-body' }, [
+        Utils.el('span', { class: 'ex-num', text: String(opts.num || '') }),
+        Utils.el('div', { style: 'min-width:0;flex:1;' }, [
+          Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
+          target ? Utils.el('div', { class: 'meta', text: `0 de ${target.targetSets} series · ${target.targetReps}` }) : null,
+          records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent-light);', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio)}` }) : null,
+        ]),
+        Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
       ]),
-      Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
     ]);
     row.querySelector('button').addEventListener('click', () => {
       expandedSet.add(key);
       rerender();
     });
     return row;
+  }
+
+  // ---------- fila de un ejercicio ya hecho y contraído ----------
+  function renderCollapsedRow(log, entry, opts, rerender) {
+    const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
+    const isCardio = !!(ex && ex.group === 'cardio');
+    const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
+    const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
+    const workingN = workingCount(entry);
+    const complete = !!(target && workingN >= target.targetSets);
+    const lastSet = [...entry.sets].reverse().find((x) => !Metrics.isWarmup(x)) || entry.sets[entry.sets.length - 1];
+    const row = Utils.el('div', { class: 'card ex-pending ex-collapsed' + (complete ? ' done' : '') }, [
+      Utils.el('div', { class: 'ex-pending-body' }, [
+        Utils.el('span', { class: 'ex-num', text: String(opts.num || '') }),
+        Utils.el('div', { style: 'min-width:0;flex:1;' }, [
+          Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
+          Utils.el('div', { class: 'meta', text: `${target ? `${workingN}/${target.targetSets} series` : `${workingN} serie${workingN === 1 ? '' : 's'}`}${lastSet ? ` · última ${Metrics.formatSet(lastSet, isCardio)}` : ''}` }),
+        ]),
+        Utils.el('span', { class: 'counter-chip' + (complete ? ' done' : ''), text: complete ? '✓' : `${workingN}` }),
+        Utils.el('span', { class: 'caret', text: '⌄' }),
+      ]),
+    ]);
+    row.addEventListener('click', () => { collapsedSet.delete(opts.key); rerender(); });
+    return row;
+  }
+
+  // ---------- cambiar el orden de los ejercicios del día ----------
+  function openReorder(iso, log, rerender) {
+    const body = Utils.el('div');
+    const list = Utils.el('div');
+    const exName = (id) => { const e = DB.getExercises().find((x) => x.id === id); return e ? e.name : '(eliminado)'; };
+    const exGroup = (id) => { const e = DB.getExercises().find((x) => x.id === id); return e ? e.group : 'otro'; };
+    function paint() {
+      list.innerHTML = '';
+      log.exercises.forEach((entry, idx) => {
+        const up = Utils.el('button', { class: 'icon-btn', text: '▲', title: 'Subir' });
+        const down = Utils.el('button', { class: 'icon-btn', text: '▼', title: 'Bajar' });
+        up.disabled = idx === 0;
+        down.disabled = idx === log.exercises.length - 1;
+        const move = (to) => {
+          const [item] = log.exercises.splice(idx, 1);
+          log.exercises.splice(to, 0, item);
+          saveLog(iso, log);
+          paint();
+        };
+        up.addEventListener('click', () => move(idx - 1));
+        down.addEventListener('click', () => move(idx + 1));
+        const done = entry.sets.length;
+        list.appendChild(Utils.el('div', { class: 'rt-row', style: `--gc:${Utils.GROUP_COLORS[exGroup(entry.exerciseId)] || '#8d95a8'}` }, [
+          Utils.el('div', { class: 'rt-top' }, [
+            Utils.el('span', { class: 'rt-num', text: String(idx + 1) }),
+            Utils.el('div', { class: 'rt-name' }, [
+              Utils.el('div', { text: exName(entry.exerciseId) }),
+              Utils.el('div', { class: 'rt-group', text: done ? `${exGroup(entry.exerciseId)} · ${done} serie${done === 1 ? '' : 's'}` : exGroup(entry.exerciseId) }),
+            ]),
+            Utils.el('div', { class: 'rt-actions' }, [up, down]),
+          ]),
+        ]));
+      });
+    }
+    paint();
+    body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:0 0 4px;', text: 'Sube o baja los ejercicios para dejarlos en el orden en que los haces. Tus series registradas no se tocan.' }));
+    body.appendChild(list);
+    const done = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Listo' });
+    done.addEventListener('click', () => { Modal.close(); rerender(); });
+    body.appendChild(done);
+    Modal.open('Orden del entrenamiento', body, { onClose: rerender });
   }
 
   // ---------- progreso histórico de un ejercicio ----------
