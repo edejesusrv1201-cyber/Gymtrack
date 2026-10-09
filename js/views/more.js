@@ -303,6 +303,38 @@ const MoreView = (() => {
     const aboutCard = Utils.el('div', { class: 'card' });
     aboutCard.appendChild(Utils.el('h3', { text: 'ℹ️ Acerca de MiGymTrack' }));
     aboutCard.appendChild(Utils.el('p', { text: 'App personal para llevar tu progreso de gym: rutinas mensuales, series normales, aproximaciones y dropsets, cardio, calentamiento, cronómetro de descanso, calorías, agua y medidas, con métricas y gráficas de progreso por semana, grupo muscular y ejercicio. Todo se guarda localmente en tu celular.' }));
+    // versión en uso y botón para forzar la actualización (por si el celular guarda la versión vieja)
+    const running = ((document.querySelector('script[src*="app.js"]') || {}).src || '').match(/v=(\d+)/);
+    const runningV = running ? running[1] : '?';
+    const verLine = Utils.el('p', { class: 'small', style: 'margin:10px 0 8px;', text: `Versión en uso: v${runningV}` });
+    const updBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🔄 Buscar actualización' });
+    updBtn.addEventListener('click', async () => {
+      updBtn.disabled = true;
+      updBtn.textContent = 'Buscando…';
+      try {
+        const txt = await fetch(`sw.js?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.text());
+        const m = txt.match(/migymtrack-v(\d+)/);
+        const latest = m ? m[1] : null;
+        if (latest && latest === runningV) {
+          verLine.textContent = `Versión en uso: v${runningV} · ya tienes la más reciente ✓`;
+          updBtn.textContent = '🔄 Buscar actualización';
+          updBtn.disabled = false;
+          return;
+        }
+        // hay una versión nueva (o no se pudo saber): limpia lo guardado y recarga. Tus datos no se tocan.
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch (e) { /* sin internet: solo recarga */ }
+      location.reload();
+    });
+    aboutCard.appendChild(verLine);
+    aboutCard.appendChild(updBtn);
     view.appendChild(aboutCard);
 
     root.appendChild(view);
