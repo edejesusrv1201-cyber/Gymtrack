@@ -341,6 +341,7 @@ const WorkoutView = (() => {
         Utils.el('span', { class: 'set-main', text: mainLabel }),
         set.pr ? Utils.el('span', { title: `Récord de ${set.pr.replace(',', ' y ')}`, text: '🏆' }) : null,
         Metrics.isWarmup(set) ? Utils.el('span', { class: 'set-felt', text: 'aprox.' }) : Utils.el('span', { class: 'set-felt', text: `${feltOpt.icon} ${feltOpt.label}` }),
+        Utils.el('button', { class: 'icon-btn', text: '✏️', title: 'Editar esta serie', onclick: () => openEditSet(iso, log, entry, sIdx, ex, isCardio, rerender) }),
         Utils.el('button', { class: 'icon-btn', text: '✕', onclick: () => {
           entry.sets.splice(sIdx, 1);
           saveLog(iso, log);
@@ -526,6 +527,119 @@ const WorkoutView = (() => {
     card.appendChild(form);
 
     return card;
+  }
+
+  // ---------- editar una serie ya registrada ----------
+  function openEditSet(iso, log, entry, sIdx, ex, isCardio, rerender) {
+    const set = entry.sets[sIdx];
+    if (!set) return;
+    const body = Utils.el('div');
+    let type = set.type === 'warmup' || set.type === 'drop' ? set.type : 'normal';
+    let uni = !!set.uni;
+    let felt = set.felt || 'normal';
+    let unit = isCardio ? Units.current() : Units.inputUnitFor(entry.exerciseId);
+    let weightIn, repsIn, durIn, distIn, calIn;
+
+    const feltWrap = Utils.el('div', { class: 'mt-8' });
+    const feltRow = Utils.el('div', { class: 'felt-select' });
+    const paintFelt = () => feltRow.querySelectorAll('.felt-btn').forEach((b) => b.classList.toggle('selected', b.dataset.k === felt));
+    FELT_OPTIONS.forEach((f) => {
+      const b = Utils.el('button', { class: 'felt-btn', title: f.label, type: 'button', 'data-k': f.key }, [Utils.el('div', { text: f.icon })]);
+      b.addEventListener('click', () => { felt = f.key; paintFelt(); });
+      feltRow.appendChild(b);
+    });
+    feltWrap.appendChild(feltRow);
+
+    if (isCardio) {
+      durIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: set.duration !== undefined ? String(set.duration) : '' });
+      distIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: '0.1', value: set.distance ? String(set.distance) : '' });
+      calIn = Utils.el('input', { type: 'number', inputmode: 'numeric', value: set.calories ? String(set.calories) : '' });
+      body.appendChild(Utils.el('div', { class: 'field-row' }, [
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Duración (min)' }), durIn]),
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Distancia (km)' }), distIn]),
+      ]));
+      body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Calorías' }), calIn]));
+    } else {
+      const segFor = (opts, get, set_) => {
+        const row = Utils.el('div', { class: 'seg small' });
+        const paint = () => row.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.k === String(get())));
+        opts.forEach(([k, t]) => {
+          const b = Utils.el('button', { class: 'seg-btn', type: 'button', 'data-k': k, text: t });
+          b.addEventListener('click', () => { set_(k); paint(); });
+          row.appendChild(b);
+        });
+        paint();
+        return row;
+      };
+      body.appendChild(Utils.el('div', { class: 'field' }, [
+        Utils.el('label', { text: 'Tipo de serie' }),
+        segFor(SET_TYPES.map((t) => [t.key, t.label]), () => type, (k) => { type = k; feltWrap.classList.toggle('hidden', type === 'warmup'); }),
+      ]));
+      body.appendChild(Utils.el('div', { class: 'field' }, [
+        Utils.el('label', { text: '¿Unilateral?' }),
+        segFor([['0', 'Bilateral'], ['1', 'Unilateral · peso por lado']], () => (uni ? '1' : '0'), (k) => { uni = k === '1'; weightLabel.textContent = weightText(); }),
+      ]));
+
+      const weightText = () => (uni ? `Peso por lado (${unit})` : `Peso (${unit})`);
+      const weightLabel = Utils.el('label', { text: weightText() });
+      weightIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: set.weight !== undefined && set.weight !== null ? String(Units.num(set.weight, unit)) : '' });
+      const unitBtn = Utils.el('button', { class: 'unit-btn', type: 'button', title: 'Cambiar entre kg y lb', text: unit });
+      unitBtn.addEventListener('click', () => {
+        const next = unit === 'kg' ? 'lb' : 'kg';
+        const typed = parseFloat(weightIn.value);
+        if (!isNaN(typed)) weightIn.value = Math.round(Units.fromKg(Units.toKg(typed, unit), next) * 10) / 10;
+        unit = next;
+        unitBtn.textContent = next;
+        weightLabel.textContent = weightText();
+      });
+      repsIn = Utils.el('input', { type: 'number', inputmode: 'numeric', value: set.reps !== undefined ? String(set.reps) : '' });
+      body.appendChild(Utils.el('div', { class: 'field-row' }, [
+        Utils.el('div', { class: 'field' }, [weightLabel, Utils.el('div', { class: 'input-unit' }, [weightIn, unitBtn])]),
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Repeticiones' }), repsIn]),
+      ]));
+    }
+
+    body.appendChild(Utils.el('label', { class: 'small text-dim', style: 'display:block;margin-top:4px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:0.7rem;', text: 'Sensación' }));
+    body.appendChild(feltWrap);
+    feltWrap.classList.toggle('hidden', !isCardio && type === 'warmup');
+    paintFelt();
+
+    const saveBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Guardar cambios' });
+    saveBtn.addEventListener('click', () => {
+      const next = { felt: !isCardio && type === 'warmup' ? 'normal' : felt };
+      if (isCardio) {
+        const duration = parseFloat(durIn.value);
+        if (isNaN(duration) || duration <= 0) { Utils.toast('Ingresa la duración en minutos'); return; }
+        next.duration = duration;
+        if (distIn.value !== '') next.distance = parseFloat(distIn.value);
+        if (calIn.value !== '') next.calories = parseFloat(calIn.value);
+      } else {
+        const entered = parseFloat(weightIn.value);
+        const reps = parseInt(repsIn.value, 10);
+        if (isNaN(entered) || isNaN(reps) || reps <= 0) { Utils.toast('Ingresa peso y repeticiones válidas'); return; }
+        next.weight = Units.toKg(entered, unit);
+        next.reps = reps;
+        if (type !== 'normal') next.type = type;
+        if (uni) next.uni = true;
+      }
+      // recalcula el récord de esta serie comparándola con las demás
+      entry.sets.splice(sIdx, 1);
+      saveLog(iso, log);
+      const prs = Metrics.detectPR(entry.exerciseId, isCardio, next);
+      if (prs.length) next.pr = prs.map((x) => x.kind).join(',');
+      entry.sets.splice(sIdx, 0, next);
+      saveLog(iso, log);
+      if (ex && !isCardio && uni !== !!ex.unilateral) {
+        const all = DB.getExercises();
+        const t = all.find((e) => e.id === ex.id);
+        if (t) { t.unilateral = uni; DB.saveExercises(all); }
+      }
+      Modal.close();
+      Utils.toast('Serie actualizada');
+      rerender();
+    });
+    body.appendChild(saveBtn);
+    Modal.open(`Editar serie · ${ex ? ex.name : ''}`, body);
   }
 
   // ---------- fila compacta de un ejercicio pendiente ----------
