@@ -858,3 +858,25 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 .sm-cell.other { background: rgba(255, 255, 255, 0.07); color: var(--text); }
 .sm-cell.now { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.55); }
 .wk-line { font-size: 0.76rem; font-weight: 700; margin-top: 6px; }
+
+/* ---------- Editor de rutinas ---------- */
+.rt-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.rt-summary:empty { display: none; }
+.rt-total { font-size: 0.74rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-light); }
+.rt-pill { font-size: 0.74rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); text-transform: capitalize; }
+.rt-row { margin-top: 8px; padding: 10px 6px 10px 10px; border-left: 3px solid var(--gc, var(--border)); background: rgba(255, 255, 255, 0.03); border-radius: 0 12px 12px 0; }
+.rt-top { display: flex; align-items: center; gap: 8px; }
+.rt-num { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 0.7rem; font-weight: 800; background: var(--bg-elev-3); color: var(--text-dim); }
+.rt-name { flex: 1; min-width: 0; font-weight: 700; font-size: 0.92rem; }
+.rt-group { font-size: 0.68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--gc); }
+.rt-actions { display: flex; flex: none; }
+.rt-actions .icon-btn { padding: 6px 9px; }
+.rt-actions .icon-btn:disabled { opacity: 0.25; }
+.rt-edit { display: flex; gap: 8px; margin-top: 8px; padding-left: 30px; }
+.rt-edit label { display: flex; flex-direction: column; gap: 3px; width: 72px; }
+.rt-edit label.grow { flex: 1; width: auto; }
+.rt-edit label span { font-size: 0.62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.rt-edit input { padding: 8px 10px; min-width: 0; width: 100%; }
+.rt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+.rt-chip { padding: 7px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; text-transform: capitalize; background: rgba(255, 255, 255, 0.06); color: var(--gc); border: 1px solid var(--border-strong); }
+.rt-chip.active { background: var(--gc); color: #14161d; border-color: transparent; }

@@ -165,54 +165,139 @@ const PlanView = (() => {
     Modal.open('Mis rutinas', body, { onClose: onDone });
   }
 
+  const EDITOR_GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
+  let lastPickedGroup = null;
+
   function openRoutineEditor(routineId, onDone) {
     const routines = DB.getRoutines();
     const r = routines.find((x) => x.id === routineId);
     if (!r) return;
+    const save = () => DB.saveRoutines(routines);
+    const exById = () => {
+      const m = {};
+      DB.getExercises().forEach((e) => { m[e.id] = e; });
+      return m;
+    };
     const body = Utils.el('div');
 
+    // ---- nombre y color ----
     const nameInput = Utils.el('input', { type: 'text', value: r.name });
-    nameInput.addEventListener('change', () => { r.name = nameInput.value || 'Sin nombre'; DB.saveRoutines(routines); });
+    nameInput.addEventListener('change', () => { r.name = nameInput.value || 'Sin nombre'; save(); });
     body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Nombre' }), nameInput]));
 
     const colorRow = Utils.el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;' });
-    COLORS.forEach((c) => {
-      const dot = Utils.el('button', { style: `width:28px;height:28px;border-radius:50%;background:${c};${c === r.color ? 'outline:2px solid white;' : ''}` });
-      dot.addEventListener('click', () => { r.color = c; DB.saveRoutines(routines); openRoutineEditor(routineId, onDone); });
+    const paintDots = () => dots.forEach((d, i) => { d.style.outline = COLORS[i] === r.color ? '2px solid white' : 'none'; });
+    const dots = COLORS.map((c) => {
+      const dot = Utils.el('button', { style: `width:28px;height:28px;border-radius:50%;background:${c};` });
+      dot.addEventListener('click', () => { r.color = c; save(); paintDots(); });
       colorRow.appendChild(dot);
+      return dot;
     });
+    paintDots();
     body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Color' }), colorRow]));
 
+    // ---- lista de ejercicios (se edita en el lugar) ----
     body.appendChild(Utils.el('div', { class: 'small text-dim mt-8', text: 'EJERCICIOS DE LA RUTINA' }));
+    const summary = Utils.el('div', { class: 'rt-summary' });
     const exList = Utils.el('div');
-    r.exercises.forEach((re, idx) => {
-      const ex = DB.getExercises().find((e) => e.id === re.exerciseId);
-      const row = Utils.el('div', { class: 'list-item' }, [
-        Utils.el('span', { text: ex ? ex.name : '(eliminado)' }),
-        Utils.el('span', { class: 'meta', text: `${re.targetSets}x ${re.targetReps}` }),
-        Utils.el('button', { class: 'icon-btn', text: '✕' }),
-      ]);
-      row.querySelector('button').addEventListener('click', () => {
-        r.exercises.splice(idx, 1);
-        DB.saveRoutines(routines);
-        openRoutineEditor(routineId, onDone);
-      });
-      exList.appendChild(row);
-    });
+    body.appendChild(summary);
     body.appendChild(exList);
 
-    const exSelect = Utils.el('select', {});
-    DB.getExercises().forEach((ex) => exSelect.appendChild(Utils.el('option', { value: ex.id, text: ex.name })));
-    const setsInput = Utils.el('input', { type: 'number', placeholder: 'Series', value: '3' });
-    const repsInput = Utils.el('input', { type: 'text', placeholder: 'Reps (ej. 8-10)', value: '10' });
-    const setsLabel = Utils.el('label', { text: 'Series' });
-    const repsLabel = Utils.el('label', { text: 'Reps objetivo' });
-    const setsField = Utils.el('div', { class: 'field' }, [setsLabel, setsInput]);
-    const repsField = Utils.el('div', { class: 'field' }, [repsLabel, repsInput]);
+    function renderSummary() {
+      const exs = exById();
+      const by = {};
+      r.exercises.forEach((re) => {
+        const ex = exs[re.exerciseId];
+        if (!ex || ex.group === 'cardio') return;
+        by[ex.group] = (by[ex.group] || 0) + (Number(re.targetSets) || 0);
+      });
+      summary.innerHTML = '';
+      const total = Object.values(by).reduce((a, b) => a + b, 0);
+      if (!total) return;
+      summary.appendChild(Utils.el('span', { class: 'rt-total', text: `${total} series` }));
+      Object.keys(by).forEach((g) => {
+        summary.appendChild(Utils.el('span', { class: 'rt-pill', style: `color:${Utils.GROUP_COLORS[g] || '#8d95a8'}`, text: `${g} ${by[g]}` }));
+      });
+    }
 
-    function updateFieldsForSelection() {
-      const ex = DB.getExercises().find((e) => e.id === exSelect.value);
-      const isCardio = !!(ex && ex.group === 'cardio');
+    function renderList() {
+      const exs = exById();
+      exList.innerHTML = '';
+      if (r.exercises.length === 0) {
+        exList.appendChild(Utils.el('div', { class: 'small text-dim', style: 'padding:10px 0;', text: 'Aún no hay ejercicios. Agrégalos abajo.' }));
+      }
+      r.exercises.forEach((re, idx) => {
+        const ex = exs[re.exerciseId];
+        const group = ex ? ex.group : 'otro';
+        const isCardio = group === 'cardio';
+
+        const setsIn = Utils.el('input', { type: 'number', min: '1', inputmode: 'numeric', value: String(re.targetSets || 1), title: 'Series' });
+        setsIn.addEventListener('change', () => {
+          re.targetSets = Math.max(1, Math.round(Number(setsIn.value) || 1));
+          setsIn.value = re.targetSets;
+          save();
+          renderSummary();
+        });
+        const repsIn = Utils.el('input', { type: 'text', value: String(re.targetReps || ''), title: isCardio ? 'Duración / distancia' : 'Reps', placeholder: isCardio ? 'ej. 20 min' : 'ej. 8-10' });
+        repsIn.addEventListener('change', () => { re.targetReps = repsIn.value.trim() || (isCardio ? '' : '10'); save(); });
+
+        const up = Utils.el('button', { class: 'icon-btn', text: '▲', title: 'Subir' });
+        const down = Utils.el('button', { class: 'icon-btn', text: '▼', title: 'Bajar' });
+        const del = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Quitar' });
+        up.disabled = idx === 0;
+        down.disabled = idx === r.exercises.length - 1;
+        const move = (to) => {
+          const [item] = r.exercises.splice(idx, 1);
+          r.exercises.splice(to, 0, item);
+          save();
+          renderList();
+        };
+        up.addEventListener('click', () => move(idx - 1));
+        down.addEventListener('click', () => move(idx + 1));
+        del.addEventListener('click', () => { r.exercises.splice(idx, 1); save(); renderList(); fillExercises(); });
+
+        const color = Utils.GROUP_COLORS[group] || '#8d95a8';
+        exList.appendChild(Utils.el('div', { class: 'rt-row', style: `--gc:${color}` }, [
+          Utils.el('div', { class: 'rt-top' }, [
+            Utils.el('span', { class: 'rt-num', text: String(idx + 1) }),
+            Utils.el('div', { class: 'rt-name' }, [
+              Utils.el('div', { text: ex ? ex.name : '(eliminado)' }),
+              Utils.el('div', { class: 'rt-group', text: group }),
+            ]),
+            Utils.el('div', { class: 'rt-actions' }, [up, down, del]),
+          ]),
+          Utils.el('div', { class: 'rt-edit' }, [
+            isCardio ? null : Utils.el('label', {}, [Utils.el('span', { text: 'Series' }), setsIn]),
+            Utils.el('label', { class: 'grow' }, [Utils.el('span', { text: isCardio ? 'Duración / distancia' : 'Reps' }), repsIn]),
+          ]),
+        ]));
+      });
+      renderSummary();
+    }
+
+    // ---- agregar ejercicio: primero grupo muscular, luego ejercicio ----
+    body.appendChild(Utils.el('div', { class: 'small text-dim mt-8', text: 'AGREGAR EJERCICIO' }));
+    const chipsRow = Utils.el('div', { class: 'rt-chips' });
+    const exSelect = Utils.el('select', {});
+    const setsInput = Utils.el('input', { type: 'number', min: '1', inputmode: 'numeric', value: '3' });
+    const repsInput = Utils.el('input', { type: 'text', value: '10' });
+    const repsLabel = Utils.el('label', { text: 'Reps objetivo' });
+    const setsField = Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Series' }), setsInput]);
+    const repsField = Utils.el('div', { class: 'field' }, [repsLabel, repsInput]);
+    let group = null;
+
+    function groupsAvailable() {
+      const present = new Set(DB.getExercises().map((e) => e.group));
+      return EDITOR_GROUPS.filter((g) => present.has(g)).concat([...present].filter((g) => !EDITOR_GROUPS.includes(g)));
+    }
+
+    function fillExercises() {
+      const used = new Set(r.exercises.map((re) => re.exerciseId));
+      exSelect.innerHTML = '';
+      DB.getExercises().filter((e) => e.group === group)
+        .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+        .forEach((ex) => exSelect.appendChild(Utils.el('option', { value: ex.id, text: used.has(ex.id) ? `${ex.name}  ✓ ya está` : ex.name })));
+      const isCardio = group === 'cardio';
       setsField.classList.toggle('hidden', isCardio);
       if (isCardio) {
         setsInput.value = '1';
@@ -226,20 +311,42 @@ const PlanView = (() => {
         if (setsInput.value === '1') setsInput.value = '3';
       }
     }
-    exSelect.addEventListener('change', updateFieldsForSelection);
-    updateFieldsForSelection();
 
-    body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Agregar ejercicio' }), exSelect]));
+    function paintChips() {
+      chipsRow.innerHTML = '';
+      groupsAvailable().forEach((g) => {
+        const color = Utils.GROUP_COLORS[g] || '#8d95a8';
+        const chip = Utils.el('button', { type: 'button', class: `rt-chip${g === group ? ' active' : ''}`, style: `--gc:${color}`, text: g });
+        chip.addEventListener('click', () => { group = g; lastPickedGroup = g; paintChips(); fillExercises(); });
+        chipsRow.appendChild(chip);
+      });
+    }
+
+    const avail = groupsAvailable();
+    group = avail.includes(lastPickedGroup) ? lastPickedGroup : avail[0];
+    paintChips();
+    fillExercises();
+
+    body.appendChild(chipsRow);
+    body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Ejercicio' }), exSelect]));
     body.appendChild(Utils.el('div', { class: 'field-row' }, [setsField, repsField]));
     const addExBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Agregar a la rutina' });
     addExBtn.addEventListener('click', () => {
       if (!exSelect.value) return;
-      r.exercises.push({ exerciseId: exSelect.value, targetSets: Number(setsInput.value) || 3, targetReps: repsInput.value || '10' });
-      DB.saveRoutines(routines);
-      openRoutineEditor(routineId, onDone);
+      const isCardio = group === 'cardio';
+      r.exercises.push({
+        exerciseId: exSelect.value,
+        targetSets: isCardio ? 1 : Math.max(1, Math.round(Number(setsInput.value) || 3)),
+        targetReps: repsInput.value.trim() || (isCardio ? '' : '10'),
+      });
+      save();
+      renderList();
+      fillExercises();
+      if (exList.lastElementChild) exList.lastElementChild.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
     body.appendChild(addExBtn);
 
+    renderList();
     Modal.open(`Editar: ${r.name}`, body, { onClose: onDone });
   }
 
