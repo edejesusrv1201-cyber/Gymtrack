@@ -18,13 +18,13 @@ const WorkoutView = (() => {
     { key: 'drop', label: 'Dropset' },
   ];
 
-  // ejercicios del día que el usuario ya expandió para registrar
-  // (los que ya tienen series siempre se muestran expandidos)
-  const expandedSet = new Set();
+  // Un solo ejercicio abierto a la vez (el "activo"); los demás son filas compactas.
+  // activo por fecha: exerciseId
+  const activeByDate = {};
+  // al terminar de dibujar, lleva la vista a este ejercicio (tras cambiar de activo o de orden)
+  let scrollToKey = null;
   // si la última serie de un ejercicio fue dropset, la siguiente sugiere dropset
   const typeMemory = {};
-  // ejercicios con series que el usuario contrajo para despejar la pantalla
-  const collapsedSet = new Set();
   let warmupOpen = false;
   let notesOpen = false;
 
@@ -77,7 +77,7 @@ const WorkoutView = (() => {
     if (syncRoutineExercises(log, routine)) changed = true;
     if (changed) saveLog(iso, log);
 
-    if (params && params.focus) expandedSet.add(`${iso}:${params.focus}`);
+    if (params && params.focus) { activeByDate[iso] = params.focus; scrollToKey = `${iso}:${params.focus}`; }
     const reparams = { date: iso };
     const rerender = () => render(root, reparams);
 
@@ -108,23 +108,31 @@ const WorkoutView = (() => {
     const weekGroups = Metrics.totals(weekR.start, weekR.end).byGroup;
 
     // Todos los ejercicios van en un solo listado y SIEMPRE en el mismo orden (el de la rutina).
-    // Cada uno se muestra abierto, contraído (si ya tiene series) o como fila pendiente, pero nunca cambia de lugar.
-    const exList = Utils.el('div', { class: 'ex-flow' });
+    // Solo UNO está abierto (el activo); los demás son filas compactas que se tocan para abrirlos.
     const incomplete = (entry) => {
       const t = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
       return !!t && workingCount(entry) < (Number(t.targetSets) || 0);
     };
-    const currentIdx = log.exercises.findIndex(incomplete);
+    let activeId = activeByDate[iso];
+    if (!activeId || !log.exercises.some((e) => e.exerciseId === activeId)) {
+      const firstPending = log.exercises.find(incomplete);
+      const lastWithSets = [...log.exercises].reverse().find((e) => e.sets.length > 0);
+      const pick = firstPending || lastWithSets || log.exercises[0];
+      activeId = pick ? pick.exerciseId : null;
+      activeByDate[iso] = activeId;
+    }
+    const activeIdx = log.exercises.findIndex((e) => e.exerciseId === activeId);
+    const activeEntry = activeIdx >= 0 ? log.exercises[activeIdx] : null;
+
+    const exList = Utils.el('div', { class: 'ex-flow' });
+    if (activeEntry) exList.appendChild(renderNowBar(iso, log, routine, activeEntry, activeIdx));
     log.exercises.forEach((entry, idx) => {
       const key = `${iso}:${entry.exerciseId}`;
-      const started = entry.sets.length > 0;
-      const opts = { num: idx + 1, total: log.exercises.length, current: idx === currentIdx, key };
-      if (started && collapsedSet.has(key)) {
-        exList.appendChild(renderCollapsedRow(log, entry, opts, rerender));
-      } else if (started || expandedSet.has(key)) {
-        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups, opts));
+      const opts = { num: idx + 1, total: log.exercises.length, key, iso };
+      if (idx === activeIdx) {
+        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups, Object.assign({ current: true, incomplete }, opts)));
       } else {
-        exList.appendChild(renderPendingRow(log, entry, key, rerender, opts));
+        exList.appendChild(renderRow(iso, log, entry, idx, opts, rerender));
       }
     });
     view.appendChild(exList);
@@ -165,6 +173,41 @@ const WorkoutView = (() => {
     }
 
     root.appendChild(view);
+
+    if (scrollToKey) {
+      const k = scrollToKey;
+      scrollToKey = null;
+      setTimeout(() => {
+        const el = view.querySelector(`[data-key="${k}"]`);
+        if (el) {
+          const hdr = document.querySelector('.app-header');
+          const off = (hdr ? hdr.offsetHeight : 70) + 44;
+          window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - off), behavior: 'smooth' });
+        }
+      }, 60);
+    }
+  }
+
+  // ---------- barra "ahora": siempre visible, dice qué ejercicio estás haciendo ----------
+  function renderNowBar(iso, log, routine, entry, idx) {
+    const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
+    const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
+    const n = workingCount(entry);
+    const bar = Utils.el('div', { class: 'now-bar' }, [
+      Utils.el('span', { class: 'ex-num', text: String(idx + 1) }),
+      Utils.el('div', { class: 'now-main' }, [
+        Utils.el('div', { class: 'now-label', text: 'AHORA' }),
+        Utils.el('div', { class: 'now-name', text: ex ? ex.name : '(ejercicio eliminado)' }),
+      ]),
+      Utils.el('span', { class: 'counter-chip' + (target && n >= target.targetSets ? ' done' : ''), text: target ? `${n}/${target.targetSets}` : `${n}` }),
+    ]);
+    const hdr = document.querySelector('.app-header');
+    bar.style.top = `${hdr ? Math.max(0, hdr.offsetHeight - 12) : 60}px`;
+    bar.addEventListener('click', () => {
+      const el = document.querySelector(`[data-key="${iso}:${entry.exerciseId}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return bar;
   }
 
   // ---------- encabezado con progreso del día ----------
@@ -250,7 +293,7 @@ const WorkoutView = (() => {
     const warmN = entry.sets.filter(Metrics.isWarmup).length;
     const dropN = entry.sets.filter(Metrics.isDrop).length;
 
-    const card = Utils.el('div', { class: 'card exercise-card' + (opts.current ? ' ex-current' : '') });
+    const card = Utils.el('div', { class: 'card exercise-card ex-current', 'data-key': opts.key || key });
 
     // --- cabecera: nombre, contador y acciones ---
     const complete = !!(target && workingN >= target.targetSets);
@@ -258,10 +301,11 @@ const WorkoutView = (() => {
       class: 'counter-chip' + (complete ? ' done' : ''),
       text: target ? `${workingN}/${target.targetSets}${complete ? ' ✓' : ''}` : `${workingN}`,
     });
-    const headerBtns = Utils.el('div', { style: 'display:flex;align-items:center;gap:2px;flex:none;' }, [
+    const headerBtns = Utils.el('div', { style: 'display:flex;align-items:center;gap:0;flex:none;' }, [
       counterChip,
       ex ? Utils.el('button', { class: 'icon-btn', text: '📈', title: 'Ver progreso', onclick: () => openProgressModal(ex, isCardio) }) : null,
-      entry.sets.length > 0 ? Utils.el('button', { class: 'icon-btn', text: '⌃', title: 'Contraer', onclick: () => { collapsedSet.add(opts.key || key); rerender(); } }) : null,
+      Utils.el('button', { class: 'icon-btn', text: '▲', title: 'Subir en el orden', disabled: idx === 0 ? 'disabled' : null, onclick: () => moveEntry(iso, log, idx, -1, rerender) }),
+      Utils.el('button', { class: 'icon-btn', text: '▼', title: 'Bajar en el orden', disabled: idx === log.exercises.length - 1 ? 'disabled' : null, onclick: () => moveEntry(iso, log, idx, 1, rerender) }),
       Utils.el('button', { class: 'icon-btn', text: '🗑️', onclick: () => {
         if (!Utils.confirmDialog('¿Quitar este ejercicio del día?')) return;
         log.exercises.splice(idx, 1);
@@ -272,7 +316,7 @@ const WorkoutView = (() => {
     card.appendChild(Utils.el('div', { class: 'ex-header' }, [
       Utils.el('div', { style: 'min-width:0;' }, [
         Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: String(opts.num) }) : null, ex ? ex.name : '(ejercicio eliminado)']),
-        ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: opts.current ? `${ex.group} · ahora` : ex.group }) : null,
+        ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: ex.group }) : null,
       ]),
       headerBtns,
     ]));
@@ -529,6 +573,20 @@ const WorkoutView = (() => {
     form.appendChild(addSetBtn);
     card.appendChild(form);
 
+    // pasar al siguiente ejercicio (cierra este y abre el otro)
+    if (idx < log.exercises.length - 1) {
+      const rest = log.exercises.slice(idx + 1);
+      const nextEntry = (opts.incomplete && rest.find(opts.incomplete)) || rest[0];
+      const nextEx = DB.getExercises().find((e) => e.id === nextEntry.exerciseId);
+      const nextBtn = Utils.el('button', {
+        class: complete ? 'btn-primary btn-block mt-8' : 'btn-secondary btn-block mt-8',
+        type: 'button',
+        text: `Siguiente: ${nextEx ? nextEx.name : 'ejercicio'} →`,
+      });
+      nextBtn.addEventListener('click', () => setActive(iso, nextEntry.exerciseId, rerender));
+      card.appendChild(nextBtn);
+    }
+
     return card;
   }
 
@@ -645,52 +703,55 @@ const WorkoutView = (() => {
     Modal.open(`Editar serie · ${ex ? ex.name : ''}`, body);
   }
 
-  // ---------- fila compacta de un ejercicio pendiente (en su mismo lugar) ----------
-  function renderPendingRow(log, entry, key, rerender, opts = {}) {
-    const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
-    const isCardio = !!(ex && ex.group === 'cardio');
-    const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
-    const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
-    const records = ex ? Metrics.exerciseRecords(ex.id, isCardio) : null;
-    const row = Utils.el('div', { class: 'card ex-pending' + (opts.current ? ' ex-current' : '') }, [
-      Utils.el('div', { class: 'ex-pending-body' }, [
-        Utils.el('span', { class: 'ex-num', text: String(opts.num || '') }),
-        Utils.el('div', { style: 'min-width:0;flex:1;' }, [
-          Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
-          target ? Utils.el('div', { class: 'meta', text: `0 de ${target.targetSets} series · ${target.targetReps}` }) : null,
-          records ? Utils.el('div', { class: 'meta', style: 'color:var(--accent-light);', text: `🏆 ${Metrics.formatSet(records.max.set, isCardio)}` }) : null,
-        ]),
-        Utils.el('button', { class: 'btn-small', text: '▶ Empezar' }),
-      ]),
-    ]);
-    row.querySelector('button').addEventListener('click', () => {
-      expandedSet.add(key);
-      rerender();
-    });
-    return row;
+  function setActive(iso, exerciseId, rerender) {
+    activeByDate[iso] = exerciseId;
+    scrollToKey = `${iso}:${exerciseId}`;
+    rerender();
   }
 
-  // ---------- fila de un ejercicio ya hecho y contraído ----------
-  function renderCollapsedRow(log, entry, opts, rerender) {
+  function moveEntry(iso, log, idx, delta, rerender) {
+    const to = idx + delta;
+    if (to < 0 || to >= log.exercises.length) return;
+    const [item] = log.exercises.splice(idx, 1);
+    log.exercises.splice(to, 0, item);
+    saveLog(iso, log);
+    scrollToKey = `${iso}:${item.exerciseId}`;
+    rerender();
+  }
+
+  // ---------- fila compacta de un ejercicio (no activo), en su mismo lugar ----------
+  function renderRow(iso, log, entry, idx, opts, rerender) {
     const ex = DB.getExercises().find((e) => e.id === entry.exerciseId);
     const isCardio = !!(ex && ex.group === 'cardio');
     const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
     const target = routine ? routine.exercises.find((re) => re.exerciseId === entry.exerciseId) : null;
     const workingN = workingCount(entry);
+    const started = entry.sets.length > 0;
     const complete = !!(target && workingN >= target.targetSets);
     const lastSet = [...entry.sets].reverse().find((x) => !Metrics.isWarmup(x)) || entry.sets[entry.sets.length - 1];
-    const row = Utils.el('div', { class: 'card ex-pending ex-collapsed' + (complete ? ' done' : '') }, [
+
+    let meta;
+    if (!started) meta = target ? `0 de ${target.targetSets} series · ${target.targetReps}` : 'Sin series';
+    else meta = `${target ? `${workingN}/${target.targetSets} series` : `${workingN} serie${workingN === 1 ? '' : 's'}`}${lastSet ? ` · última ${Metrics.formatSet(lastSet, isCardio)}` : ''}`;
+
+    const up = Utils.el('button', { class: 'icon-btn', text: '▲', title: 'Subir en el orden' });
+    const down = Utils.el('button', { class: 'icon-btn', text: '▼', title: 'Bajar en el orden' });
+    up.disabled = idx === 0;
+    down.disabled = idx === log.exercises.length - 1;
+    up.addEventListener('click', (e) => { e.stopPropagation(); moveEntry(iso, log, idx, -1, rerender); });
+    down.addEventListener('click', (e) => { e.stopPropagation(); moveEntry(iso, log, idx, 1, rerender); });
+
+    const row = Utils.el('div', { class: 'card ex-pending' + (started ? ' ex-started' : '') + (complete ? ' done' : ''), 'data-key': opts.key }, [
       Utils.el('div', { class: 'ex-pending-body' }, [
-        Utils.el('span', { class: 'ex-num', text: String(opts.num || '') }),
+        Utils.el('span', { class: 'ex-num', text: complete ? '✓' : String(opts.num) }),
         Utils.el('div', { style: 'min-width:0;flex:1;' }, [
           Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
-          Utils.el('div', { class: 'meta', text: `${target ? `${workingN}/${target.targetSets} series` : `${workingN} serie${workingN === 1 ? '' : 's'}`}${lastSet ? ` · última ${Metrics.formatSet(lastSet, isCardio)}` : ''}` }),
+          Utils.el('div', { class: 'meta', text: meta }),
         ]),
-        Utils.el('span', { class: 'counter-chip' + (complete ? ' done' : ''), text: complete ? '✓' : `${workingN}` }),
-        Utils.el('span', { class: 'caret', text: '⌄' }),
+        Utils.el('div', { class: 'row-move' }, [up, down]),
       ]),
     ]);
-    row.addEventListener('click', () => { collapsedSet.delete(opts.key); rerender(); });
+    row.addEventListener('click', () => setActive(iso, entry.exerciseId, rerender));
     return row;
   }
 
@@ -795,7 +856,8 @@ const WorkoutView = (() => {
     function addToDay(ex, row, btn) {
       log.exercises.push({ exerciseId: ex.id, sets: [] });
       saveLog(iso, log);
-      expandedSet.add(`${iso}:${ex.id}`);
+      activeByDate[iso] = ex.id;
+      scrollToKey = `${iso}:${ex.id}`;
       added.add(ex.id);
       btn.textContent = '✓';
       btn.disabled = true;
@@ -880,7 +942,8 @@ const WorkoutView = (() => {
         DB.saveExercises(exercises);
         log.exercises.push({ exerciseId: ex.id, sets: [] });
         saveLog(iso, log);
-        expandedSet.add(`${iso}:${ex.id}`);
+        activeByDate[iso] = ex.id;
+        scrollToKey = `${iso}:${ex.id}`;
         added.add(ex.id);
         onDone();
         query = '';

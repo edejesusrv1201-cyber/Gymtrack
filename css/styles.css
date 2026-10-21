@@ -898,3 +898,30 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 .ex-pending .meta { font-size: 0.76rem; color: var(--text-dim); margin-top: 1px; }
 .ex-collapsed { cursor: pointer; opacity: 0.92; }
 .ex-collapsed.done .ex-num { background: rgba(53, 212, 154, 0.2); color: var(--green); }
+
+/* ---------- Entrenamiento: un ejercicio activo + barra "ahora" ---------- */
+.now-bar {
+  position: sticky; z-index: 15;
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 10px; padding: 9px 12px;
+  border-radius: 16px;
+  background: rgba(20, 22, 30, 0.92);
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.now-bar .ex-num { margin: 0; background: var(--accent-grad); color: var(--on-accent); }
+.now-main { flex: 1; min-width: 0; }
+.now-label { font-size: 0.58rem; font-weight: 800; letter-spacing: .14em; color: var(--accent-light); }
+.now-name { font-size: 0.98rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.exercise-card.ex-current { box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.7), 0 10px 30px rgba(var(--accent-rgb), 0.18); }
+.ex-pending { cursor: pointer; opacity: 0.9; }
+.ex-pending.ex-started .ex-num { background: rgba(var(--accent-rgb), 0.18); color: var(--accent-light); }
+.ex-pending.done .ex-num { background: rgba(53, 212, 154, 0.2); color: var(--green); }
+.row-move { display: flex; flex: none; }
+.row-move .icon-btn { padding: 8px 10px; }
+.row-move .icon-btn:disabled { opacity: 0.2; }
+.ex-header .icon-btn:disabled { opacity: 0.2; }
+.ex-header .icon-btn { padding: 6px 6px; }
+.ex-header h3 { word-break: break-word; }
