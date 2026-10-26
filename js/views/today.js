@@ -30,6 +30,18 @@ const TodayView = (() => {
     return wl[iso];
   }
 
+  // ejercicios de la rutina que el usuario quitó de ESTE día (para que no reaparezcan)
+  const removedIds = (log) => (log && log.removedRoutine === log.routineId && Array.isArray(log.removed) ? log.removed : []);
+
+  // la rutina tal como quedó hoy: sin los ejercicios que quitaste
+  function effectiveRoutine(routine, log) {
+    if (!routine || !log) return routine;
+    const rm = removedIds(log);
+    if (!rm.length) return routine;
+    const exercises = routine.exercises.filter((re) => !rm.includes(re.exerciseId));
+    return exercises.length ? Object.assign({}, routine, { exercises }) : routine;
+  }
+
   const workingSets = (entry) => entry.sets.filter(Metrics.isNormal).length;
   const routineTotalSets = (r) => r.exercises.reduce((s, re) => s + (Number(re.targetSets) || 0), 0);
 
@@ -264,9 +276,9 @@ const TodayView = (() => {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
     const todayIso = Utils.todayISO();
-    const routine = getRoutineForDate(todayIso);
     const workoutLog = DB.getWorkoutLog();
     const log = workoutLog[todayIso];
+    const routine = effectiveRoutine(getRoutineForDate(todayIso), log);
     const settings = DB.getSettings();
     const rerender = () => render(root);
 
@@ -356,5 +368,5 @@ const TodayView = (() => {
     Modal.open('Historial de entrenamientos', body);
   }
 
-  return { render, getRoutineForDate, ensureLog, openRoutinePicker, openDaySheet };
+  return { render, getRoutineForDate, ensureLog, removedIds, effectiveRoutine, openRoutinePicker, openDaySheet };
 })();

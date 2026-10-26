@@ -42,13 +42,14 @@ const WorkoutView = (() => {
   function syncRoutineExercises(log, routine) {
     let changed = false;
     const routineIds = new Set(routine ? routine.exercises.map((re) => re.exerciseId) : []);
+    const removed = TodayView.removedIds(log);
     const before = log.exercises.length;
     log.exercises = log.exercises.filter((e) => !(e.fromRoutine && e.sets.length === 0 && !routineIds.has(e.exerciseId)));
     if (log.exercises.length !== before) changed = true;
     if (routine) {
       const presentIds = new Set(log.exercises.map((e) => e.exerciseId));
       routine.exercises.forEach((re) => {
-        if (!presentIds.has(re.exerciseId)) {
+        if (!presentIds.has(re.exerciseId) && !removed.includes(re.exerciseId)) {
           log.exercises.push({ exerciseId: re.exerciseId, sets: [], fromRoutine: true });
           presentIds.add(re.exerciseId);
           changed = true;
@@ -71,10 +72,12 @@ const WorkoutView = (() => {
     const hasSets = log.exercises.some((e) => e.sets.length > 0);
     if (!hasSets && (log.routineId || null) !== plannedId) {
       log.routineId = plannedId;
+      log.removed = [];
       changed = true;
     }
-    const routine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
-    if (syncRoutineExercises(log, routine)) changed = true;
+    const baseRoutine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
+    if (syncRoutineExercises(log, baseRoutine)) changed = true;
+    const routine = TodayView.effectiveRoutine(baseRoutine, log);
     if (changed) saveLog(iso, log);
 
     if (params && params.focus) { activeByDate[iso] = params.focus; scrollToKey = `${iso}:${params.focus}`; }
@@ -92,6 +95,7 @@ const WorkoutView = (() => {
       const useBtn = Utils.el('button', { class: 'btn-small', text: 'Cambiar' });
       useBtn.addEventListener('click', () => {
         log.routineId = planned.id;
+        log.removed = [];
         syncRoutineExercises(log, planned);
         saveLog(iso, log);
         rerender();
@@ -161,6 +165,11 @@ const WorkoutView = (() => {
       const finishBtn = Utils.el('button', { class: 'btn-primary', text: '🏁 Finalizar entrenamiento' });
       finishBtn.addEventListener('click', () => {
         const before = log.exercises.length;
+        if (log.routineId) {
+          const prevRm = TodayView.removedIds(log);
+          log.removedRoutine = log.routineId;
+          log.removed = Array.from(new Set(prevRm.concat(log.exercises.filter((e) => e.sets.length === 0 && e.fromRoutine).map((e) => e.exerciseId))));
+        }
         log.exercises = log.exercises.filter((e) => e.sets.length > 0);
         const removed = before - log.exercises.length;
         saveLog(iso, log);
@@ -308,7 +317,13 @@ const WorkoutView = (() => {
       Utils.el('button', { class: 'icon-btn', text: '▼', title: 'Bajar en el orden', disabled: idx === log.exercises.length - 1 ? 'disabled' : null, onclick: () => moveEntry(iso, log, idx, 1, rerender) }),
       Utils.el('button', { class: 'icon-btn', text: '🗑️', onclick: () => {
         if (!Utils.confirmDialog('¿Quitar este ejercicio del día?')) return;
-        log.exercises.splice(idx, 1);
+        const [gone] = log.exercises.splice(idx, 1);
+        // si venía de la rutina, recuerda que lo quitaste para que no vuelva a aparecer
+        if (gone && log.routineId) {
+          const prevRm = TodayView.removedIds(log);
+          log.removedRoutine = log.routineId;
+          log.removed = Array.from(new Set(prevRm.concat(gone.exerciseId)));
+        }
         saveLog(iso, log);
         rerender();
       } }),
@@ -808,6 +823,7 @@ const WorkoutView = (() => {
   // ---------- agregar ejercicio al día: buscador, grupos, recientes y crear nuevo ----------
   function openAddExercise(iso, log, onDone) {
     const body = Utils.el('div');
+    const unremove = (id) => { if (Array.isArray(log.removed)) log.removed = log.removed.filter((x) => x !== id); };
     const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const GROUP_ORDER = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
     const added = new Set();
@@ -854,6 +870,7 @@ const WorkoutView = (() => {
     }
 
     function addToDay(ex, row, btn) {
+      unremove(ex.id);
       log.exercises.push({ exerciseId: ex.id, sets: [] });
       saveLog(iso, log);
       activeByDate[iso] = ex.id;
