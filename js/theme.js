@@ -25,9 +25,9 @@ const Theme = (() => {
   ];
   // glow = opacidad de las manchas · card = opacidad de las tarjetas (más baja = se ve más el fondo)
   const INTENSITIES = {
-    suave: { glow: 0.45, card: 0.84 },
-    media: { glow: 0.72, card: 0.64 },
-    intensa: { glow: 0.95, card: 0.48 },
+    suave: { glow: 0.34, card: 0.92 },
+    media: { glow: 0.5, card: 0.86 },
+    intensa: { glow: 0.72, card: 0.76 },
   };
   const REST_COLORS = ['#4f7cff', '#3de0c2', '#a384ff'];
   const APP_ACCENT = { main: '#ff6a3d', a: '#ff5a36', b: '#ff8f3d', c: '#ffb347', light: '#ffb08a' };

@@ -925,3 +925,78 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 .ex-header .icon-btn:disabled { opacity: 0.2; }
 .ex-header .icon-btn { padding: 6px 6px; }
 .ex-header h3 { word-break: break-word; }
+
+/* ============================================================
+   Pulido v20 — más limpio: menos ruido, más aire, mejor lectura
+   ============================================================ */
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)), rgba(16, 19, 27, var(--card-alpha));
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  padding: 18px;
+  margin-bottom: 12px;
+}
+.tile, .week-day, .stat-box {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.tile { background: rgba(16, 19, 27, var(--card-alpha)); }
+.view { padding: 2px 16px 24px; }
+
+h3 { font-size: 1.02rem; letter-spacing: -0.01em; }
+.eyebrow { font-size: 0.64rem; letter-spacing: 0.1em; font-weight: 700; opacity: 0.85; }
+.card-title-row { margin-bottom: 12px; }
+p { line-height: 1.5; }
+
+/* listas: menos líneas, más respiro */
+.list-item { padding: 13px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.list-item:last-child { border-bottom: none; }
+.ex-row { padding: 14px 0; }
+
+/* botones secundarios más discretos */
+.btn-secondary { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.09); }
+.action-row button { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); }
+.icon-btn { color: var(--text-dim); font-size: 1rem; }
+
+/* cabecera del entrenamiento */
+.ex-header { align-items: flex-start !important; }
+.ex-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.ex-actions .icon-btn { padding: 6px 8px; font-size: 1.05rem; }
+.exercise-card .ex-header h3 { font-size: 1.12rem; line-height: 1.2; }
+.exercise-card.ex-current { box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb), 0.55), 0 10px 28px rgba(0, 0, 0, 0.3); }
+
+/* barra "ahora": oculta salvo que el ejercicio abierto salga de la pantalla */
+.now-bar { display: none; }
+.now-bar.show { display: flex; animation: fadein .18s ease; }
+
+/* guía de récords: texto simple, sin caja */
+.exercise-card .guide { background: none !important; border: none !important; padding: 0 !important; margin: 8px 0 4px; font-size: 0.78rem; line-height: 1.45; color: var(--text-dim); }
+.exercise-card .guide > div:first-child { color: var(--text); }
+.wk-line { font-weight: 600; font-size: 0.74rem; margin-top: 6px; opacity: 0.95; }
+
+/* series registradas y formulario */
+.set-line { padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.felt-select { gap: 6px; }
+
+/* pastilla unilateral */
+.uni-chip { display: block; width: 100%; margin: 2px 0 10px; padding: 9px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 700; text-align: center; background: rgba(255, 255, 255, 0.04); color: var(--text-dim); border: 1px dashed rgba(255, 255, 255, 0.18); }
+.uni-chip.on { background: var(--accent-soft); color: var(--accent-light); border: 1px solid rgba(var(--accent-rgb), 0.45); }
+
+/* menú de acciones (hoja inferior) */
+.action-menu { display: flex; flex-direction: column; gap: 8px; padding-bottom: 6px; }
+.am-item { width: 100%; text-align: left; padding: 15px 16px; border-radius: 14px; font-weight: 700; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.07); }
+.am-item:disabled { opacity: 0.3; }
+.am-item.danger { color: var(--red); }
+
+/* filas de ejercicios pendientes más ligeras */
+.ex-pending { padding: 13px 14px; margin-bottom: 8px; }
+.ex-pending .meta { margin-top: 2px; }
+.row-move .icon-btn { padding: 8px 9px; font-size: 0.8rem; }
+
+/* hoy: tarjeta principal */
+.hero { padding: 20px; margin-bottom: 12px; }
+.tiles { gap: 8px; margin-bottom: 12px; }
+.dots span { background: rgba(255, 255, 255, 0.16); }
+.dots span.on { background: var(--accent-grad); }

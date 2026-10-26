@@ -23,6 +23,7 @@ const WorkoutView = (() => {
   const activeByDate = {};
   // al terminar de dibujar, lleva la vista a este ejercicio (tras cambiar de activo o de orden)
   let scrollToKey = null;
+  let nowObserver = null;
   // si la última serie de un ejercicio fue dropset, la siguiente sugiere dropset
   const typeMemory = {};
   let warmupOpen = false;
@@ -183,6 +184,22 @@ const WorkoutView = (() => {
 
     root.appendChild(view);
 
+    // la barra "ahora" solo se muestra cuando el ejercicio abierto se salió de la pantalla
+    if (nowObserver) { nowObserver.disconnect(); nowObserver = null; }
+    const nowBar = view.querySelector('.now-bar');
+    const activeCard = view.querySelector('.exercise-card');
+    if (nowBar && activeCard && 'IntersectionObserver' in window) {
+      const hdr = document.querySelector('.app-header');
+      const topPx = (hdr ? hdr.offsetHeight : 70) - 10;
+      nowObserver = new IntersectionObserver(([en]) => {
+        const above = !en.isIntersecting && en.boundingClientRect.top < topPx + 10;
+        nowBar.classList.toggle('show', above);
+      }, { rootMargin: `-${topPx}px 0px 0px 0px`, threshold: 0 });
+      nowObserver.observe(activeCard);
+    } else if (nowBar) {
+      nowBar.classList.add('show');
+    }
+
     if (scrollToKey) {
       const k = scrollToKey;
       scrollToKey = null;
@@ -310,23 +327,38 @@ const WorkoutView = (() => {
       class: 'counter-chip' + (complete ? ' done' : ''),
       text: target ? `${workingN}/${target.targetSets}${complete ? ' ✓' : ''}` : `${workingN}`,
     });
-    const headerBtns = Utils.el('div', { style: 'display:flex;align-items:center;gap:0;flex:none;' }, [
+    const removeEntry = () => {
+      if (!Utils.confirmDialog('¿Quitar este ejercicio del día?')) return;
+      const [gone] = log.exercises.splice(idx, 1);
+      // si venía de la rutina, recuerda que lo quitaste para que no vuelva a aparecer
+      if (gone && log.routineId) {
+        const prevRm = TodayView.removedIds(log);
+        log.removedRoutine = log.routineId;
+        log.removed = Array.from(new Set(prevRm.concat(gone.exerciseId)));
+      }
+      saveLog(iso, log);
+      Modal.close();
+      rerender();
+    };
+    const openMenu = () => {
+      const menu = Utils.el('div', { class: 'action-menu' });
+      const add = (label, fn, danger) => {
+        const b = Utils.el('button', { class: 'am-item' + (danger ? ' danger' : ''), type: 'button', text: label });
+        b.addEventListener('click', fn);
+        menu.appendChild(b);
+        return b;
+      };
+      const up = add('▲  Subir en el orden', () => { Modal.close(); moveEntry(iso, log, idx, -1, rerender); });
+      const down = add('▼  Bajar en el orden', () => { Modal.close(); moveEntry(iso, log, idx, 1, rerender); });
+      up.disabled = idx === 0;
+      down.disabled = idx === log.exercises.length - 1;
+      add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
+      Modal.open(ex ? ex.name : 'Ejercicio', menu);
+    };
+    const headerBtns = Utils.el('div', { class: 'ex-actions' }, [
       counterChip,
       ex ? Utils.el('button', { class: 'icon-btn', text: '📈', title: 'Ver progreso', onclick: () => openProgressModal(ex, isCardio) }) : null,
-      Utils.el('button', { class: 'icon-btn', text: '▲', title: 'Subir en el orden', disabled: idx === 0 ? 'disabled' : null, onclick: () => moveEntry(iso, log, idx, -1, rerender) }),
-      Utils.el('button', { class: 'icon-btn', text: '▼', title: 'Bajar en el orden', disabled: idx === log.exercises.length - 1 ? 'disabled' : null, onclick: () => moveEntry(iso, log, idx, 1, rerender) }),
-      Utils.el('button', { class: 'icon-btn', text: '🗑️', onclick: () => {
-        if (!Utils.confirmDialog('¿Quitar este ejercicio del día?')) return;
-        const [gone] = log.exercises.splice(idx, 1);
-        // si venía de la rutina, recuerda que lo quitaste para que no vuelva a aparecer
-        if (gone && log.routineId) {
-          const prevRm = TodayView.removedIds(log);
-          log.removedRoutine = log.routineId;
-          log.removed = Array.from(new Set(prevRm.concat(gone.exerciseId)));
-        }
-        saveLog(iso, log);
-        rerender();
-      } }),
+      Utils.el('button', { class: 'icon-btn', text: '⋯', title: 'Más opciones', onclick: openMenu }),
     ]);
     card.appendChild(Utils.el('div', { class: 'ex-header' }, [
       Utils.el('div', { style: 'min-width:0;' }, [
@@ -496,32 +528,29 @@ const WorkoutView = (() => {
       });
       form.appendChild(typeRow);
 
-      // bilateral / unilateral (peso por lado)
-      const uniRow = Utils.el('div', { class: 'seg small' });
+      // bilateral / unilateral (peso por lado): una pastilla que se enciende o apaga
+      const uniChip = Utils.el('button', { class: 'uni-chip', type: 'button' });
       const paintUni = () => {
-        uniRow.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', (b.dataset.u === '1') === uniSelected));
+        uniChip.classList.toggle('on', uniSelected);
+        uniChip.textContent = uniSelected ? '✓ Unilateral · peso por lado' : 'Unilateral · peso por lado';
         weightInput.placeholder = uniSelected ? `Peso por lado (${inputUnit})` : `Peso (${inputUnit})`;
       };
-      [['0', 'Bilateral'], ['1', 'Unilateral · peso por lado']].forEach(([v, t]) => {
-        const b = Utils.el('button', { class: 'seg-btn', type: 'button', 'data-u': v, text: t });
-        b.addEventListener('click', () => {
-          uniSelected = v === '1';
-          if (ex) {
-            const all = DB.getExercises();
-            const target = all.find((e) => e.id === ex.id);
-            if (target) { target.unilateral = uniSelected; DB.saveExercises(all); }
-          }
-          weightInput.value = suggestWeight(typeSelected);
-          paintUni();
-        });
-        uniRow.appendChild(b);
+      uniChip.addEventListener('click', () => {
+        uniSelected = !uniSelected;
+        if (ex) {
+          const all = DB.getExercises();
+          const t = all.find((e) => e.id === ex.id);
+          if (t) { t.unilateral = uniSelected; DB.saveExercises(all); }
+        }
+        weightInput.value = suggestWeight(typeSelected);
+        paintUni();
       });
-      form.appendChild(uniRow);
       form.paintUni = paintUni;
       form.appendChild(Utils.el('div', { class: 'field-row' }, [
         Utils.el('div', { class: 'field' }, [Utils.el('div', { class: 'input-unit' }, [weightInput, unitBtn])]),
         Utils.el('div', { class: 'field' }, [repsInput]),
       ]));
+      form.appendChild(uniChip);
       addSetBtn.textContent = BTN_TEXT[typeSelected];
       form.refreshType = refreshType;
     }
