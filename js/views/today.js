@@ -272,6 +272,82 @@ const TodayView = (() => {
     return card;
   }
 
+  // ---------- aviso: grupos musculares que van cortos esta semana ----------
+  function renderGaps(rerender) {
+    const dow = new Date().getDay(); // la semana empieza en domingo; se avisa de miércoles en adelante
+    if (dow < 3) return null;
+    const wk = Metrics.weekRange(0);
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('gt_gap_dismiss') === wk.start; } catch (e) { /* sin almacenamiento */ }
+    if (dismissed) return null;
+    // solo si ya vienes entrenando (algo en las últimas 3 semanas)
+    const recent = Metrics.weekRange(-2);
+    if (Metrics.totals(recent.start, wk.end).sets === 0) return null;
+    const goal = Metrics.weeklyGoal();
+    const by = Metrics.totals(wk.start, wk.end).byGroup;
+    const gaps = Metrics.STRENGTH_GROUPS
+      .map((g) => ({ g, n: by[g] ? by[g].sets : 0 }))
+      .filter((x) => x.n < goal.min)
+      .sort((a, b) => a.n - b.n);
+    if (!gaps.length) return null;
+
+    const card = Utils.el('div', { class: 'card gap-card' });
+    card.appendChild(Utils.el('div', { class: 'card-title-row' }, [
+      Utils.el('h3', { text: 'Esta semana te faltan series' }),
+      Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Ocultar esta semana', onclick: () => {
+        try { localStorage.setItem('gt_gap_dismiss', wk.start); } catch (e) { /* sin almacenamiento */ }
+        rerender();
+      } }),
+    ]));
+    card.appendChild(Utils.el('p', { class: 'small', style: 'margin:-4px 0 8px;', text: `Meta: ${goal.min}–${goal.max} por grupo. Toca uno para elegir un ejercicio y sumarlo a hoy.` }));
+    const row = Utils.el('div', { class: 'gap-chips' });
+    gaps.forEach(({ g, n }) => {
+      const chip = Utils.el('button', { type: 'button', class: 'gap-chip', style: `--gc:${Utils.GROUP_COLORS[g] || '#8d95a8'}` }, [
+        Utils.el('b', { text: g }), ` ${n}/${goal.min}`,
+      ]);
+      chip.addEventListener('click', () => openGroupPicker(g, rerender));
+      row.appendChild(chip);
+    });
+    card.appendChild(row);
+    return card;
+  }
+
+  function openGroupPicker(group, rerender) {
+    const todayIso = Utils.todayISO();
+    const wl = DB.getWorkoutLog();
+    const uses = {};
+    Object.keys(wl).forEach((d) => (wl[d].exercises || []).forEach((e) => { if (e.sets && e.sets.length) uses[e.exerciseId] = (uses[e.exerciseId] || 0) + 1; }));
+    const list = DB.getExercises().filter((e) => e.group === group)
+      .sort((a, b) => (uses[b.id] || 0) - (uses[a.id] || 0) || a.name.localeCompare(b.name, 'es'));
+    const body = Utils.el('div');
+    if (!list.length) {
+      body.appendChild(Utils.el('p', { text: `Aún no tienes ejercicios de ${group}. Agrégalos desde Más → Biblioteca.` }));
+    }
+    list.forEach((ex) => {
+      const times = uses[ex.id] || 0;
+      const row = Utils.el('div', { class: 'list-item' }, [
+        Utils.el('div', { style: 'min-width:0;' }, [
+          Utils.el('div', { style: 'font-weight:700;', text: ex.name }),
+          Utils.el('div', { class: 'meta', text: times ? `lo has hecho en ${times} entrenamiento${times === 1 ? '' : 's'}` : 'aún no lo has hecho' }),
+        ]),
+        Utils.el('button', { class: 'btn-small', text: '+ Hoy' }),
+      ]);
+      row.querySelector('button').addEventListener('click', () => {
+        const routine = effectiveRoutine(getRoutineForDate(todayIso), DB.getWorkoutLog()[todayIso]);
+        const log = ensureLog(todayIso, routine);
+        if (Array.isArray(log.removed)) log.removed = log.removed.filter((x) => x !== ex.id);
+        if (!log.exercises.some((e) => e.exerciseId === ex.id)) log.exercises.push({ exerciseId: ex.id, sets: [] });
+        const all = DB.getWorkoutLog();
+        all[todayIso] = log;
+        DB.saveWorkoutLog(all);
+        Modal.close();
+        App.navigate('workout', { date: todayIso, focus: ex.id });
+      });
+      body.appendChild(row);
+    });
+    Modal.open(`Ejercicios de ${group}`, body);
+  }
+
   function render(root) {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
@@ -359,6 +435,9 @@ const TodayView = (() => {
     qWeight.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
     [qFood, qWater, qWeight].forEach((b) => quick.appendChild(b));
     view.appendChild(quick);
+
+    const gapCard = renderGaps(rerender);
+    if (gapCard) view.appendChild(gapCard);
 
     view.appendChild(renderWeek(workoutLog, rerender));
 

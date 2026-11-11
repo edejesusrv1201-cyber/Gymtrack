@@ -23,11 +23,25 @@ const Metrics = (() => {
   const isDrop = (s) => s.type === 'drop';
   const isNormal = (s) => !s.type || s.type === 'normal';
 
+  // peso corporal más reciente (kg) a una fecha; si no hay antes, el más cercano
+  function bodyWeightKg(iso) {
+    const list = DB.getMeasurements().filter((m) => m.weight);
+    if (!list.length) return 0;
+    const day = iso || Utils.todayISO();
+    let best = null;
+    list.forEach((m) => { if (m.date <= day && (!best || m.date > best.date)) best = m; });
+    if (!best) best = list[0];
+    return Number(best.weight) || 0;
+  }
+
+  // carga real de una serie: en ejercicios de peso corporal = tu peso al momento + la carga extra
+  const loadOf = (s) => (s.bw ? (Number(s.bwKg) || 0) + (Number(s.weight) || 0) : Number(s.weight) || 0);
+
   function volumeOfSet(s) {
     if (isWarmup(s)) return 0;
     if (s.weight === undefined || s.weight === null) return 0;
     // unilateral: el peso es por lado, así que se levantó dos veces (izquierda y derecha)
-    return (Number(s.weight) || 0) * (Number(s.reps) || 0) * (s.uni ? 2 : 1);
+    return loadOf(s) * (Number(s.reps) || 0) * (s.uni ? 2 : 1);
   }
 
   // 1RM estimado (Epley)
@@ -135,12 +149,12 @@ const Metrics = (() => {
       }
       const work = entry.sets.filter(isNormal);
       if (work.length === 0) return;
-      const top = work.reduce((a, b) => ((Number(b.weight) || 0) > (Number(a.weight) || 0) ? b : a), work[0]);
+      const top = work.reduce((a, b) => (loadOf(b) > loadOf(a) ? b : a), work[0]);
       rows.push({
         date: d,
-        weight: Number(top.weight) || 0,
+        weight: loadOf(top),
         reps: Number(top.reps) || 0,
-        e1rm: Math.max(...work.map((s) => e1rm(s.weight, s.reps))),
+        e1rm: Math.max(...work.map((s) => e1rm(loadOf(s), s.reps))),
         volume: entry.sets.reduce((s, x) => s + volumeOfSet(x), 0),
         sets: work.length,
       });
@@ -159,11 +173,11 @@ const Metrics = (() => {
       if (!entry) return;
       entry.sets.forEach((set) => {
         if (!isCardio && !isNormal(set)) return;
-        const value = isCardio ? set.duration : set.weight;
+        const value = isCardio ? set.duration : loadOf(set);
         if (value === undefined || value === null) return;
-        if (!max || value > (isCardio ? max.set.duration : max.set.weight)) max = { set, date: d };
-        if (!min || value < (isCardio ? min.set.duration : min.set.weight)) min = { set, date: d };
-        if (!isCardio) bestE1rm = Math.max(bestE1rm, e1rm(set.weight, set.reps));
+        if (!max || value > (isCardio ? max.set.duration : loadOf(max.set))) max = { set, date: d };
+        if (!min || value < (isCardio ? min.set.duration : loadOf(min.set))) min = { set, date: d };
+        if (!isCardio) bestE1rm = Math.max(bestE1rm, e1rm(loadOf(set), set.reps));
       });
     });
     if (!max) return null;
@@ -173,7 +187,7 @@ const Metrics = (() => {
   function formatSet(set, isCardio, units) {
     return isCardio
       ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}`
-      : `${Units.label(set.weight)}${set.uni ? ' /lado' : ''} × ${set.reps}`;
+      : `${set.bw ? ((Number(set.weight) || 0) === 0 ? 'peso corporal' : `PC ${(Number(set.weight) || 0) > 0 ? '+' : '−'}${Units.label(Math.abs(Number(set.weight) || 0))}`) : Units.label(set.weight)}${set.uni ? ' /lado' : ''} × ${set.reps}`;
   }
 
   // última sesión anterior a una fecha (para "Última vez")
@@ -187,7 +201,7 @@ const Metrics = (() => {
       if (pool.length === 0) continue;
       const best = isCardio
         ? pool.reduce((a, b) => ((b.duration || 0) > (a.duration || 0) ? b : a), pool[0])
-        : pool.reduce((a, b) => ((Number(b.weight) || 0) > (Number(a.weight) || 0) ? b : a), pool[0]);
+        : pool.reduce((a, b) => (loadOf(b) > loadOf(a) ? b : a), pool[0]);
       return { date: d, best, count: pool.length };
     }
     return null;
@@ -221,13 +235,13 @@ const Metrics = (() => {
     }
 
     if (!isNormal(set)) return [];
-    const w = Number(set.weight) || 0;
+    const w = loadOf(set);
     const r = Number(set.reps) || 0;
-    const prevW = max(prior.map((x) => x.weight));
+    const prevW = max(prior.map((x) => loadOf(x)));
     if (w > prevW) {
       prs.push({ kind: 'peso', value: w, reps: r, prev: prevW });
     } else {
-      const heavier = prior.filter((x) => (Number(x.weight) || 0) >= w);
+      const heavier = prior.filter((x) => loadOf(x) >= w);
       const prevR = max(heavier.map((x) => x.reps));
       if (heavier.length && r > prevR) prs.push({ kind: 'reps', value: r, weight: w, prev: prevR });
     }
@@ -235,7 +249,7 @@ const Metrics = (() => {
   }
 
   return {
-    STRENGTH_GROUPS, weeklyGoal, isWarmup, isDrop, isNormal, volumeOfSet, e1rm,
+    bodyWeightKg, loadOf, STRENGTH_GROUPS, weeklyGoal, isWarmup, isDrop, isNormal, volumeOfSet, e1rm,
     weekRange, monthRange, totals, weeklySeries, dayLevels,
     exerciseSessions, exerciseRecords, formatSet, previousBest, detectPR,
   };

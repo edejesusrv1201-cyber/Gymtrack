@@ -1115,3 +1115,13 @@ p { line-height: 1.5; }
 .sm-warn { padding: 9px 12px; border-radius: 12px; background: rgba(255, 194, 71, 0.14); color: var(--yellow); font-weight: 700; font-size: 0.82rem; }
 .scan-raw summary { font-size: 0.78rem; color: var(--text-dim); cursor: pointer; padding: 4px 0; }
 .scan-raw pre { white-space: pre-wrap; font-size: 0.72rem; color: var(--text-dim); background: rgba(255, 255, 255, 0.04); padding: 8px; border-radius: 10px; margin: 4px 0 0; max-height: 160px; overflow: auto; }
+
+/* ---------- peso corporal, actualizar rutina, grupos que faltan ---------- */
+.chip-pair { display: flex; gap: 8px; }
+.chip-pair .uni-chip { flex: 1; width: auto; font-size: 0.78rem; padding: 9px 6px; }
+.sync-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); cursor: pointer; }
+.sync-check { flex: none; width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 0.85rem; border: 1.5px solid rgba(255, 255, 255, 0.25); }
+.sync-check.on { background: var(--accent-grad); color: var(--on-accent); border-color: transparent; }
+.gap-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gap-chip { padding: 9px 14px; border-radius: 999px; font-size: 0.86rem; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-dim); border: 1px solid var(--gc); text-transform: none; }
+.gap-chip b { color: var(--gc); text-transform: capitalize; }

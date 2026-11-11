@@ -30,11 +30,11 @@ const ExerciseUI = (() => {
     ['Press de pecho en máquina', 'pecho', 'maquina'],
     ['Press inclinado en máquina', 'pecho', 'maquina'],
     ['Press en máquina Smith', 'pecho', 'maquina'],
-    ['Fondos en paralelas', 'pecho', 'corporal'],
-    ['Flexiones de pecho', 'pecho', 'corporal'],
+    ['Fondos en paralelas', 'pecho', 'corporal', false, true],
+    ['Flexiones de pecho', 'pecho', 'corporal', false, true],
     ['Pullover con mancuerna', 'pecho', 'mancuernas'],
     // espalda
-    ['Dominadas', 'espalda', 'corporal'],
+    ['Dominadas', 'espalda', 'corporal', false, true],
     ['Dominadas asistidas en máquina', 'espalda', 'maquina'],
     ['Jalón al pecho en polea', 'espalda', 'polea'],
     ['Jalón agarre cerrado', 'espalda', 'polea'],
@@ -93,7 +93,7 @@ const ExerciseUI = (() => {
     ['Extensión de tríceps en polea (cuerda)', 'brazo', 'polea'],
     ['Extensión de tríceps en polea a una mano', 'brazo', 'polea', true],
     ['Press francés', 'brazo', 'barra'],
-    ['Fondos en banco (tríceps)', 'brazo', 'corporal'],
+    ['Fondos en banco (tríceps)', 'brazo', 'corporal', false, true],
     ['Patada de tríceps', 'brazo', 'mancuernas', true],
     ['Extensión de tríceps sobre la cabeza', 'brazo', 'mancuernas'],
     ['Press cerrado', 'brazo', 'barra'],
@@ -137,6 +137,7 @@ const ExerciseUI = (() => {
     let group = existing ? existing.group : (GROUPS.includes(preset.group) ? preset.group : 'pecho');
     let equipment = existing ? (existing.equipment || '') : '';
     let uni = existing ? !!existing.unilateral : false;
+    let bwFlag = existing ? !!existing.bodyweight : false;
 
     const nameIn = Utils.el('input', { type: 'text', value: existing ? existing.name : (preset.name || ''), placeholder: 'ej. Peck-deck, Prensa 45°, Curl en polea' });
     body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Nombre' }), nameIn]));
@@ -170,14 +171,22 @@ const ExerciseUI = (() => {
       uniBtn.textContent = uni ? '✓ Unilateral · el peso se anota por lado' : 'Unilateral · el peso se anota por lado';
     };
     uniBtn.addEventListener('click', () => { uni = !uni; paintUni(); });
+    const bwBtn = Utils.el('button', { class: 'uni-chip', type: 'button' });
+    const paintBw = () => {
+      bwBtn.classList.toggle('on', bwFlag);
+      bwBtn.textContent = bwFlag ? '✓ Peso corporal · anotas solo la carga extra' : 'Peso corporal (dominadas, fondos…) · anotas solo la carga extra';
+    };
+    bwBtn.addEventListener('click', () => { bwFlag = !bwFlag; paintBw(); });
     body.appendChild(uniBtn);
+    body.appendChild(bwBtn);
 
     function paintRest() {
       const isCardio = group === 'cardio';
       eqField.classList.toggle('hidden', false);
       uniBtn.classList.toggle('hidden', isCardio || group === 'movilidad');
+      bwBtn.classList.toggle('hidden', isCardio || group === 'movilidad');
     }
-    paintGroups(); paintEq(); paintUni(); paintRest();
+    paintGroups(); paintEq(); paintUni(); paintBw(); paintRest();
 
     const save = Utils.el('button', { class: 'btn-primary btn-block', text: existing ? 'Guardar cambios' : 'Crear ejercicio' });
     save.addEventListener('click', () => {
@@ -192,6 +201,7 @@ const ExerciseUI = (() => {
       Object.assign(ex, { name, group });
       if (equipment) ex.equipment = equipment; else delete ex.equipment;
       if (uni && group !== 'cardio' && group !== 'movilidad') ex.unilateral = true; else if (existing) ex.unilateral = false; else delete ex.unilateral;
+      if (bwFlag && group !== 'cardio' && group !== 'movilidad') ex.bodyweight = true; else delete ex.bodyweight;
       DB.saveExercises(all);
       Modal.close();
       if (onSaved) onSaved(ex);
@@ -250,13 +260,13 @@ const ExerciseUI = (() => {
       if (!items.length) {
         list.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: 'No hay coincidencias. Puedes crear el tuyo con el botón de abajo.' }));
       }
-      items.forEach(([name, g, eq, uni]) => {
+      items.forEach(([name, g, eq, uni, bw]) => {
         const has = owned.has(norm(name));
         const btn = Utils.el('button', { class: 'btn-small', text: has ? '✓' : '+' });
         btn.disabled = has;
         const row = Utils.el('div', { class: `list-item${has ? ' ax-added' : ''}` }, [
           Utils.el('div', { style: 'min-width:0;' }, [
-            Utils.el('div', { style: 'font-weight:700;' }, [name, uni ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
+            Utils.el('div', { style: 'font-weight:700;' }, [name, uni ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null, bw ? Utils.el('span', { class: 'uni-pill', text: 'peso corporal' }) : null]),
             Utils.el('div', { class: `meta grp-${g}`, text: `${g} · ${eqLabel(eq)}${has ? ' · ya en tu catálogo' : ''}` }),
           ]),
           btn,
@@ -265,6 +275,7 @@ const ExerciseUI = (() => {
           const all = DB.getExercises();
           const ex = { id: DB.uid(), name, group: g, equipment: eq };
           if (uni) ex.unilateral = true;
+          if (bw) ex.bodyweight = true;
           all.push(ex);
           DB.saveExercises(all);
           added.add(name);

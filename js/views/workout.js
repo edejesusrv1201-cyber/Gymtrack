@@ -165,6 +165,12 @@ const WorkoutView = (() => {
     if (log.exercises.length > 0) {
       const finishBtn = Utils.el('button', { class: 'btn-primary', text: '🏁 Finalizar entrenamiento' });
       finishBtn.addEventListener('click', () => {
+        // lo que cambió respecto a la rutina (antes de limpiar el día)
+        const baseRoutine = log.routineId ? DB.getRoutines().find((r) => r.id === log.routineId) : null;
+        const inRoutine = new Set(baseRoutine ? baseRoutine.exercises.map((re) => re.exerciseId) : []);
+        const extras = baseRoutine ? log.exercises.filter((e) => e.sets.length > 0 && !inRoutine.has(e.exerciseId)) : [];
+        const dropped = baseRoutine ? TodayView.removedIds(log).filter((id) => inRoutine.has(id)) : [];
+        const orderIds = log.exercises.map((e) => e.exerciseId);
         const before = log.exercises.length;
         if (log.routineId) {
           const prevRm = TodayView.removedIds(log);
@@ -177,7 +183,8 @@ const WorkoutView = (() => {
         Utils.toast(removed > 0
           ? `Entrenamiento guardado · se quitaron ${removed} ejercicio${removed === 1 ? '' : 's'} sin registro`
           : 'Entrenamiento guardado');
-        App.navigate('hoy');
+        if (baseRoutine && (extras.length || dropped.length)) openRoutineSync(baseRoutine.id, extras, dropped, orderIds, () => App.navigate('hoy'));
+        else App.navigate('hoy');
       });
       view.appendChild(finishBtn);
     }
@@ -433,7 +440,7 @@ const WorkoutView = (() => {
       const feltOpt = FELT_OPTIONS.find((f) => f.key === set.felt) || FELT_OPTIONS[1];
       const mainLabel = isCardio
         ? `${set.duration} min${set.distance ? ` · ${set.distance} km` : ''}${set.calories ? ` · ${set.calories} kcal` : ''}`
-        : `${Units.label(set.weight)}${set.uni ? ' /lado' : ''} × ${set.reps}`;
+        : Metrics.formatSet(set, false);
       let badge;
       if (Metrics.isWarmup(set)) badge = Utils.el('span', { class: 'set-badge warm', title: 'Aproximación', text: 'A' });
       else if (Metrics.isDrop(set)) badge = Utils.el('span', { class: 'set-badge drop', title: 'Dropset', text: '↓' });
@@ -459,6 +466,10 @@ const WorkoutView = (() => {
     const lastWork = [...entry.sets].reverse().find(Metrics.isNormal);
     // unilateral: el peso es por lado (se recuerda en el ejercicio)
     let uniSelected = !!(ex && ex.unilateral);
+    // peso corporal: el campo es la carga EXTRA (0 = solo tu peso, negativo = asistencia)
+    let bwSelected = !!(ex && ex.bodyweight);
+    const sameMode = (x) => !!x.uni === uniSelected && !!x.bw === bwSelected;
+    const placeholderFor = (u) => (bwSelected ? `Carga extra (${u}) · 0 = tu peso` : uniSelected ? `Peso por lado (${u})` : `Peso (${u})`);
 
     let weightInput, repsInput, durationInput, distanceInput, caloriesInput;
     let typeSelected = isCardio ? 'normal' : (typeMemory[key] || 'normal');
@@ -477,12 +488,12 @@ const WorkoutView = (() => {
       }
       if (type === 'warmup') {
         if (lastSet && Metrics.isWarmup(lastSet)) return Units.num(lastSet.weight, inputUnit);
-        const baseKg = prev && !!prev.best.uni === uniSelected ? Number(prev.best.weight) : lastWork && !!lastWork.uni === uniSelected ? Number(lastWork.weight) : 0;
+        const baseKg = prev && sameMode(prev.best) ? Number(prev.best.weight) : lastWork && sameMode(lastWork) ? Number(lastWork.weight) : 0;
         const st = Units.step(inputUnit, true);
         return baseKg > 0 ? Math.round((asInput(baseKg) * 0.5) / st) * st : '';
       }
-      if (lastWork && !!lastWork.uni === uniSelected) return Units.num(lastWork.weight, inputUnit);
-      if (prev && !!prev.best.uni === uniSelected) return Units.num(prev.best.weight, inputUnit);
+      if (lastWork && sameMode(lastWork)) return Units.num(lastWork.weight, inputUnit);
+      if (prev && sameMode(prev.best)) return Units.num(prev.best.weight, inputUnit);
       return '';
     }
 
@@ -514,7 +525,7 @@ const WorkoutView = (() => {
         inputUnit = next;
         Units.rememberInputUnit(entry.exerciseId, next);
         unitBtn.textContent = next;
-        weightInput.placeholder = uniSelected ? `Peso por lado (${next})` : `Peso (${next})`;
+        weightInput.placeholder = placeholderFor(next);
       });
       repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
       weightInput.value = suggestWeight(typeSelected);
@@ -538,11 +549,24 @@ const WorkoutView = (() => {
 
       // bilateral / unilateral (peso por lado): una pastilla que se enciende o apaga
       const uniChip = Utils.el('button', { class: 'uni-chip', type: 'button' });
+      const bwChip = Utils.el('button', { class: 'uni-chip', type: 'button' });
       const paintUni = () => {
         uniChip.classList.toggle('on', uniSelected);
-        uniChip.textContent = uniSelected ? '✓ Unilateral · peso por lado' : 'Unilateral · peso por lado';
-        weightInput.placeholder = uniSelected ? `Peso por lado (${inputUnit})` : `Peso (${inputUnit})`;
+        uniChip.textContent = uniSelected ? '✓ Unilateral' : 'Unilateral';
+        bwChip.classList.toggle('on', bwSelected);
+        bwChip.textContent = bwSelected ? '✓ Peso corporal' : 'Peso corporal';
+        weightInput.placeholder = placeholderFor(inputUnit);
       };
+      bwChip.addEventListener('click', () => {
+        bwSelected = !bwSelected;
+        if (ex) {
+          const all = DB.getExercises();
+          const t = all.find((e) => e.id === ex.id);
+          if (t) { if (bwSelected) t.bodyweight = true; else delete t.bodyweight; DB.saveExercises(all); }
+        }
+        weightInput.value = suggestWeight(typeSelected);
+        paintUni();
+      });
       uniChip.addEventListener('click', () => {
         uniSelected = !uniSelected;
         if (ex) {
@@ -558,7 +582,7 @@ const WorkoutView = (() => {
         Utils.el('div', { class: 'field' }, [Utils.el('div', { class: 'input-unit' }, [weightInput, unitBtn])]),
         Utils.el('div', { class: 'field' }, [repsInput]),
       ]));
-      form.appendChild(uniChip);
+      form.appendChild(Utils.el('div', { class: 'chip-pair' }, [uniChip, bwChip]));
       addSetBtn.textContent = BTN_TEXT[typeSelected];
       form.refreshType = refreshType;
     }
@@ -600,7 +624,8 @@ const WorkoutView = (() => {
         Celebrate.record(prs, ex ? ex.name : '');
         return;
       }
-      const entered = parseFloat(weightInput.value);
+      let entered = parseFloat(weightInput.value);
+      if (bwSelected && isNaN(entered) && weightInput.value.trim() === '') entered = 0;
       const weight = Units.toKg(entered, inputUnit);
       const reps = parseInt(repsInput.value, 10);
       if (isNaN(entered) || isNaN(reps) || reps <= 0) {
@@ -610,6 +635,11 @@ const WorkoutView = (() => {
       const set = { weight, reps, felt: typeSelected === 'warmup' ? 'normal' : feltSelected };
       if (typeSelected !== 'normal') set.type = typeSelected;
       if (uniSelected) set.uni = true;
+      if (bwSelected) {
+        set.bw = true;
+        set.bwKg = Metrics.bodyWeightKg(iso);
+        if (!set.bwKg) Utils.toast('Registra tu peso corporal (Hoy → ⚖️ Peso) para que cuente en el volumen');
+      }
       const prs = Metrics.detectPR(entry.exerciseId, false, set);
       if (prs.length) set.pr = prs.map((x) => x.kind).join(',');
       entry.sets.push(set);
@@ -649,6 +679,7 @@ const WorkoutView = (() => {
     const body = Utils.el('div');
     let type = set.type === 'warmup' || set.type === 'drop' ? set.type : 'normal';
     let uni = !!set.uni;
+    let bw = !!set.bw;
     let felt = set.felt || 'normal';
     let unit = isCardio ? Units.current() : Units.inputUnitFor(entry.exerciseId);
     let weightIn, repsIn, durIn, distIn, calIn;
@@ -693,7 +724,21 @@ const WorkoutView = (() => {
         segFor([['0', 'Bilateral'], ['1', 'Unilateral · peso por lado']], () => (uni ? '1' : '0'), (k) => { uni = k === '1'; weightLabel.textContent = weightText(); }),
       ]));
 
-      const weightText = () => (uni ? `Peso por lado (${unit})` : `Peso (${unit})`);
+      body.appendChild(Utils.el('div', { class: 'field' }, [
+        Utils.el('label', { text: '¿Peso corporal? (dominadas, fondos…)' }),
+        segFor([['0', 'Peso normal'], ['1', 'Peso corporal · carga extra']], () => (bw ? '1' : '0'), (k) => {
+          bw = k === '1';
+          // si estaba anotado tu peso corporal completo, pasa a 0 de carga extra
+          if (bw && weightIn) {
+            const cur = Units.toKg(parseFloat(weightIn.value) || 0, unit);
+            const bwk = Metrics.bodyWeightKg(iso);
+            if (bwk && Math.abs(cur - bwk) <= 3) weightIn.value = '0';
+          }
+          weightLabel.textContent = weightText();
+        }),
+      ]));
+
+      const weightText = () => (bw ? `Carga extra (${unit}) · 0 = tu peso` : uni ? `Peso por lado (${unit})` : `Peso (${unit})`);
       const weightLabel = Utils.el('label', { text: weightText() });
       weightIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: set.weight !== undefined && set.weight !== null ? String(Units.num(set.weight, unit)) : '' });
       const unitBtn = Utils.el('button', { class: 'unit-btn', type: 'button', title: 'Cambiar entre kg y lb', text: unit });
@@ -727,13 +772,15 @@ const WorkoutView = (() => {
         if (distIn.value !== '') next.distance = parseFloat(distIn.value);
         if (calIn.value !== '') next.calories = parseFloat(calIn.value);
       } else {
-        const entered = parseFloat(weightIn.value);
+        let entered = parseFloat(weightIn.value);
+        if (bw && isNaN(entered) && weightIn.value.trim() === '') entered = 0;
         const reps = parseInt(repsIn.value, 10);
         if (isNaN(entered) || isNaN(reps) || reps <= 0) { Utils.toast('Ingresa peso y repeticiones válidas'); return; }
         next.weight = Units.toKg(entered, unit);
         next.reps = reps;
         if (type !== 'normal') next.type = type;
         if (uni) next.uni = true;
+        if (bw) { next.bw = true; next.bwKg = set.bwKg || Metrics.bodyWeightKg(iso); }
       }
       // recalcula el récord de esta serie comparándola con las demás
       entry.sets.splice(sIdx, 1);
@@ -753,6 +800,90 @@ const WorkoutView = (() => {
     });
     body.appendChild(saveBtn);
     Modal.open(`Editar serie · ${ex ? ex.name : ''}`, body);
+  }
+
+  // al terminar: ofrece dejar la rutina como realmente la hiciste
+  function openRoutineSync(routineId, extras, dropped, orderIds, onDone) {
+    const routine = DB.getRoutines().find((r) => r.id === routineId);
+    if (!routine) { onDone(); return; }
+    const exs = DB.getExercises();
+    const nameOf = (id) => { const e = exs.find((x) => x.id === id); return e ? e.name : '(eliminado)'; };
+    const body = Utils.el('div');
+    body.appendChild(Utils.el('p', { class: 'small', text: `Hoy hiciste «${routine.name}» un poco distinto a como la tienes guardada. ¿Quieres actualizarla para la próxima vez?` }));
+
+    const picks = [];
+    function checkRow(label, sub, checked) {
+      const state = { on: checked };
+      const mark = Utils.el('span', { class: 'sync-check' + (checked ? ' on' : ''), text: checked ? '✓' : '' });
+      const row = Utils.el('div', { class: 'sync-row' }, [
+        mark,
+        Utils.el('div', { style: 'min-width:0;flex:1;' }, [Utils.el('div', { style: 'font-weight:700;', text: label }), sub ? Utils.el('div', { class: 'meta', text: sub }) : null]),
+      ]);
+      row.addEventListener('click', (ev) => {
+        if (ev.target.tagName === 'INPUT') return;
+        state.on = !state.on;
+        mark.classList.toggle('on', state.on);
+        mark.textContent = state.on ? '✓' : '';
+      });
+      return { state, row };
+    }
+
+    if (extras.length) {
+      body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:10px 0 4px;', text: 'Hiciste y no está en la rutina' }));
+      extras.forEach((e) => {
+        const ex = exs.find((x) => x.id === e.exerciseId);
+        const isCardio = !!(ex && ex.group === 'cardio');
+        const work = e.sets.filter(Metrics.isNormal);
+        let sets = Math.max(1, work.length);
+        let reps = '10';
+        if (isCardio) { sets = 1; const d = e.sets[0] || {}; reps = d.duration ? `${d.duration} min` : ''; }
+        else if (work.length) {
+          const rs = work.map((x) => Number(x.reps) || 0).filter(Boolean);
+          const lo = Math.min(...rs); const hi = Math.max(...rs);
+          reps = lo === hi ? String(lo) : `${lo}-${hi}`;
+        }
+        const c = checkRow(nameOf(e.exerciseId), `${isCardio ? 'cardio' : `${sets} serie${sets === 1 ? '' : 's'} · ${reps} reps`} (como lo hiciste hoy)`, true);
+        picks.push({ kind: 'add', id: e.exerciseId, sets, reps, state: c.state });
+        body.appendChild(c.row);
+      });
+    }
+    if (dropped.length) {
+      body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:10px 0 4px;', text: 'Quitaste hoy de la rutina' }));
+      dropped.forEach((id) => {
+        const c = checkRow(nameOf(id), 'Quitarlo también de la rutina guardada', false);
+        picks.push({ kind: 'remove', id, state: c.state });
+        body.appendChild(c.row);
+      });
+    }
+
+    const save = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Actualizar mi rutina' });
+    save.addEventListener('click', () => {
+      const all = DB.getRoutines();
+      const r = all.find((x) => x.id === routineId);
+      if (r) {
+        picks.filter((p) => p.state.on && p.kind === 'remove').forEach((p) => { r.exercises = r.exercises.filter((re) => re.exerciseId !== p.id); });
+        picks.filter((p) => p.state.on && p.kind === 'add').forEach((p) => {
+          if (r.exercises.some((re) => re.exerciseId === p.id)) return;
+          // lo coloca justo después del ejercicio que hiciste antes de él
+          const myIdx = orderIds.indexOf(p.id);
+          let at = 0;
+          for (let i = myIdx - 1; i >= 0; i -= 1) {
+            const pos = r.exercises.findIndex((re) => re.exerciseId === orderIds[i]);
+            if (pos >= 0) { at = pos + 1; break; }
+          }
+          r.exercises.splice(at, 0, { exerciseId: p.id, targetSets: p.sets, targetReps: p.reps });
+        });
+        DB.saveRoutines(all);
+        Utils.toast('Rutina actualizada ✓');
+      }
+      Modal.close();
+      onDone();
+    });
+    const skip = Utils.el('button', { class: 'btn-secondary btn-block', text: 'Ahora no' });
+    skip.addEventListener('click', () => { Modal.close(); onDone(); });
+    body.appendChild(save);
+    body.appendChild(skip);
+    Modal.open('🔄 ¿Actualizar tu rutina?', body, { onClose: onDone, dismissOnBackdrop: false });
   }
 
   // nota y tiempo de descanso propios de un ejercicio

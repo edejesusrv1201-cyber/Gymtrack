@@ -105,33 +105,76 @@ const PlanView = (() => {
     Modal.open('Asignar rutina', body);
   }
 
+  // patrón de la semana que más repites: rutina más frecuente por día de la semana (mes actual; si está vacío, el anterior)
+  function detectPattern(mk) {
+    const [year, month1] = mk.split('-').map(Number);
+    const plans = DB.getMonthlyPlans();
+    const prevKey = Utils.monthKey(new Date(year, month1 - 2, 1));
+    const sources = [plans[mk], plans[prevKey]].filter((p) => p && p.days && Object.keys(p.days).length);
+    const pattern = [];
+    if (!sources.length) return { pattern, from: null };
+    const src = sources[0];
+    const srcKey = src === plans[mk] ? mk : prevKey;
+    const [sy, sm] = srcKey.split('-').map(Number);
+    const counts = Array.from({ length: 7 }, () => ({}));
+    Object.keys(src.days).forEach((d) => {
+      const rid = src.days[d];
+      if (!rid) return;
+      const dow = new Date(sy, sm - 1, Number(d)).getDay();
+      counts[dow][rid] = (counts[dow][rid] || 0) + 1;
+    });
+    counts.forEach((c, dow) => {
+      const best = Object.keys(c).sort((a, z) => c[z] - c[a])[0];
+      if (best) pattern[dow] = best;
+    });
+    return { pattern, from: srcKey };
+  }
+
   function openWeeklyTemplate(mk, onDone) {
     const body = Utils.el('div');
-    body.appendChild(Utils.el('p', { text: 'Elige qué rutina va cada día de la semana. Se aplicará a todo el mes actual (puedes ajustar días individuales después).' }));
+    const { pattern, from } = detectPattern(mk);
+    const [yr, mo] = mk.split('-').map(Number);
+    body.appendChild(Utils.el('p', { text: from
+      ? `Armé esta semana con lo que más repetiste en ${Utils.MESES[Number(from.split('-')[1]) - 1]}. Ajústala y aplícala a ${Utils.MESES[mo - 1]}.`
+      : 'Elige qué rutina va cada día de la semana y se aplicará a todo el mes.' }));
     const routines = DB.getRoutines();
     const selects = [];
     Utils.DIAS.forEach((dowName, dowIdx) => {
       const sel = Utils.el('select', {});
       sel.appendChild(Utils.el('option', { value: '', text: '— Sin asignar —' }));
       routines.forEach((r) => sel.appendChild(Utils.el('option', { value: r.id, text: r.name })));
+      if (pattern[dowIdx] && routines.some((r) => r.id === pattern[dowIdx])) sel.value = pattern[dowIdx];
       selects[dowIdx] = sel;
       body.appendChild(Utils.el('div', { class: 'field' }, [
         Utils.el('label', { text: dowName }),
         sel,
       ]));
     });
+
+    let onlyEmpty = true;
+    const keepBtn = Utils.el('button', { class: 'uni-chip on', type: 'button', text: '✓ Solo llenar los días vacíos (no pisa lo que ya asignaste)' });
+    keepBtn.addEventListener('click', () => {
+      onlyEmpty = !onlyEmpty;
+      keepBtn.classList.toggle('on', onlyEmpty);
+      keepBtn.textContent = onlyEmpty ? '✓ Solo llenar los días vacíos (no pisa lo que ya asignaste)' : 'Reemplazar todos los días del mes';
+    });
+    body.appendChild(keepBtn);
+
     const applyBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Aplicar al mes' });
     applyBtn.addEventListener('click', () => {
-      const [year, month1] = mk.split('-').map(Number);
-      const month0 = month1 - 1;
-      const totalDays = Utils.daysInMonth(year, month0);
+      const totalDays = Utils.daysInMonth(yr, mo - 1);
+      const existing = (DB.getMonthlyPlans()[mk] || { days: {} }).days || {};
+      let changed = 0;
       for (let day = 1; day <= totalDays; day++) {
-        const dow = new Date(year, month0, day).getDay();
+        const dow = new Date(yr, mo - 1, day).getDay();
         const val = selects[dow].value;
-        DB.setPlannedRoutine(`${year}-${Utils.pad(month1)}-${Utils.pad(day)}`, val || null);
+        if (onlyEmpty && existing[String(day)]) continue;
+        if (onlyEmpty && !val) continue;
+        DB.setPlannedRoutine(`${yr}-${Utils.pad(mo)}-${Utils.pad(day)}`, val || null);
+        changed += 1;
       }
       Modal.close();
-      Utils.toast('Plantilla aplicada a todo el mes');
+      Utils.toast(`Plantilla aplicada · ${changed} día${changed === 1 ? '' : 's'}`);
       onDone();
     });
     body.appendChild(applyBtn);

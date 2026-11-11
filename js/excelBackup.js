@@ -486,14 +486,14 @@ const ExcelBackup = (() => {
       const grey = warm ? { color: PAL.dim, italic: true } : {};
       const gc = x.ex ? hex6(Utils.GROUP_COLORS[x.ex.group] || '#8d95a8') : PAL.dim;
       const vol = Metrics.volumeOfSet(s);
-      const e1 = !isCardio && Metrics.isNormal(s) ? Metrics.e1rm(s.weight, s.reps) : 0;
+      const e1 = !isCardio && Metrics.isNormal(s) ? Metrics.e1rm(Metrics.loadOf(s), s.reps) : 0;
       return [
         { v: excelDate(x.date), s: grey, z: 'dd/mm/yyyy' },
         { v: dow(x.date), s: grey },
         { v: x.routine ? x.routine.name : 'Libre', s: grey },
         { v: x.ex ? x.ex.name : '(ejercicio eliminado)', s: Object.assign({ bold: !warm }, grey) },
         { v: x.ex ? x.ex.group : '', s: { color: gc, bold: true } },
-        { v: (warm ? 'Aproximación' : Metrics.isDrop(s) ? 'Dropset' : 'Normal') + (s.uni ? ' · unilateral' : ''), s: grey },
+        { v: (warm ? 'Aproximación' : Metrics.isDrop(s) ? 'Dropset' : 'Normal') + (s.uni ? ' · unilateral' : '') + (s.bw ? ' · peso corporal' : ''), s: grey },
         { v: x.label, s: Object.assign({ h: 'center' }, grey) },
         { v: s.weight !== undefined && s.weight !== null && s.weight !== '' ? Units.num(s.weight) : '', s: grey, z: '0.0' },
         { v: s.reps !== undefined && s.reps !== null && s.reps !== '' ? Number(s.reps) : '', s: grey },
@@ -792,7 +792,7 @@ const ExcelBackup = (() => {
           entry.sets.forEach((set, sIdx) => {
             seriesRows.push({
               date, orden: idx, exerciseId: entry.exerciseId, fromRoutine: !!entry.fromRoutine, setIndex: sIdx,
-              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type, pr: set.pr, uni: set.uni ? 1 : undefined,
+              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type, pr: set.pr, uni: set.uni ? 1 : undefined, bw: set.bw ? 1 : undefined, bwKg: set.bw ? set.bwKg : undefined,
             });
           });
         }
@@ -849,6 +849,7 @@ const ExcelBackup = (() => {
       const ex = { id: String(r.id), name: r.name, group: r.group };
       if (r.unilateral === true || r.unilateral === 'true' || r.unilateral === 1 || r.unilateral === '1') ex.unilateral = true;
       if (r.equipment) ex.equipment = String(r.equipment);
+      if (r.bodyweight === true || r.bodyweight === 'true' || r.bodyweight === 1 || r.bodyweight === '1') ex.bodyweight = true;
       if (r.note) ex.note = String(r.note);
       if (num(r.restSec) > 0) ex.restSec = num(r.restSec);
       return ex;
@@ -931,6 +932,7 @@ const ExcelBackup = (() => {
         if (r.type === 'warmup' || r.type === 'drop') set.type = r.type;
         if (r.pr) set.pr = String(r.pr);
         if (r.uni === 1 || r.uni === '1' || r.uni === true) set.uni = true;
+        if (r.bw === 1 || r.bw === '1' || r.bw === true) { set.bw = true; set.bwKg = num(r.bwKg) || 0; }
         if (r.duration !== undefined && r.duration !== '') {
           set.duration = num(r.duration);
           if (r.distance !== '') set.distance = num(r.distance);
