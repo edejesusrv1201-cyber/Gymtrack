@@ -653,7 +653,7 @@ const ExcelBackup = (() => {
         { v: excelDate(d), z: 'dd/mm/yyyy' },
         { v: MEAL[e.meal] || e.meal || '' },
         { v: e.foodName, s: { bold: true } },
-        { v: Number(e.servings) || 1, z: '0.##' },
+        { v: e.grams ? `${Utils.round1(e.grams)} g` : `${Utils.round1(Number(e.servings) || 1)} porc.`, s: { h: 'right' } },
         { v: Math.round(Number(e.kcal) || 0), z: '#,##0', s: { bold: true } },
         { v: Utils.round1(Number(e.protein) || 0), z: '0.0' },
         { v: Utils.round1(Number(e.carbs) || 0), z: '0.0' },
@@ -661,7 +661,7 @@ const ExcelBackup = (() => {
       ]));
     });
     return tableSheet(
-      ['Fecha', 'Comida', 'Alimento', 'Porciones', 'Calorías', 'Proteína (g)', 'Carbos (g)', 'Grasas (g)'],
+      ['Fecha', 'Comida', 'Alimento', 'Cantidad', 'Calorías', 'Proteína (g)', 'Carbos (g)', 'Grasas (g)'],
       rows,
       [{ w: 12 }, { w: 13 }, { w: 32 }, { w: 11 }, { w: 11 }, { w: 13 }, { w: 12 }, { w: 12 }],
     );
@@ -740,7 +740,12 @@ const ExcelBackup = (() => {
     add(routinesSheet(), 'Rutinas');
 
     // --- hojas técnicas (ocultas) ---
-    add(dataSheet([settings]), DATA.ajustes);
+    const settingsFlat = {};
+    Object.keys(settings).forEach((k) => {
+      const v = settings[k];
+      settingsFlat[k] = v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
+    });
+    add(dataSheet([settingsFlat]), DATA.ajustes);
     add(dataSheet(exercises), DATA.ejercicios);
     add(dataSheet(routines.map((r) => ({ id: r.id, name: r.name, color: r.color }))), DATA.rutinas);
 
@@ -834,6 +839,7 @@ const ExcelBackup = (() => {
         if (v === '') v = null;
         else if (v === 'true') v = true;
         else if (v === 'false') v = false;
+        else if (typeof v === 'string' && (v.charAt(0) === '{' || v.charAt(0) === '[')) { try { v = JSON.parse(v); } catch (e) { /* queda como texto */ } }
         else if (typeof v === 'string' && !isNaN(v)) v = Number(v);
         settings[k] = v;
       });
@@ -872,20 +878,28 @@ const ExcelBackup = (() => {
       return m;
     }).sort((a, b) => (a.date > b.date ? 1 : -1));
 
-    const foods = rows('alimentos').map((r) => ({
-      id: String(r.id), name: r.name, servingLabel: String(r.servingLabel),
-      kcal: num(r.kcal) || 0, protein: num(r.protein) || 0, carbs: num(r.carbs) || 0, fat: num(r.fat) || 0,
-    }));
+    const foods = rows('alimentos').map((r) => {
+      const food = {
+        id: String(r.id), name: r.name, servingLabel: String(r.servingLabel),
+        kcal: num(r.kcal) || 0, protein: num(r.protein) || 0, carbs: num(r.carbs) || 0, fat: num(r.fat) || 0,
+      };
+      if (r.basis === 'g' || r.basis === 's') food.basis = r.basis;
+      if (num(r.portionG) > 0) food.portionG = num(r.portionG);
+      if (bool(r.combo)) food.combo = true;
+      return food;
+    });
 
     const calorieLog = {};
     rows('calorias').forEach((r) => {
       const date = asISODate(r.date);
       calorieLog[date] = calorieLog[date] || [];
-      calorieLog[date].push({
+      const entry = {
         id: String(r.id), foodId: r.foodId ? String(r.foodId) : undefined, foodName: r.foodName,
         servings: num(r.servings) || 1, kcal: num(r.kcal) || 0, protein: num(r.protein) || 0,
         carbs: num(r.carbs) || 0, fat: num(r.fat) || 0, meal: r.meal, time: r.time,
-      });
+      };
+      if (num(r.grams) > 0) entry.grams = num(r.grams);
+      calorieLog[date].push(entry);
     });
 
     const waterLog = {};

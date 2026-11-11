@@ -1000,3 +1000,73 @@ p { line-height: 1.5; }
 .tiles { gap: 8px; margin-bottom: 12px; }
 .dots span { background: rgba(255, 255, 255, 0.16); }
 .dots span.on { background: var(--accent-grad); }
+
+/* ============================================================
+   Alimentación v21
+   ============================================================ */
+.day-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.day-nav .btn-small { width: 42px; height: 38px; padding: 0; font-size: 1rem; }
+.day-title { text-align: center; flex: 1; min-width: 0; }
+.day-title .h { font-weight: 800; font-size: 1.05rem; }
+.link-btn { background: none; padding: 2px 0; color: var(--accent-light); font-weight: 700; }
+
+.nut-top { display: flex; align-items: center; gap: 18px; }
+.nut-rem { flex: 1; min-width: 0; }
+.nut-rem-val { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.nut-macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.nut-macro { min-width: 0; }
+.nm-label { font-size: 0.68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.nm-val { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.nm-goal { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 4px; }
+.nm-left { font-size: 0.7rem; color: var(--text-dim); margin-top: 3px; }
+.nut-hint { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-light); font-size: 0.84rem; font-weight: 700; }
+.nut-split { margin-top: 12px; }
+.ns-bar { display: flex; height: 8px; border-radius: 6px; overflow: hidden; margin-bottom: 6px; background: var(--bg-elev-3); }
+.ns-bar i { display: block; height: 100%; }
+.nut-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
+.nut-actions .btn-primary { width: 100%; }
+.nut-actions .btn-secondary { width: auto; padding: 0 18px; }
+
+.meal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.meal-head h4 { font-size: 1.02rem; }
+.meal-kcal { font-weight: 800; font-size: 1.05rem; }
+.meal-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); cursor: pointer; }
+.mr-main { flex: 1; min-width: 0; }
+.mr-name { font-weight: 700; font-size: 0.94rem; }
+.meal-row .meta { font-size: 0.74rem; color: var(--text-dim); margin-top: 1px; }
+.mr-kcal { font-weight: 800; font-variant-numeric: tabular-nums; }
+.meal-actions { display: flex; gap: 8px; margin-top: 10px; }
+.meal-actions .btn-secondary { flex: 1; padding: 10px 6px; font-size: 0.84rem; }
+
+.wk-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; }
+.wk-col { background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; border-radius: 10px; }
+.wk-col.sel .wk-day { color: var(--accent-light); }
+.wk-val { font-size: 0.6rem; color: var(--text-dim); height: 12px; font-variant-numeric: tabular-nums; }
+.wk-bar { position: relative; width: 100%; height: 84px; display: flex; align-items: flex-end; justify-content: center; border-radius: 8px; background: rgba(255, 255, 255, 0.04); overflow: hidden; }
+.wk-col.sel .wk-bar { box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb), 0.6); }
+.wk-bar i { display: block; width: 62%; border-radius: 5px 5px 0 0; }
+.wk-bar b { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(255, 255, 255, 0.4); }
+.wk-day { font-size: 0.66rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+
+/* agregar alimento */
+.nut-chips { flex-wrap: nowrap; overflow-x: auto; margin-left: -4px; padding: 2px 4px 6px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.nut-chips::-webkit-scrollbar { display: none; }
+.nut-chips .rt-chip { flex: none; text-transform: none; white-space: nowrap; }
+.nut-chips .rt-chip.active { color: var(--on-accent); background: var(--accent-grad); }
+.food-row { display: flex; align-items: center; gap: 8px; padding: 11px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); cursor: pointer; }
+.fr-main { flex: 1; min-width: 0; }
+.fr-name { font-weight: 700; font-size: 0.94rem; }
+.food-row .meta { font-size: 0.72rem; color: var(--text-dim); margin-top: 1px; }
+.star-btn { background: none; padding: 6px 8px; font-size: 1.15rem; color: var(--text-dim); flex: none; }
+.star-btn.on { color: var(--yellow); }
+.fr-add { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; background: var(--accent-soft); color: var(--accent-light); }
+
+/* cantidad */
+.qty-row { display: flex; align-items: center; gap: 10px; }
+.qty-input { font-size: 1.6rem !important; font-weight: 800; text-align: center; padding: 12px; flex: 1; min-width: 0; }
+.qty-unit { flex: none; font-weight: 700; color: var(--text-dim); max-width: 40%; }
+.qty-preview { margin-top: 12px; padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid var(--border); text-align: center; }
+.qp-kcal { font-size: 0.95rem; color: var(--text-dim); }
+.qp-kcal b { font-size: 2rem; letter-spacing: -0.03em; color: var(--text); }
+.qp-macros { display: flex; justify-content: center; gap: 14px; font-weight: 800; font-size: 0.9rem; margin: 4px 0 6px; }
+.rt-chip.plain { text-transform: none; }
