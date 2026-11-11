@@ -12,6 +12,41 @@ const CalculatorView = (() => {
     const measurements = DB.getMeasurements();
     const lastWeight = measurements.length ? measurements[measurements.length - 1].weight : '';
 
+    // ---- mantenimiento real, según tu propio registro ----
+    const real = Nutrition.adaptiveTdee();
+    const realCard = Utils.el('div', { class: 'card' });
+    realCard.appendChild(Utils.el('h3', { text: '📈 Tu mantenimiento real' }));
+    if (!real.ok) {
+      realCard.appendChild(Utils.el('p', { text: `La fórmula es un estimado. Con tu propio registro puedo calcular cuántas calorías gastas de verdad. ${real.reason}` }));
+    } else {
+      const dir = real.slopeKgWeek > 0 ? 'subió' : real.slopeKgWeek < 0 ? 'bajó' : 'se mantuvo';
+      realCard.appendChild(Utils.el('div', { class: 'stat-box', style: 'margin-bottom:8px;' }, [
+        Utils.el('div', { class: 'val', text: `${real.tdee} kcal` }),
+        Utils.el('div', { class: 'lbl', text: 'mantenimiento estimado' }),
+      ]));
+      realCard.appendChild(Utils.el('p', { class: 'small', text: `Comiste ${real.avgKcal} kcal en promedio (${real.loggedDays} días) y tu peso ${dir}${real.slopeKgWeek ? ` ${Math.abs(real.slopeKgWeek)} kg/semana` : ''}. Es más exacto mientras más comidas registres completas.` }));
+      const kg = DB.getSettings().calcWeightKg || (DB.getMeasurements().slice(-1)[0] || {}).weight || 0;
+      const useGoal = (delta, label) => {
+        const k = real.tdee + delta;
+        const prot = kg ? Math.round(kg * 2) : Math.round((k * 0.25) / 4);
+        const fat = Math.round((k * 0.25) / 9);
+        const carbs = Math.max(0, Math.round((k - prot * 4 - fat * 9) / 4));
+        const s2 = DB.getSettings();
+        Object.assign(s2, { calorieGoal: k, proteinGoal: prot, carbGoal: carbs, fatGoal: fat });
+        DB.saveSettings(s2);
+        Utils.toast(`Meta: ${label} · ${k} kcal`);
+      };
+      const row = Utils.el('div', { class: 'grid-3' });
+      [[-400, 'Bajar'], [0, 'Mantener'], [300, 'Subir']].forEach(([d, label]) => {
+        const b = Utils.el('button', { class: 'btn-secondary', style: 'padding:10px 4px;font-size:0.8rem;', text: `${label}\n${real.tdee + d}` });
+        b.style.whiteSpace = 'pre-line';
+        b.addEventListener('click', () => useGoal(d, label));
+        row.appendChild(b);
+      });
+      realCard.appendChild(row);
+    }
+    view.appendChild(realCard);
+
     const card = Utils.el('div', { class: 'card' });
     card.appendChild(Utils.el('h3', { text: '🧮 Calculadora de mantenimiento' }));
     card.appendChild(Utils.el('p', { text: 'Calcula tu gasto calórico total (TDEE) y compara déficit, mantenimiento o superávit para elegir tu meta diaria.' }));

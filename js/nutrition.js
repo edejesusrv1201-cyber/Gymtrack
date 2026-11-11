@@ -44,5 +44,39 @@ const Nutrition = (() => {
     });
   }
 
-  return { ACTIVITY_MULTIPLIERS, bmr, tdee, buildPlan, SCENARIOS };
+  // Mantenimiento REAL estimado a partir de lo que comiste y cómo cambió tu peso (últimos `windowDays` días).
+  //   gasto ≈ calorías promedio − (cambio de peso por día × 7700 kcal/kg)
+  // Devuelve null si todavía no hay datos suficientes.
+  function adaptiveTdee(windowDays = 28) {
+    const cal = DB.getCalorieLog();
+    const end = new Date();
+    const days = [];
+    for (let i = 0; i < windowDays; i++) {
+      const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i);
+      days.push(Utils.toISODate(d));
+    }
+    // solo días con registro "completo" (más de 800 kcal), para no contar días a medias
+    const logged = days.map((iso) => (cal[iso] || []).reduce((s, e) => s + (e.kcal || 0), 0)).filter((k) => k >= 800);
+    if (logged.length < 7) return { ok: false, reason: `Registra tus comidas al menos 7 días (llevas ${logged.length}).` };
+    const avgKcal = logged.reduce((s, k) => s + k, 0) / logged.length;
+
+    const since = days[days.length - 1];
+    const points = DB.getMeasurements().filter((m) => m.weight && m.date >= since)
+      .map((m) => ({ t: Utils.parseISO(m.date).getTime() / 86400000, w: Number(m.weight) }));
+    if (points.length < 2) return { ok: false, reason: 'Necesito al menos 2 pesajes en las últimas 4 semanas (Progreso → Cuerpo).' };
+    const span = Math.max(...points.map((p) => p.t)) - Math.min(...points.map((p) => p.t));
+    if (span < 7) return { ok: false, reason: 'Tus pesajes deben cubrir al menos 7 días.' };
+
+    // pendiente por mínimos cuadrados (kg por día)
+    const n = points.length;
+    const mt = points.reduce((s, p) => s + p.t, 0) / n;
+    const mw = points.reduce((s, p) => s + p.w, 0) / n;
+    const num = points.reduce((s, p) => s + (p.t - mt) * (p.w - mw), 0);
+    const den = points.reduce((s, p) => s + (p.t - mt) ** 2, 0) || 1;
+    const slope = num / den;
+    const tdee = Math.round(avgKcal - slope * 7700);
+    return { ok: true, tdee, avgKcal: Math.round(avgKcal), loggedDays: logged.length, slopeKgWeek: Utils.round1(slope * 7), weighIns: n };
+  }
+
+  return { ACTIVITY_MULTIPLIERS, bmr, tdee, buildPlan, SCENARIOS, adaptiveTdee };
 })();
