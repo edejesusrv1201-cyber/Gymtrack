@@ -352,6 +352,7 @@ const WorkoutView = (() => {
       const down = add('▼  Bajar en el orden', () => { Modal.close(); moveEntry(iso, log, idx, 1, rerender); });
       up.disabled = idx === 0;
       down.disabled = idx === log.exercises.length - 1;
+      add('📝  Nota y descanso de este ejercicio', () => { Modal.close(); openExerciseSettings(ex, rerender); });
       add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
       Modal.open(ex ? ex.name : 'Ejercicio', menu);
     };
@@ -367,6 +368,13 @@ const WorkoutView = (() => {
       ]),
       headerBtns,
     ]));
+
+    // --- nota del ejercicio (ej. "asiento en 4") ---
+    if (ex) {
+      const noteLine = Utils.el('button', { type: 'button', class: 'ex-note' + (ex.note ? '' : ' empty'), text: ex.note ? `📝 ${ex.note}` : '＋ Nota (asiento, agarre…)' });
+      noteLine.addEventListener('click', () => openExerciseSettings(ex, rerender));
+      card.appendChild(noteLine);
+    }
 
     // --- series de este grupo muscular en la semana ---
     if (ex && Metrics.STRENGTH_GROUPS.includes(ex.group)) {
@@ -610,7 +618,7 @@ const WorkoutView = (() => {
       if (typeSelected === 'drop') typeMemory[key] = 'drop';
       else delete typeMemory[key];
       // descanso solo tras una serie efectiva (las aproximaciones y los drops van seguidos)
-      if (typeSelected === 'normal') RestTimer.quickStart(DB.getSettings().restDefault);
+      if (typeSelected === 'normal') RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault);
       rerender();
       Celebrate.record(prs, ex ? ex.name : '');
     });
@@ -745,6 +753,34 @@ const WorkoutView = (() => {
     });
     body.appendChild(saveBtn);
     Modal.open(`Editar serie · ${ex ? ex.name : ''}`, body);
+  }
+
+  // nota y tiempo de descanso propios de un ejercicio
+  function openExerciseSettings(ex, rerender) {
+    if (!ex) return;
+    const body = Utils.el('div');
+    const note = Utils.el('textarea', { rows: 3, placeholder: 'ej. Asiento en 4, agarre ancho, pausa de 1 s abajo' });
+    note.value = ex.note || '';
+    const rest = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: `${DB.getSettings().restDefault || 90} (por defecto)`, value: ex.restSec ? String(ex.restSec) : '' });
+    body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Nota (la ves cada vez que haces este ejercicio)' }), note]));
+    body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Descanso entre series (segundos)' }), rest]));
+    body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:-4px 0 10px;', text: 'Déjalo vacío para usar el descanso general de Ajustes.' }));
+    const save = Utils.el('button', { class: 'btn-primary btn-block', text: 'Guardar' });
+    save.addEventListener('click', () => {
+      const all = DB.getExercises();
+      const t = all.find((e) => e.id === ex.id);
+      if (t) {
+        const n = note.value.trim();
+        if (n) t.note = n; else delete t.note;
+        const r = parseInt(rest.value, 10);
+        if (r > 0) t.restSec = r; else delete t.restSec;
+        DB.saveExercises(all);
+      }
+      Modal.close();
+      rerender();
+    });
+    body.appendChild(save);
+    Modal.open(ex.name, body);
   }
 
   function setActive(iso, exerciseId, rerender) {

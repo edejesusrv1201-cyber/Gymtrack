@@ -849,6 +849,8 @@ const ExcelBackup = (() => {
       const ex = { id: String(r.id), name: r.name, group: r.group };
       if (r.unilateral === true || r.unilateral === 'true' || r.unilateral === 1 || r.unilateral === '1') ex.unilateral = true;
       if (r.equipment) ex.equipment = String(r.equipment);
+      if (r.note) ex.note = String(r.note);
+      if (num(r.restSec) > 0) ex.restSec = num(r.restSec);
       return ex;
     });
 

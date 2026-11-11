@@ -79,6 +79,33 @@ const App = (() => {
     }
   }
 
+  // avisa si hay una versión nueva publicada (solo con internet)
+  function checkForUpdate() {
+    const m = ((document.querySelector('script[src*="app.js"]') || {}).src || '').match(/v=(\d+)/);
+    const running = m ? m[1] : null;
+    if (!running || !navigator.onLine) return;
+    fetch(`sw.js?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.text()).then((txt) => {
+      const l = txt.match(/migymtrack-v(\d+)/);
+      if (!l || l[1] === running || document.getElementById('updateBanner')) return;
+      const bar = Utils.el('div', { class: 'update-banner', id: 'updateBanner' }, [
+        Utils.el('span', { text: '🆕 Hay una versión nueva de MiGymTrack' }),
+      ]);
+      const go = Utils.el('button', { class: 'btn-small', text: 'Actualizar' });
+      go.addEventListener('click', async () => {
+        go.disabled = true; go.textContent = '…';
+        try {
+          if ('serviceWorker' in navigator) (await navigator.serviceWorker.getRegistrations()).forEach((r) => r.unregister());
+          if (window.caches) (await caches.keys()).forEach((k) => caches.delete(k));
+        } catch (e) { /* igual se recarga */ }
+        setTimeout(() => location.reload(), 300);
+      });
+      const close = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Más tarde' });
+      close.addEventListener('click', () => bar.remove());
+      bar.appendChild(Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;flex:none;' }, [go, close]));
+      document.body.appendChild(bar);
+    }).catch(() => { /* sin conexión */ });
+  }
+
   function init() {
     DB.ensureSeed();
     // pide al navegador (Safari incluido) que no borre los datos si hay poco espacio
@@ -88,6 +115,7 @@ const App = (() => {
     RestTimer.init();
     navigate('hoy');
     registerServiceWorker();
+    setTimeout(checkForUpdate, 3500);
   }
 
   return { navigate, init, get currentView() { return currentView; }, get currentParams() { return currentParams; } };

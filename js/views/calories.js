@@ -850,5 +850,12 @@ const CaloriesView = (() => {
     Modal.open('Mis alimentos', body, { onClose: refresh });
   }
 
-  return { render };
+  // desde Hoy: abre la pantalla de calorías (día de hoy) con el menú de agregar
+  function addNow() {
+    cursorIso = Utils.todayISO();
+    App.navigate('calorias');
+    openAddFood(defaultMeal());
+  }
+
+  return { render, addNow };
 })();

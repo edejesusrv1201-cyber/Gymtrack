@@ -297,6 +297,24 @@ const TodayView = (() => {
       ]));
     }
 
+    // recordatorio semanal de peso (se puede ocultar por hoy)
+    const sinceW = MeasurementsView.daysSinceWeight();
+    let nudgeHidden = false;
+    try { nudgeHidden = localStorage.getItem('gt_weight_nudge') === todayIso; } catch (e) { /* sin almacenamiento */ }
+    if ((sinceW === null || sinceW >= 7) && !nudgeHidden) {
+      const reg = Utils.el('button', { class: 'btn-small', text: 'Pesarme' });
+      reg.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
+      const later = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Recordármelo mañana' });
+      later.addEventListener('click', () => {
+        try { localStorage.setItem('gt_weight_nudge', todayIso); } catch (e) { /* sin almacenamiento */ }
+        rerender();
+      });
+      view.appendChild(Utils.el('div', { class: 'banner' }, [
+        Utils.el('span', { text: sinceW === null ? '⚖️ Aún no registras tu peso. Es la base para ver tu progreso.' : `⚖️ Hace ${sinceW} días que no registras tu peso.` }),
+        Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;flex:none;' }, [reg, later]),
+      ]));
+    }
+
     view.appendChild(renderHero(todayIso, routine, log, rerender));
     if (routine && routine.exercises.length > 0) view.appendChild(renderExerciseList(todayIso, routine, log));
 
@@ -322,6 +340,25 @@ const TodayView = (() => {
       tile('Agua', `${Utils.round1(waterMl / 1000)} L`, `de ${Utils.round1(waterGoal / 1000)} L`, waterMl / waterGoal, 'linear-gradient(90deg,#5b8cff,#3de0c2)', { view: 'calorias' }),
       tile('Semana', `${weekDays}`, weekDays === 1 ? 'día entrenado' : 'días entrenados', weekDays / 5, 'linear-gradient(90deg,#35d49a,#3de0c2)', { view: 'progreso', params: { section: 'entreno' } }),
     ]));
+
+    // accesos rápidos del día
+    const quick = Utils.el('div', { class: 'quick-row' });
+    const qFood = Utils.el('button', { type: 'button', text: '🍽️ Comida' });
+    qFood.addEventListener('click', () => CaloriesView.addNow());
+    const qWater = Utils.el('button', { type: 'button', text: '💧 +250 ml' });
+    qWater.addEventListener('click', () => {
+      const wl = DB.getWaterLog();
+      wl[todayIso] = wl[todayIso] || [];
+      wl[todayIso].push({ id: DB.uid(), ml: 250, time: new Date().toISOString() });
+      DB.saveWaterLog(wl);
+      Utils.vibrate(20);
+      Utils.toast('💧 +250 ml');
+      rerender();
+    });
+    const qWeight = Utils.el('button', { type: 'button', text: '⚖️ Peso' });
+    qWeight.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
+    [qFood, qWater, qWeight].forEach((b) => quick.appendChild(b));
+    view.appendChild(quick);
 
     view.appendChild(renderWeek(workoutLog, rerender));
 

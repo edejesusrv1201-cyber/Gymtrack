@@ -39,6 +39,8 @@ const MeasurementsView = (() => {
     });
     view.appendChild(addBtn);
 
+    view.appendChild(goalCard(measurements, () => render(root)));
+
     // ---- gráfico de progreso ----
     if (measurements.length >= 2) {
       const chartCard = Utils.el('div', { class: 'card' });
@@ -223,5 +225,153 @@ const MeasurementsView = (() => {
     container.appendChild(box('30 días', fmtDelta(Utils.round1(last.y - base.y)), base === first && first.x > cutoffIso ? 'desde el inicio' : `desde ${Utils.shortDate(base.x)}`));
   }
 
-  return { render };
+  // ---------- registro rápido de peso (desde Hoy) ----------
+  function weightPoints(list) {
+    return list.filter((m) => m.weight).map((m) => ({ date: m.date, kg: Number(m.weight) }));
+  }
+
+  // días desde el último pesaje (null = nunca)
+  function daysSinceWeight() {
+    const pts = weightPoints(DB.getMeasurements());
+    if (!pts.length) return null;
+    const last = pts.reduce((a, p) => (p.date > a ? p.date : a), '0000-00-00');
+    return Math.floor((Utils.parseISO(Utils.todayISO()) - Utils.parseISO(last)) / 86400000);
+  }
+
+  function openQuickWeight(onSaved) {
+    const body = Utils.el('div');
+    const savedUnit = DB.getSettings().bodyWeightUnit;
+    let unit = savedUnit === 'lb' || savedUnit === 'kg' ? savedUnit : Units.current();
+    const pts = weightPoints(DB.getMeasurements());
+    const lastKg = pts.length ? pts[pts.length - 1].kg : 0;
+    const inp = Utils.el('input', { type: 'number', step: 'any', inputmode: 'decimal', placeholder: `Peso (${unit})`, value: lastKg ? String(Units.num(lastKg, unit)) : '' });
+    const label = Utils.el('label', { text: `Peso de hoy (${unit})` });
+    const btn = Utils.el('button', { class: 'unit-btn', type: 'button', text: unit });
+    btn.addEventListener('click', () => {
+      const next = unit === 'kg' ? 'lb' : 'kg';
+      const typed = parseFloat(inp.value);
+      if (!isNaN(typed)) inp.value = Math.round(Units.fromKg(Units.toKg(typed, unit), next) * 10) / 10;
+      unit = next;
+      const st = DB.getSettings(); st.bodyWeightUnit = next; DB.saveSettings(st);
+      btn.textContent = next; label.textContent = `Peso de hoy (${next})`; inp.placeholder = `Peso (${next})`;
+    });
+    body.appendChild(Utils.el('p', { class: 'small', text: 'Pésate en ayunas y en la misma báscula para que la tendencia sea confiable.' }));
+    body.appendChild(Utils.el('div', { class: 'field' }, [label, Utils.el('div', { class: 'input-unit' }, [inp, btn])]));
+    const save = Utils.el('button', { class: 'btn-primary btn-block', text: '✓ Guardar peso' });
+    save.addEventListener('click', () => {
+      const v = parseFloat(inp.value);
+      if (!(v > 0)) { Utils.toast('Escribe tu peso'); return; }
+      const list = DB.getMeasurements();
+      const today = Utils.todayISO();
+      let rec = list.find((m) => m.date === today);
+      if (!rec) { rec = { id: DB.uid(), date: today }; list.push(rec); }
+      rec.weight = Units.toKg(v, unit);
+      list.sort((a, b) => (a.date > b.date ? 1 : -1));
+      DB.saveMeasurements(list);
+      try { localStorage.removeItem('gt_weight_nudge'); } catch (e) { /* sin almacenamiento */ }
+      Modal.close();
+      Utils.toast('Peso guardado ⚖️');
+      if (onSaved) onSaved();
+    });
+    body.appendChild(save);
+    Modal.open('⚖️ Registrar peso', body);
+    setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) { /* sin foco */ } }, 120);
+  }
+
+  // ---------- meta de peso con proyección ----------
+  // tendencia (kg/día) por mínimos cuadrados con los pesajes de las últimas 6 semanas
+  function weightTrend() {
+    const since = Utils.toISODate(new Date(Date.now() - 42 * 86400000));
+    const pts = weightPoints(DB.getMeasurements()).filter((p) => p.date >= since)
+      .map((p) => ({ t: Utils.parseISO(p.date).getTime() / 86400000, w: p.kg }));
+    if (pts.length < 2) return null;
+    const span = Math.max(...pts.map((p) => p.t)) - Math.min(...pts.map((p) => p.t));
+    if (span < 5) return null;
+    const n = pts.length;
+    const mt = pts.reduce((s, p) => s + p.t, 0) / n;
+    const mw = pts.reduce((s, p) => s + p.w, 0) / n;
+    const den = pts.reduce((s, p) => s + (p.t - mt) ** 2, 0) || 1;
+    return pts.reduce((s, p) => s + (p.t - mt) * (p.w - mw), 0) / den;
+  }
+
+  function openGoalForm(onSaved) {
+    const body = Utils.el('div');
+    const s = DB.getSettings();
+    let unit = Units.current();
+    const inp = Utils.el('input', { type: 'number', step: 'any', inputmode: 'decimal', value: s.goalWeightKg ? String(Units.num(s.goalWeightKg, unit)) : '' });
+    body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: `Peso que quieres alcanzar (${unit})` }), inp]));
+    const save = Utils.el('button', { class: 'btn-primary btn-block', text: 'Guardar meta' });
+    save.addEventListener('click', () => {
+      const v = parseFloat(inp.value);
+      if (!(v > 0)) { Utils.toast('Escribe un peso válido'); return; }
+      const st = DB.getSettings();
+      const pts = weightPoints(DB.getMeasurements());
+      st.goalWeightKg = Units.toKg(v, unit);
+      st.goalStartKg = pts.length ? pts[pts.length - 1].kg : st.goalWeightKg;
+      DB.saveSettings(st);
+      Modal.close();
+      if (onSaved) onSaved();
+    });
+    body.appendChild(save);
+    if (s.goalWeightKg) {
+      const del = Utils.el('button', { class: 'btn-secondary btn-block', style: 'color:var(--red);', text: 'Quitar meta' });
+      del.addEventListener('click', () => {
+        const st = DB.getSettings(); delete st.goalWeightKg; delete st.goalStartKg; DB.saveSettings(st);
+        Modal.close();
+        if (onSaved) onSaved();
+      });
+      body.appendChild(del);
+    }
+    Modal.open('🎯 Meta de peso', body);
+  }
+
+  function goalCard(measurements, rerender) {
+    const s = DB.getSettings();
+    const card = Utils.el('div', { class: 'card' });
+    const pts = weightPoints(measurements);
+    if (!s.goalWeightKg) {
+      card.appendChild(Utils.el('div', { class: 'card-title-row' }, [Utils.el('h3', { text: '🎯 Meta de peso' })]));
+      card.appendChild(Utils.el('p', { class: 'small', text: 'Ponte una meta y te muestro cuánto te falta y la fecha aproximada según tu tendencia.' }));
+      const b = Utils.el('button', { class: 'btn-secondary btn-block', text: 'Definir mi meta' });
+      b.addEventListener('click', () => openGoalForm(rerender));
+      card.appendChild(b);
+      return card;
+    }
+    const goal = s.goalWeightKg;
+    const cur = pts.length ? pts[pts.length - 1].kg : null;
+    card.appendChild(Utils.el('div', { class: 'card-title-row' }, [
+      Utils.el('h3', { text: '🎯 Meta de peso' }),
+      Utils.el('button', { class: 'link-btn small', text: 'Cambiar', onclick: () => openGoalForm(rerender) }),
+    ]));
+    if (cur === null) {
+      card.appendChild(Utils.el('p', { class: 'small', text: `Meta: ${Units.label(goal)}. Registra tu peso para ver el avance.` }));
+      return card;
+    }
+    const start = s.goalStartKg || cur;
+    const total = goal - start;
+    const done = cur - start;
+    const pct = total === 0 ? 100 : Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+    const left = goal - cur;
+    card.appendChild(Utils.el('div', { class: 'goal-row' }, [
+      Utils.el('div', {}, [Utils.el('div', { class: 'eyebrow', text: 'Ahora' }), Utils.el('div', { class: 'goal-val', text: Units.label(cur) })]),
+      Utils.el('div', { style: 'text-align:center;' }, [Utils.el('div', { class: 'eyebrow', text: Math.abs(left) < 0.2 ? '¡Meta lograda!' : left > 0 ? 'Te faltan' : 'Te sobran' }), Utils.el('div', { class: 'goal-val', text: Math.abs(left) < 0.2 ? '✓' : `${Utils.round1(Math.abs(Units.fromKg(left)))} ${Units.current()}` })]),
+      Utils.el('div', { style: 'text-align:right;' }, [Utils.el('div', { class: 'eyebrow', text: 'Meta' }), Utils.el('div', { class: 'goal-val', text: Units.label(goal) })]),
+    ]));
+    card.appendChild(Utils.el('div', { class: 'macro-bar', style: 'margin-top:10px;' }, [Utils.el('div', { class: 'macro-bar-fill', style: `width:${pct}%;background:var(--accent-grad);` })]));
+
+    const slope = weightTrend(); // kg/día
+    let note;
+    if (Math.abs(left) < 0.2) note = 'Estás en tu meta. Ahora toca mantenerla.';
+    else if (slope === null) note = 'Con otro pesaje en unos días calculo tu tendencia y la fecha estimada.';
+    else if (Math.abs(slope) < 0.005) note = `Tu peso está estable (${Utils.round1(Units.fromKg(slope * 7))} ${Units.current()}/semana).`;
+    else if ((left > 0) === (slope > 0)) {
+      const days = Math.round(left / slope);
+      const d = new Date(Date.now() + days * 86400000);
+      note = `A este ritmo (${slope > 0 ? '+' : ''}${Utils.round1(Units.fromKg(slope * 7))} ${Units.current()}/semana) llegarías hacia el ${Utils.DIAS_CORTOS[d.getDay()]} ${d.getDate()} de ${Utils.MESES[d.getMonth()]} (≈ ${days <= 14 ? `${days} días` : `${Math.round(days / 7)} semanas`}).`;
+    } else note = `Tu tendencia va en dirección contraria a la meta (${slope > 0 ? '+' : ''}${Utils.round1(Units.fromKg(slope * 7))} ${Units.current()}/semana). Revisa tus calorías en la pestaña de alimentación.`;
+    card.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:8px;', text: note }));
+    return card;
+  }
+
+  return { render, daysSinceWeight, openQuickWeight };
 })();
