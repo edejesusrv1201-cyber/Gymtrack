@@ -955,58 +955,25 @@ const WorkoutView = (() => {
       }
     }
 
-    // crear uno nuevo sin salir del entrenamiento
-    function paintCreate(open) {
+    // crear uno nuevo sin salir del entrenamiento (o traerlo de la biblioteca)
+    function addCreated(ex) {
+      if (!ex) return;
+      unremove(ex.id);
+      if (!log.exercises.some((e) => e.exerciseId === ex.id)) log.exercises.push({ exerciseId: ex.id, sets: [] });
+      saveLog(iso, log);
+      activeByDate[iso] = ex.id;
+      scrollToKey = `${iso}:${ex.id}`;
+      Utils.toast(`"${ex.name}" agregado al día`);
+      onDone();
+    }
+    function paintCreate() {
       createWrap.innerHTML = '';
-      if (!open) {
-        const b = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '➕ Crear ejercicio nuevo' });
-        b.addEventListener('click', () => paintCreate(true));
-        createWrap.appendChild(b);
-        return;
-      }
-      const nameIn = Utils.el('input', { type: 'text', placeholder: 'Nombre del ejercicio', value: query || '' });
-      const groupSel = Utils.el('select', {});
-      GROUP_ORDER.forEach((g) => groupSel.appendChild(Utils.el('option', { value: g, text: g })));
-      if (filter && GROUP_ORDER.includes(filter)) groupSel.value = filter;
-      let uni = false;
-      const seg = Utils.el('div', { class: 'seg small' });
-      const paintSeg = () => seg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', (x.dataset.u === '1') === uni));
-      [['0', 'Bilateral'], ['1', 'Unilateral (peso por lado)']].forEach(([v, t]) => {
-        const x = Utils.el('button', { type: 'button', class: 'seg-btn', 'data-u': v, text: t });
-        x.addEventListener('click', () => { uni = v === '1'; paintSeg(); });
-        seg.appendChild(x);
-      });
-      paintSeg();
-      const create = Utils.el('button', { class: 'btn-primary btn-block', text: 'Crear y agregar al día' });
-      create.addEventListener('click', () => {
-        const name = nameIn.value.trim();
-        if (!name) { Utils.toast('Escribe el nombre del ejercicio'); return; }
-        const exercises = DB.getExercises();
-        const ex = { id: DB.uid(), name, group: groupSel.value };
-        if (uni) ex.unilateral = true;
-        exercises.push(ex);
-        DB.saveExercises(exercises);
-        log.exercises.push({ exerciseId: ex.id, sets: [] });
-        saveLog(iso, log);
-        activeByDate[iso] = ex.id;
-        scrollToKey = `${iso}:${ex.id}`;
-        added.add(ex.id);
-        onDone();
-        query = '';
-        search.value = '';
-        doneBtn.textContent = `Listo (${added.size} agregado${added.size === 1 ? '' : 's'})`;
-        paintChips();
-        paintList();
-        paintCreate(false);
-        Utils.toast(`"${name}" creado y agregado`);
-      });
-      createWrap.appendChild(Utils.el('div', { class: 'ax-create' }, [
-        Utils.el('div', { class: 'small text-dim', text: 'NUEVO EJERCICIO' }),
-        Utils.el('div', { class: 'field mt-8' }, [nameIn]),
-        Utils.el('div', { class: 'field' }, [groupSel]),
-        seg,
-        create,
-      ]));
+      const lib = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '📚 Biblioteca de ejercicios y máquinas' });
+      lib.addEventListener('click', () => ExerciseUI.openLibrary({ onAdd: (ex) => { addCreated(ex); }, onClose: () => openAddExercise(iso, log, onDone) }));
+      const b = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Crear ejercicio nuevo' });
+      b.addEventListener('click', () => ExerciseUI.openForm(null, (ex) => { addCreated(ex); }, { name: query, group: GROUP_ORDER.includes(filter) ? filter : 'pecho' }));
+      createWrap.appendChild(lib);
+      createWrap.appendChild(b);
     }
 
     const doneBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Listo' });
@@ -1021,7 +988,7 @@ const WorkoutView = (() => {
     body.appendChild(doneBtn);
     paintChips();
     paintList();
-    paintCreate(false);
+    paintCreate();
     Modal.open('Agregar ejercicio', body);
   }
 

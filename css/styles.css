@@ -1070,3 +1070,20 @@ p { line-height: 1.5; }
 .qp-kcal b { font-size: 2rem; letter-spacing: -0.03em; color: var(--text); }
 .qp-macros { display: flex; justify-content: center; gap: 14px; font-weight: 800; font-size: 0.9rem; margin: 4px 0 6px; }
 .rt-chip.plain { text-transform: none; }
+
+/* ---------- Rutinas: tarjetas ---------- */
+.rt-card { margin-bottom: 10px; padding: 12px 12px 12px 14px; border-left: 3px solid var(--gc, var(--border)); border-radius: 0 14px 14px 0; background: rgba(255, 255, 255, 0.035); }
+.rt-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rt-card-name { font-weight: 800; color: var(--gc); font-size: 1.02rem; }
+.rt-card-btns { display: flex; align-items: center; gap: 2px; flex: none; }
+.rt-card .rt-summary { margin: 8px 0 0; }
+
+/* ---------- Plan: calendario con nombre de rutina ---------- */
+.cal-day { gap: 1px; padding: 2px 0; }
+.cal-day .cd-num { font-size: 0.86rem; font-weight: 800; line-height: 1.1; }
+.cal-day .cd-lb { font-size: 0.56rem; font-weight: 800; letter-spacing: .02em; line-height: 1.1; max-width: 100%; white-space: nowrap; overflow: hidden; }
+.cal-day.rest { opacity: 0.6; }
+.cal-day .cd-check { position: absolute; top: 2px; right: 4px; font-size: 0.6rem; font-weight: 800; color: var(--green); }
+.cal-day.trained { background: rgba(53, 212, 154, 0.12); }
+.cal-summary { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; font-size: 0.76rem; color: var(--text-dim); }
+.cal-summary b { color: var(--text); font-size: 0.95rem; }

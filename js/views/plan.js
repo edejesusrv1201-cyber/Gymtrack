@@ -33,18 +33,31 @@ const PlanView = (() => {
     for (let i = 0; i < firstDow; i++) grid.appendChild(Utils.el('div', { class: 'cal-day empty' }));
     const totalDays = Utils.daysInMonth(year, month0);
     const todayIso = Utils.todayISO();
+    const wlog = DB.getWorkoutLog();
+    let planned = 0; let done = 0;
     for (let day = 1; day <= totalDays; day++) {
       const iso = `${year}-${Utils.pad(month0 + 1)}-${Utils.pad(day)}`;
       const routineId = plan.days[String(day)];
       const routine = routineId ? DB.getRoutines().find((r) => r.id === routineId) : null;
-      const cell = Utils.el('div', { class: 'cal-day' + (iso === todayIso ? ' today' : '') }, [
-        Utils.el('div', { text: String(day) }),
-        routine ? Utils.el('div', { class: 'dot', style: `background:${routine.color}` }) : null,
+      const trained = !!(wlog[iso] && (wlog[iso].exercises || []).some((e) => e.sets && e.sets.length));
+      const isRest = !!(routine && routine.exercises.length === 0);
+      if (routine && !isRest) planned += 1;
+      if (trained) done += 1;
+      const first = routine ? routine.name.split(/[\s(]/)[0] : '';
+      const cell = Utils.el('div', { class: 'cal-day' + (iso === todayIso ? ' today' : '') + (trained ? ' trained' : '') + (isRest ? ' rest' : '') }, [
+        Utils.el('div', { class: 'cd-num', text: String(day) }),
+        routine ? Utils.el('div', { class: 'cd-lb', style: `color:${routine.color}`, text: first.length > 5 ? `${first.slice(0, 4)}.` : first }) : null,
+        trained ? Utils.el('span', { class: 'cd-check', text: '✓' }) : null,
       ]);
       cell.addEventListener('click', () => openAssignDay(iso, day, mk, () => render(root)));
       grid.appendChild(cell);
     }
     calCard.appendChild(grid);
+
+    calCard.appendChild(Utils.el('div', { class: 'cal-summary' }, [
+      Utils.el('span', {}, [Utils.el('b', { text: String(planned) }), ' días de entreno planeados']),
+      Utils.el('span', {}, [Utils.el('b', { text: String(done) }), ' con series registradas ✓']),
+    ]));
 
     const legend = Utils.el('div', { class: 'cal-legend' });
     DB.getRoutines().forEach((r) => {
@@ -126,43 +139,101 @@ const PlanView = (() => {
   }
 
   // ---------- Gestión de rutinas ----------
+  // plantillas para empezar una rutina con ejercicios ya puestos (solo usa los que existen en tu catálogo)
+  const ROUTINE_STARTERS = [
+    { name: 'Push (Empuje)', items: [['ex_press_banca', 4, '8-10'], ['ex_press_inclinado', 3, '10-12'], ['ex_press_militar', 3, '8-10'], ['ex_elevaciones_laterales', 3, '12-15'], ['ex_press_frances', 3, '10-12']] },
+    { name: 'Pull (Jalón)', items: [['ex_dominadas', 4, '6-10'], ['ex_remo_barra', 4, '8-10'], ['ex_jalon_pecho', 3, '10-12'], ['ex_curl_biceps', 3, '10-12']] },
+    { name: 'Piernas', items: [['ex_sentadilla', 4, '8-10'], ['ex_prensa', 3, '10-12'], ['ex_curl_femoral', 3, '10-12'], ['ex_elevacion_talones', 3, '12-15']] },
+    { name: 'Torso', items: [['ex_press_banca', 3, '8-10'], ['ex_remo_barra', 3, '8-10'], ['ex_press_militar', 3, '8-10'], ['ex_jalon_pecho', 3, '10-12'], ['ex_curl_biceps', 2, '10-12'], ['ex_extension_triceps', 2, '10-12']] },
+  ];
+
+  function routineSummary(r) {
+    const exs = DB.getExercises();
+    const by = {};
+    let sets = 0;
+    r.exercises.forEach((re) => {
+      const ex = exs.find((e) => e.id === re.exerciseId);
+      if (!ex || ex.group === 'cardio') return;
+      by[ex.group] = (by[ex.group] || 0) + (Number(re.targetSets) || 0);
+      sets += Number(re.targetSets) || 0;
+    });
+    return { by, sets };
+  }
+
   function openRoutineList(onDone) {
     const body = Utils.el('div');
     function refresh() {
       body.innerHTML = '';
-      DB.getRoutines().forEach((r) => {
-        const row = Utils.el('div', { class: 'list-item' }, [
-          Utils.el('div', {}, [
-            Utils.el('div', { text: r.name, style: `color:${r.color};font-weight:600;` }),
-            Utils.el('div', { class: 'meta', text: `${r.exercises.length} ejercicios` }),
+      const routines = DB.getRoutines();
+      routines.forEach((r) => {
+        const { by, sets } = routineSummary(r);
+        const row = Utils.el('div', { class: 'rt-card', style: `--gc:${r.color}` }, [
+          Utils.el('div', { class: 'rt-card-top' }, [
+            Utils.el('div', { style: 'min-width:0;' }, [
+              Utils.el('div', { class: 'rt-card-name', text: r.name }),
+              Utils.el('div', { class: 'meta', text: r.exercises.length ? `${r.exercises.length} ejercicio${r.exercises.length === 1 ? '' : 's'}${sets ? ` · ${sets} series` : ''}` : 'Día de descanso / sin ejercicios' }),
+            ]),
+            Utils.el('div', { class: 'rt-card-btns' }, [
+              Utils.el('button', { class: 'btn-small', text: 'Editar' }),
+              Utils.el('button', { class: 'icon-btn', text: '⧉', title: 'Duplicar' }),
+              Utils.el('button', { class: 'icon-btn', text: '🗑️', title: 'Eliminar' }),
+            ]),
           ]),
-          Utils.el('div', {}, [
-            Utils.el('button', { class: 'btn-small', text: 'Editar', style: 'margin-right:6px;' }),
-            Utils.el('button', { class: 'btn-small', text: '🗑️' }),
-          ]),
+          Object.keys(by).length ? Utils.el('div', { class: 'rt-summary' }, Object.keys(by).map((g) => Utils.el('span', { class: 'rt-pill', style: `color:${Utils.GROUP_COLORS[g] || '#8d95a8'}`, text: `${g} ${by[g]}` }))) : null,
         ]);
-        row.querySelectorAll('button')[0].addEventListener('click', () => openRoutineEditor(r.id, refresh));
-        row.querySelectorAll('button')[1].addEventListener('click', () => {
+        const [edit, dup, del] = row.querySelectorAll('button');
+        edit.addEventListener('click', () => openRoutineEditor(r.id, refresh));
+        dup.addEventListener('click', () => {
+          const all = DB.getRoutines();
+          const copy = { id: DB.uid(), name: `${r.name} (copia)`, color: r.color, exercises: r.exercises.map((e) => Object.assign({}, e)) };
+          all.push(copy);
+          DB.saveRoutines(all);
+          Utils.toast('Rutina duplicada');
+          openRoutineEditor(copy.id, refresh);
+        });
+        del.addEventListener('click', () => {
           if (!Utils.confirmDialog(`¿Eliminar la rutina "${r.name}"? Esto no borra tu historial ya registrado.`)) return;
-          const routines = DB.getRoutines().filter((x) => x.id !== r.id);
-          DB.saveRoutines(routines);
+          DB.saveRoutines(DB.getRoutines().filter((x) => x.id !== r.id));
           refresh();
           onDone();
         });
         body.appendChild(row);
       });
       const addBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: '➕ Nueva rutina' });
-      addBtn.addEventListener('click', () => {
-        const routines = DB.getRoutines();
-        const newR = { id: DB.uid(), name: 'Nueva rutina', color: COLORS[routines.length % COLORS.length], exercises: [] };
-        routines.push(newR);
-        DB.saveRoutines(routines);
-        openRoutineEditor(newR.id, refresh);
-      });
+      addBtn.addEventListener('click', () => openNewRoutine(refresh, onDone));
       body.appendChild(addBtn);
     }
     refresh();
     Modal.open('Mis rutinas', body, { onClose: onDone });
+  }
+
+  // elegir cómo empezar: en blanco o con una plantilla
+  function openNewRoutine(refresh, onDone) {
+    const body = Utils.el('div');
+    body.appendChild(Utils.el('p', { class: 'small', text: '¿Cómo quieres empezar? Luego puedes cambiar todo.' }));
+    const exs = DB.getExercises();
+    const make = (name, items) => {
+      const routines = DB.getRoutines();
+      const COLS = COLORS;
+      const newR = { id: DB.uid(), name, color: COLS[routines.length % COLS.length], exercises: items };
+      routines.push(newR);
+      DB.saveRoutines(routines);
+      openRoutineEditor(newR.id, refresh);
+    };
+    const blank = Utils.el('button', { class: 'btn-secondary btn-block', text: '📄 En blanco' });
+    blank.addEventListener('click', () => make('Nueva rutina', []));
+    body.appendChild(blank);
+    ROUTINE_STARTERS.forEach((t) => {
+      const items = t.items.filter(([id]) => exs.some((e) => e.id === id)).map(([id, n, reps]) => ({ exerciseId: id, targetSets: n, targetReps: reps }));
+      if (items.length < 2) return;
+      const b = Utils.el('button', { class: 'btn-secondary btn-block', text: `${t.name} · ${items.length} ejercicios` });
+      b.addEventListener('click', () => make(t.name, items));
+      body.appendChild(b);
+    });
+    const cancel = Utils.el('button', { class: 'link-btn small', style: 'margin-top:10px;', text: '← Volver' });
+    cancel.addEventListener('click', () => openRoutineList(onDone));
+    body.appendChild(cancel);
+    Modal.open('Nueva rutina', body, { onClose: onDone });
   }
 
   const EDITOR_GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
@@ -345,6 +416,12 @@ const PlanView = (() => {
       if (exList.lastElementChild) exList.lastElementChild.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
     body.appendChild(addExBtn);
+    const libBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '📚 Biblioteca de ejercicios y máquinas' });
+    libBtn.addEventListener('click', () => ExerciseUI.openLibrary({ onClose: () => openRoutineEditor(routineId, onDone) }));
+    const newExBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '✍️ Crear ejercicio propio' });
+    newExBtn.addEventListener('click', () => ExerciseUI.openForm(null, (ex) => { if (ex) lastPickedGroup = ex.group; openRoutineEditor(routineId, onDone); }, { group }));
+    body.appendChild(libBtn);
+    body.appendChild(newExBtn);
 
     renderList();
     Modal.open(`Editar: ${r.name}`, body, { onClose: onDone });

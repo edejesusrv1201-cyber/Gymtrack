@@ -177,58 +177,61 @@ const MoreView = (() => {
     // ---- catálogo de ejercicios ----
     const exCard = Utils.el('div', { class: 'card' });
     exCard.appendChild(Utils.el('div', { class: 'flex-between' }, [
-      Utils.el('h3', { class: 'mb-0', text: '🏋️ Catálogo de ejercicios' }),
+      Utils.el('h3', { class: 'mb-0', text: '🏋️ Mis ejercicios y máquinas' }),
+      Utils.el('span', { class: 'pill', id: 'exCount', text: '' }),
     ]));
-    const exList = Utils.el('div', { class: 'mt-8' });
+    const exSearch = Utils.el('input', { type: 'search', placeholder: '🔎 Buscar ejercicio…', class: 'ax-search', style: 'margin-top:10px;' });
+    const exChips = Utils.el('div', { class: 'rt-chips nut-chips' });
+    const exList = Utils.el('div');
+    let exGroup = 'todos';
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     function refreshExList() {
+      const all = DB.getExercises();
+      exCard.querySelector('#exCount').textContent = `${all.length}`;
+      // chips con cantidad por grupo
+      exChips.innerHTML = '';
+      const present = ['todos'].concat(GROUPS.filter((g) => all.some((e) => e.group === g)));
+      present.forEach((g) => {
+        const n = g === 'todos' ? all.length : all.filter((e) => e.group === g).length;
+        const chip = Utils.el('button', { type: 'button', class: `rt-chip${g === exGroup && !exSearch.value ? ' active' : ''}`, style: `--gc:${g === 'todos' ? 'var(--accent-light)' : (Utils.GROUP_COLORS[g] || '#8d95a8')}`, text: `${g} ${n}` });
+        chip.addEventListener('click', () => { exGroup = g; exSearch.value = ''; refreshExList(); });
+        exChips.appendChild(chip);
+      });
       exList.innerHTML = '';
-      DB.getExercises().forEach((ex) => {
-        const row = Utils.el('div', { class: 'list-item' }, [
-          Utils.el('div', {}, [
-            Utils.el('div', { text: ex.name }),
-            Utils.el('div', { class: `meta grp-${ex.group}`, text: ex.group }),
+      const q = norm(exSearch.value);
+      let items = all.filter((e) => (q ? norm(e.name).includes(q) : exGroup === 'todos' || e.group === exGroup));
+      items = items.slice().sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.name.localeCompare(b.name, 'es'));
+      if (!items.length) exList.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: 'No hay ejercicios aquí. Agrégalos desde la biblioteca o crea el tuyo.' }));
+      let lastG = null;
+      items.forEach((ex) => {
+        if ((exGroup === 'todos' || q) && ex.group !== lastG) {
+          lastG = ex.group;
+          exList.appendChild(Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:12px;', text: ex.group }));
+        }
+        const eq = ExerciseUI.eqLabel(ex.equipment);
+        const row = Utils.el('div', { class: 'list-item', style: 'cursor:pointer;' }, [
+          Utils.el('div', { style: 'min-width:0;' }, [
+            Utils.el('div', { style: 'font-weight:700;' }, [ex.name, ex.unilateral ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
+            eq ? Utils.el('div', { class: 'meta', text: eq }) : null,
           ]),
-          Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;' }, [
-            ex.group === 'cardio' ? null : Utils.el('button', { class: `uni-toggle${ex.unilateral ? ' on' : ''}`, type: 'button', title: 'Unilateral: el peso se anota por lado', text: ex.unilateral ? 'Unilateral' : 'Bilateral' }),
-            Utils.el('button', { class: 'icon-btn', text: '🗑️' }),
-          ]),
+          Utils.el('span', { class: 'text-dim', text: '›' }),
         ]);
-        const uniBtn = row.querySelector('.uni-toggle');
-        if (uniBtn) uniBtn.addEventListener('click', () => {
-          const all = DB.getExercises();
-          const t = all.find((x) => x.id === ex.id);
-          if (t) { t.unilateral = !t.unilateral; DB.saveExercises(all); }
-          refreshExList();
-        });
-        row.querySelector('.icon-btn').addEventListener('click', () => {
-          if (!Utils.confirmDialog(`¿Eliminar "${ex.name}" del catálogo? Tu historial ya registrado se conserva.`)) return;
-          DB.saveExercises(DB.getExercises().filter((x) => x.id !== ex.id));
-          refreshExList();
-        });
+        row.addEventListener('click', () => ExerciseUI.openForm(ex, refreshExList));
         exList.appendChild(row);
       });
     }
-    refreshExList();
+    exSearch.addEventListener('input', refreshExList);
+    exCard.appendChild(exSearch);
+    exCard.appendChild(exChips);
     exCard.appendChild(exList);
-
-    const newNameInput = Utils.el('input', { type: 'text', placeholder: 'Nombre del ejercicio' });
-    const newGroupSel = Utils.el('select', {});
-    GROUPS.forEach((g) => newGroupSel.appendChild(Utils.el('option', { value: g, text: g })));
-    exCard.appendChild(Utils.el('div', { class: 'field-row mt-8' }, [
-      Utils.el('div', { class: 'field' }, [newNameInput]),
-      Utils.el('div', { class: 'field', style: 'max-width:110px;' }, [newGroupSel]),
-    ]));
-    const addExBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Agregar ejercicio' });
-    addExBtn.addEventListener('click', () => {
-      if (!newNameInput.value.trim()) return;
-      const exercises = DB.getExercises();
-      exercises.push({ id: DB.uid(), name: newNameInput.value.trim(), group: newGroupSel.value });
-      DB.saveExercises(exercises);
-      newNameInput.value = '';
-      refreshExList();
-    });
+    const libBtn = Utils.el('button', { class: 'btn-primary btn-block', text: '📚 Biblioteca de ejercicios y máquinas' });
+    libBtn.addEventListener('click', () => ExerciseUI.openLibrary({ onClose: refreshExList }));
+    const addExBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Crear ejercicio propio' });
+    addExBtn.addEventListener('click', () => ExerciseUI.openForm(null, refreshExList, { group: exGroup === 'todos' ? 'pecho' : exGroup }));
+    exCard.appendChild(libBtn);
     exCard.appendChild(addExBtn);
     view.appendChild(exCard);
+    refreshExList();
 
     // ---- respaldo ----
     const backupCard = Utils.el('div', { class: 'card' });
