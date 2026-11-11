@@ -75,7 +75,9 @@ const CaloriesView = (() => {
     addMain.addEventListener('click', () => openAddFood(isToday ? defaultMeal() : 'almuerzo'));
     const addQuick = Utils.el('button', { class: 'btn-secondary', text: '⚡ Rápido', title: 'Solo calorías y macros' });
     addQuick.addEventListener('click', () => openQuickAdd(isToday ? defaultMeal() : 'almuerzo'));
-    view.appendChild(Utils.el('div', { class: 'nut-actions' }, [addMain, addQuick]));
+    const addScan = Utils.el('button', { class: 'btn-secondary', text: '📷', title: 'Escanear tabla nutricional' });
+    addScan.addEventListener('click', () => scanLabel(isToday ? defaultMeal() : 'almuerzo'));
+    view.appendChild(Utils.el('div', { class: 'nut-actions' }, [addMain, addQuick, addScan]));
 
     // ---- comidas ----
     MEALS.forEach((meal) => view.appendChild(renderMeal(meal, entries)));
@@ -390,6 +392,9 @@ const CaloriesView = (() => {
 
     search.addEventListener('input', () => { query = search.value.trim(); paintChips(); paintList(); });
 
+    const scan = Utils.el('button', { class: 'btn-primary btn-block', text: '📷 Escanear tabla nutricional' });
+    scan.addEventListener('click', () => scanLabel(meal));
+    body.appendChild(scan);
     const create = Utils.el('button', { class: 'btn-secondary btn-block', text: '✍️ Crear alimento nuevo' });
     create.addEventListener('click', () => openFoodForm(null, (food) => {
       const sp = FoodDB.spec(food);
@@ -406,6 +411,32 @@ const CaloriesView = (() => {
     paintChips();
     paintList();
     Modal.open('Agregar alimento', body, { onClose: refresh });
+  }
+
+  // ---------------------------------------------------------------- escanear etiqueta
+  function scanLabel(meal) {
+    LabelScan.open({
+      onResult: (p, raw, thumb) => {
+        const extra = Utils.el('div', { class: 'scan-result' });
+        if (thumb) extra.appendChild(Utils.el('img', { class: 'scan-thumb', src: thumb, alt: 'Etiqueta' }));
+        const msgs = Utils.el('div', { class: 'scan-msgs' });
+        if (p.ok) msgs.appendChild(Utils.el('div', { class: 'sm-ok', text: '✓ Leí la etiqueta. Compara los números con tu producto antes de guardar.' }));
+        else msgs.appendChild(Utils.el('div', { class: 'sm-warn', text: 'No pude leer bien la etiqueta. Completa los números a mano o toma otra foto más cerca y con mejor luz.' }));
+        const missing = [['kcal', 'calorías'], ['protein', 'proteína'], ['carbs', 'carbohidratos'], ['fat', 'grasas']].filter(([k]) => !p.found[k]).map((x) => x[1]);
+        if (p.ok && missing.length) msgs.appendChild(Utils.el('div', { class: 'sm-warn', text: `No encontré: ${missing.join(', ')}. Complétalo.` }));
+        p.notes.forEach((n) => msgs.appendChild(Utils.el('div', { class: 'small text-dim', text: n })));
+        extra.appendChild(msgs);
+        if (raw && raw.trim()) {
+          const det = Utils.el('details', { class: 'scan-raw' }, [Utils.el('summary', { text: 'Ver el texto que leí' }), Utils.el('pre', { text: raw.trim() })]);
+          msgs.appendChild(det);
+        }
+        openFoodForm(null, (food) => {
+          openQuantity({ sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' });
+        }, '', {
+          basis: p.basis, kcal: p.kcal, protein: p.protein, carbs: p.carbs, fat: p.fat, servingLabel: p.servingLabel, portionG: p.portionG, extra,
+        });
+      },
+    });
   }
 
   // ---------------------------------------------------------------- cantidad (agregar o editar)
@@ -733,17 +764,22 @@ const CaloriesView = (() => {
   }
 
   // ---------------------------------------------------------------- crear / editar alimento propio
-  function openFoodForm(existing, onSaved, presetName) {
+  // prefill: valores iniciales (por ejemplo, leídos de una etiqueta) y `extra`: nodo que se muestra arriba
+  function openFoodForm(existing, onSaved, presetName, prefill) {
     const body = Utils.el('div');
-    let basis = existing ? (existing.basis === 'g' ? 'g' : 's') : 'g';
+    const src = existing || prefill || null;
+    const numStr = (v) => (v === null || v === undefined ? '' : String(v));
+    let basis = src ? (src.basis === 'g' ? 'g' : 's') : 'g';
 
-    const nameIn = Utils.el('input', { type: 'text', value: existing ? existing.name : (presetName || ''), placeholder: 'ej. Pan de la panadería' });
-    const kcalIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: existing ? String(existing.kcal) : '' });
-    const pIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: existing ? String(existing.protein || 0) : '' });
-    const cIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: existing ? String(existing.carbs || 0) : '' });
-    const fIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: existing ? String(existing.fat || 0) : '' });
-    const labelIn = Utils.el('input', { type: 'text', value: existing ? (existing.servingLabel || '') : '', placeholder: 'ej. 1 pan, 1 taza, 1 scoop' });
-    const portionG = Utils.el('input', { type: 'number', inputmode: 'decimal', value: existing && existing.portionG ? String(existing.portionG) : '', placeholder: 'gramos de 1 porción (opcional)' });
+    if (prefill && prefill.extra) body.appendChild(prefill.extra);
+
+    const nameIn = Utils.el('input', { type: 'text', value: existing ? existing.name : (presetName || (prefill && prefill.name) || ''), placeholder: prefill ? 'Nombre del producto (ej. Galletas de avena)' : 'ej. Pan de la panadería' });
+    const kcalIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: src ? numStr(src.kcal) : '' });
+    const pIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: src ? numStr(existing ? (src.protein || 0) : src.protein) : '' });
+    const cIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: src ? numStr(existing ? (src.carbs || 0) : src.carbs) : '' });
+    const fIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: src ? numStr(existing ? (src.fat || 0) : src.fat) : '' });
+    const labelIn = Utils.el('input', { type: 'text', value: src ? (src.servingLabel || '') : '', placeholder: 'ej. 1 pan, 1 taza, 1 scoop' });
+    const portionG = Utils.el('input', { type: 'number', inputmode: 'decimal', value: src && src.portionG ? String(src.portionG) : '', placeholder: 'gramos de 1 porción (opcional)' });
 
     body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Nombre del alimento' }), nameIn]));
 
@@ -804,7 +840,7 @@ const CaloriesView = (() => {
       if (onSaved) onSaved(food);
     });
     body.appendChild(saveBtn);
-    Modal.open(existing ? 'Editar alimento' : 'Nuevo alimento', body);
+    Modal.open(existing ? 'Editar alimento' : (prefill ? 'Revisa los datos de la etiqueta' : 'Nuevo alimento'), body);
   }
 
   // ---------------------------------------------------------------- mis alimentos

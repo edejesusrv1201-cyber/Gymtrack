@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v24';
+const CACHE_NAME = 'migymtrack-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const ASSETS = [
   './js/exercises.js',
   './js/nutrition.js',
   './js/foodDb.js',
+  './js/labelScan.js',
   './js/excelBackup.js',
   './js/app.js',
   './js/views/today.js',
@@ -56,6 +57,17 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // archivos del lector de etiquetas (OCR): son pesados, se guardan la primera vez y se leen del caché
+  if (event.request.url.indexOf('/js/lib/ocr/') !== -1) {
+    event.respondWith(
+      caches.match(event.request, { ignoreSearch: true }).then((hit) => hit || fetch(event.request).then((resp) => {
+        const copy = resp.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+        return resp;
+      }))
+    );
+    return;
+  }
   // Red primero: así las actualizaciones se ven de inmediato al abrir con internet.
   // Si no hay red, cae al caché (para que siga funcionando offline).
   event.respondWith(
