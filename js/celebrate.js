@@ -219,5 +219,5 @@ const Celebrate = (() => {
     fireworks();
   }
 
-  return { record, preview, enabled, reducedMotion };
+  return { record, preview, enabled, reducedMotion, fireworks, banner };
 })();

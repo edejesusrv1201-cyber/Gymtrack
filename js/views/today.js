@@ -348,6 +348,41 @@ const TodayView = (() => {
     Modal.open(`Ejercicios de ${group}`, body);
   }
 
+  // ---------- tarjeta de nivel / racha ----------
+  function renderPlayer() {
+    const ev = Gamify.evaluate();
+    const { lvl, st } = ev;
+    const card = Utils.el('button', { type: 'button', class: 'player-card' }, [
+      Utils.el('div', { class: 'pc-lv' }, [Utils.el('span', { text: String(lvl.level) })]),
+      Utils.el('div', { class: 'pc-main' }, [
+        Utils.el('div', { class: 'pc-top' }, [Utils.el('b', { text: lvl.title }), Utils.el('span', { class: 'pc-xp', text: `${ev.xp} XP` })]),
+        Utils.el('div', { class: 'pc-bar' }, [Utils.el('i', { style: `width:${Math.max(4, Math.round(lvl.pct * 100))}%` })]),
+      ]),
+      Utils.el('div', { class: 'pc-streak' }, [Utils.el('span', { class: 'flame', text: '🔥' }), Utils.el('b', { text: String(st.streak) })]),
+    ]);
+    card.addEventListener('click', () => App.navigate('progreso', { section: 'logros' }));
+    return card;
+  }
+
+  // ---------- aviso: llevas semanas sin entrenar ----------
+  function renderComeback() {
+    const g = Progression.gap();
+    if (!g || g.days < 14) return null;
+    const weeks = Math.round(g.weeks);
+    const card = Utils.el('div', { class: 'card comeback-card' });
+    card.appendChild(Utils.el('div', { class: 'cb-head' }, [
+      Utils.el('span', { class: 'cb-icon', text: '↩' }),
+      Utils.el('div', {}, [
+        Utils.el('div', { class: 'cb-title', text: `Llevas ${weeks} semanas sin entrenar` }),
+        Utils.el('div', { class: 'small text-dim', text: `Tu fuerza baja solo ~${Math.round((1 - Progression.detrain(g.weeks)) * 100)} % y vuelve rápido. Te preparé pesos para retomar.` }),
+      ]),
+    ]));
+    const b = Utils.el('button', { class: 'btn-primary btn-block', text: 'Ver mi plan de regreso' });
+    b.addEventListener('click', () => Progression.openReturnPlan(g.weeks));
+    card.appendChild(b);
+    return card;
+  }
+
   function render(root) {
     root.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
@@ -390,6 +425,10 @@ const TodayView = (() => {
         Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;flex:none;' }, [reg, later]),
       ]));
     }
+
+    view.appendChild(renderPlayer());
+    const comeback = renderComeback();
+    if (comeback) view.appendChild(comeback);
 
     view.appendChild(renderHero(todayIso, routine, log, rerender));
     if (routine && routine.exercises.length > 0) view.appendChild(renderExerciseList(todayIso, routine, log));
@@ -448,6 +487,9 @@ const TodayView = (() => {
     view.appendChild(Utils.el('div', { class: 'grid-2' }, [hist, stats]));
 
     root.appendChild(view);
+
+    // celebra logros o nivel nuevos (si los hay) sin interrumpir otra ventana
+    setTimeout(() => { try { Gamify.announce(Gamify.check()); } catch (e) { /* sin logros por ahora */ } }, 700);
   }
 
   function showHistory() {

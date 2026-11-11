@@ -54,6 +54,7 @@ const StatsView = (() => {
     host.innerHTML = '';
     if (sessions.length < 2) {
       host.appendChild(emptyNote('Necesitas al menos 2 días registrados en este ejercicio para ver el progreso.'));
+      if (!isCardio) host.appendChild(Progression.panel(ex));
       return;
     }
     const metrics = isCardio
@@ -110,6 +111,7 @@ const StatsView = (() => {
           },
         });
       });
+      if (!isCardio) host.appendChild(Progression.panel(ex));
     }
     build();
   }

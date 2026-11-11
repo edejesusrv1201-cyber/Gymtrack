@@ -183,8 +183,11 @@ const WorkoutView = (() => {
         Utils.toast(removed > 0
           ? `Entrenamiento guardado · se quitaron ${removed} ejercicio${removed === 1 ? '' : 's'} sin registro`
           : 'Entrenamiento guardado');
-        if (baseRoutine && (extras.length || dropped.length)) openRoutineSync(baseRoutine.id, extras, dropped, orderIds, () => App.navigate('hoy'));
-        else App.navigate('hoy');
+        const afterSummary = () => {
+          if (baseRoutine && (extras.length || dropped.length)) openRoutineSync(baseRoutine.id, extras, dropped, orderIds, () => App.navigate('hoy'));
+          else App.navigate('hoy');
+        };
+        Gamify.showSummary(iso, log, afterSummary);
       });
       view.appendChild(finishBtn);
     }
@@ -653,6 +656,25 @@ const WorkoutView = (() => {
       Celebrate.record(prs, ex ? ex.name : '');
     });
     form.appendChild(addSetBtn);
+
+    // peso sugerido para hoy: progresión de cargas o regreso tras semanas sin este ejercicio
+    if (ex && !isCardio && workingN === 0 && weightInput) {
+      const sg = Progression.suggest(ex.id, { unit: inputUnit, range: target ? Progression.parseRange(target.targetReps) : [8, 12] });
+      if (sg) {
+        const lbl = `${Units.num(sg.weightKg, inputUnit)}${inputUnit}`;
+        const text = sg.kind === 'return'
+          ? `↩ Vuelves tras ${sg.weeks} sem sin este ejercicio: empieza con ~${lbl} × ${sg.reps} (≈${sg.pct}% de tu mejor)`
+          : sg.kind === 'progress'
+            ? `📈 Sube hoy a ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps} (la última vez hiciste ${sg.lastReps}+ reps en todas)`
+            : `🎯 Hoy: ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps}`;
+        const sgBtn = Utils.el('button', { type: 'button', class: `sugg-line ${sg.kind}`, text });
+        sgBtn.addEventListener('click', () => {
+          weightInput.value = String(Units.num(sg.weightKg, inputUnit));
+          Utils.toast('Peso sugerido puesto ✓');
+        });
+        card.appendChild(sgBtn);
+      }
+    }
     card.appendChild(form);
 
     // pasar al siguiente ejercicio (cierra este y abre el otro)
