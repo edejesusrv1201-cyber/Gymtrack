@@ -37,6 +37,10 @@ const App = (() => {
     const root = document.getElementById('viewRoot');
     const mod = VIEW_MODULES[viewName];
     if (!mod) return;
+    // las pantallas entran con animación solo al navegar (no en cada actualización de la misma pantalla)
+    root.classList.add('anim-in');
+    clearTimeout(navigate.animTimer);
+    navigate.animTimer = setTimeout(() => root.classList.remove('anim-in'), 1100);
     mod.render(root, params);
     Theme.apply(viewName === 'workout' && params.date ? params.date : undefined);
     updateChrome();

@@ -122,6 +122,7 @@ const Theme = (() => {
       preset: PRESETS.find((p) => p.key === s.themePreset) || PRESETS[0],
       intensity: INTENSITIES[s.themeIntensity] ? s.themeIntensity : 'media',
       motion: s.themeMotion || (reducedMotion() ? 'quieto' : 'lava'),
+      ui: s.uiAnim || (reducedMotion() ? 'off' : 'on'),
       accent: s.themeAccent === 'app' ? 'app' : 'tema',
     };
   }
@@ -141,7 +142,11 @@ const Theme = (() => {
     const res = resolve(iso);
     const root = document.documentElement;
     res.colors.forEach((c, i) => root.style.setProperty(`--g${i + 1}`, c));
-    root.style.setProperty('--glow-opacity', String(INTENSITIES[cfg.intensity].glow));
+    // colores muy claros (amarillo, durazno, rosa pastel) brillan demasiado y apagan el texto: se atenúan
+    const lum = (hex) => { const [r, g, b] = hexToRgb(hex).map((v) => v / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const avgLum = res.colors.reduce((a, c) => a + lum(c), 0) / res.colors.length;
+    const damp = avgLum > 0.5 ? 0.8 : avgLum > 0.4 ? 0.92 : 1;
+    root.style.setProperty('--glow-opacity', String(INTENSITIES[cfg.intensity].glow * damp));
     root.style.setProperty('--card-alpha', String(INTENSITIES[cfg.intensity].card));
 
     const acc = cfg.accent === 'app' ? APP_ACCENT : accentFromColor(res.colors[0]);
@@ -155,10 +160,27 @@ const Theme = (() => {
 
     const glow = document.getElementById('bgGlow');
     if (glow) glow.dataset.motion = cfg.motion;
+    root.dataset.ui = cfg.ui;
     return res;
   }
 
+  // partículas que flotan en el fondo (solo se ven con el fondo en movimiento)
+  function makeParticles() {
+    const glow = document.getElementById('bgGlow');
+    if (!glow || glow.querySelector('b')) return;
+    for (let i = 0; i < 16; i += 1) {
+      const b = document.createElement('b');
+      b.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`);
+      b.style.setProperty('--s', `${(3 + Math.random() * 7).toFixed(1)}px`);
+      b.style.setProperty('--d', `${(16 + Math.random() * 18).toFixed(1)}s`);
+      b.style.setProperty('--dl', `-${(Math.random() * 30).toFixed(1)}s`);
+      b.style.setProperty('--dx', `${Math.round(Math.random() * 90 - 45)}px`);
+      glow.appendChild(b);
+    }
+  }
+
   function init() {
+    makeParticles();
     apply();
     // si cambia el día con la app abierta, el color del día se actualiza al volver
     document.addEventListener('visibilitychange', () => { if (!document.hidden) apply(); });

@@ -1226,3 +1226,93 @@ p { line-height: 1.5; }
 .ing-row .ing-name { flex: 1; min-width: 0; font-weight: 700; font-size: 0.9rem; }
 .ing-row input { width: 84px; flex: none; padding: 8px 10px; text-align: right; }
 .recipe-total { margin: 12px 0; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); text-align: center; }
+
+/* ============================================================
+   v29 — Letras legibles, fondo más vivo y menús animados
+   ============================================================ */
+
+/* ---- legibilidad: una capa oscura bajo el contenido y superficies con base sólida ---- */
+.bg-glow::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(180deg, rgba(9, 11, 16, 0.16), rgba(9, 11, 16, 0) 30%, rgba(9, 11, 16, 0.1)); }
+.btn-secondary, .action-row button, .quick-row button, .seg, .chip-btn, .pill, .link-btn.small {
+  background-color: rgba(14, 17, 25, 0.76);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.btn-secondary, .action-row button, .quick-row button { background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)); }
+.banner { background-color: rgba(14, 17, 25, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.uni-chip:not(.on), .ex-note:not(.empty), .sugg-line { background-color: rgba(14, 17, 25, 0.6); }
+.app-header .subtitle { color: #b9c0d3; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+.view > h3, .view > .eyebrow, .day-title .h, .view .link-btn { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
+.tile, .week-day { background-color: rgba(14, 17, 25, 0.7); }
+
+/* ---- fondo con más vida ---- */
+.bg-glow::before { content: ''; position: absolute; left: -60%; top: -30%; width: 220%; height: 160%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .8s ease;
+  background: conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(var(--accent-rgb), 0.16) 50deg, transparent 110deg, rgba(255, 255, 255, 0.05) 190deg, transparent 250deg, rgba(var(--accent-rgb), 0.12) 300deg, transparent 360deg); mix-blend-mode: screen; }
+.bg-glow[data-motion="lava"]::before, .bg-glow[data-motion="intenso"]::before { opacity: 1; animation: auroraspin 70s linear infinite; }
+.bg-glow[data-motion="intenso"]::before { animation-duration: 36s; }
+@keyframes auroraspin { to { transform: rotate(360deg); } }
+
+.bg-glow b { display: none; position: absolute; z-index: 2; bottom: -20px; left: var(--x); width: var(--s); height: var(--s); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(var(--accent-rgb), 0.35) 55%, transparent 72%); }
+.bg-glow[data-motion="lava"] b, .bg-glow[data-motion="intenso"] b { display: block; animation: floatup var(--d) linear var(--dl) infinite; will-change: transform, opacity; }
+.bg-glow[data-motion="intenso"] b { animation-duration: calc(var(--d) * 0.55); }
+@keyframes floatup { 0% { transform: translate3d(0, 0, 0) scale(0.6); opacity: 0; } 12% { opacity: 0.85; } 85% { opacity: 0.5; } 100% { transform: translate3d(var(--dx), -112vh, 0) scale(1.3); opacity: 0; } }
+
+/* manchas más rápidas que antes */
+.bg-glow[data-motion="lava"] i:nth-child(1) { animation-duration: 19s; }
+.bg-glow[data-motion="lava"] i:nth-child(2) { animation-duration: 23s; }
+.bg-glow[data-motion="lava"] i:nth-child(3) { animation-duration: 27s; }
+.bg-glow[data-motion="lava"] i:nth-child(4) { animation-duration: 21s; }
+.bg-glow[data-motion="lava"] i:nth-child(5) { animation-duration: 30s; }
+.bg-glow[data-motion="intenso"] i:nth-child(1) { animation: lava1 11s ease-in-out -4s infinite alternate; }
+.bg-glow[data-motion="intenso"] i:nth-child(2) { animation: lava2 13s ease-in-out -9s infinite alternate; }
+.bg-glow[data-motion="intenso"] i:nth-child(3) { animation: lava3 15s ease-in-out -6s infinite alternate; }
+.bg-glow[data-motion="intenso"] i:nth-child(4) { animation: lava4 12s ease-in-out -11s infinite alternate; }
+.bg-glow[data-motion="intenso"] i:nth-child(5) { animation: lava5 17s ease-in-out -14s infinite alternate; }
+.bg-glow[data-motion="lava"], .bg-glow[data-motion="intenso"] { animation: bgbreath 9s ease-in-out infinite; }
+@keyframes bgbreath { 0%, 100% { opacity: 0.88; } 50% { opacity: 1; } }
+
+/* ---- menús y pantallas animados ---- */
+@keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes sheetspring { 0% { transform: translateY(100%); } 62% { transform: translateY(-9px); } 100% { transform: none; } }
+@keyframes sheetdown { to { transform: translateY(100%); } }
+@keyframes fadeback { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeaway { to { opacity: 0; } }
+@keyframes growx { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ringdraw { from { stroke-dashoffset: 1000; } }
+@keyframes btnshine { 0%, 62% { transform: translateX(-160%) skewX(-18deg); } 100% { transform: translateX(380%) skewX(-18deg); } }
+@keyframes navpop { 0% { transform: scale(0.65) translateY(3px); } 60% { transform: scale(1.18); } 100% { transform: none; } }
+@keyframes cardin { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+
+:root[data-ui="on"] .view { animation: none; }
+:root[data-ui="on"] #viewRoot.anim-in .view > * { animation: rise .55s cubic-bezier(.2, .85, .25, 1) both; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(2) { animation-delay: .05s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(3) { animation-delay: .10s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(4) { animation-delay: .15s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(5) { animation-delay: .20s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(6) { animation-delay: .25s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(7) { animation-delay: .30s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(8) { animation-delay: .34s; }
+:root[data-ui="on"] #viewRoot.anim-in .view > *:nth-child(n+9) { animation-delay: .38s; }
+
+:root[data-ui="on"] .modal-backdrop { animation: fadeback .25s ease both; }
+:root[data-ui="on"] .modal-sheet { animation: sheetspring .46s cubic-bezier(.2, .9, .3, 1) both; }
+:root[data-ui="on"] .modal-backdrop.closing { animation: fadeaway .22s ease both; pointer-events: none; }
+:root[data-ui="on"] .modal-backdrop.closing .modal-sheet { animation: sheetdown .22s ease-in both; }
+:root[data-ui="on"] .modal-sheet > :last-child > * { animation: rise .4s cubic-bezier(.2, .85, .25, 1) both; animation-delay: .12s; }
+:root[data-ui="on"] .modal-sheet > :last-child > *:nth-child(2) { animation-delay: .16s; }
+:root[data-ui="on"] .modal-sheet > :last-child > *:nth-child(3) { animation-delay: .20s; }
+:root[data-ui="on"] .modal-sheet > :last-child > *:nth-child(4) { animation-delay: .24s; }
+:root[data-ui="on"] .modal-sheet > :last-child > *:nth-child(5) { animation-delay: .28s; }
+:root[data-ui="on"] .modal-sheet > :last-child > *:nth-child(6) { animation-delay: .32s; }
+:root[data-ui="on"] .modal-sheet > :last-child > *:nth-child(n+7) { animation-delay: .36s; }
+
+:root[data-ui="on"] .macro-bar-fill, :root[data-ui="on"] .tile-bar > div, :root[data-ui="on"] .pc-bar i, :root[data-ui="on"] .bt-bar i, :root[data-ui="on"] .ns-bar i { transform-origin: left center; animation: growx .95s cubic-bezier(.2, .85, .25, 1) .15s both; }
+:root[data-ui="on"] .ring svg circle:last-of-type { animation: ringdraw 1.2s cubic-bezier(.2, .85, .25, 1) .1s both; }
+:root[data-ui="on"] .btn-primary { position: relative; overflow: hidden; }
+:root[data-ui="on"] .btn-primary::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 38%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.42), transparent); transform: translateX(-160%) skewX(-18deg); animation: btnshine 5s ease-in-out infinite; pointer-events: none; }
+:root[data-ui="on"] .nav-btn.active svg { animation: navpop .5s cubic-bezier(.2, 1.5, .4, 1); }
+:root[data-ui="on"] #viewRoot.anim-in .exercise-card.ex-current { animation: cardin .45s cubic-bezier(.2, .85, .25, 1) both; }
+:root[data-ui="on"] .badge-tile.done .badge { animation: glow 3.2s ease-in-out infinite; }
+:root[data-ui="on"] .list-item:active, :root[data-ui="on"] .meal-row:active, :root[data-ui="on"] .food-row:active, :root[data-ui="on"] .ex-row:active { background: rgba(255, 255, 255, 0.06); transition: background .1s; }
+@media (prefers-reduced-motion: reduce) { :root[data-ui="off"] *, :root[data-ui="off"] *::before, :root[data-ui="off"] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }

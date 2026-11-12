@@ -218,7 +218,7 @@ const Gamify = (() => {
   // ventana de celebración con los logros nuevos / subida de nivel
   function announce(res) {
     if (!res || (!res.fresh.length && !res.up && !(res.challenges || []).length)) return;
-    if (document.querySelector('.modal-backdrop')) return; // no interrumpe otra ventana
+    if (document.querySelector('.modal-backdrop:not(.closing)')) return; // no interrumpe otra ventana
     const body = Utils.el('div', { class: 'unlock-body' });
     if (res.up) {
       body.appendChild(Utils.el('div', { class: 'levelup' }, [

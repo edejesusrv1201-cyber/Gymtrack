@@ -62,14 +62,21 @@ const MoreView = (() => {
       true,
     ));
 
-    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Efecto lava (fondo en movimiento)' }));
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Fondo en movimiento (lava y partículas)' }));
     card.appendChild(Utils.segmented(
-      [{ key: 'lava', label: 'Activado' }, { key: 'quieto', label: 'Quieto' }],
+      [{ key: 'lava', label: 'Suave' }, { key: 'intenso', label: 'Intenso' }, { key: 'quieto', label: 'Quieto' }],
       cfg.motion,
       (k) => save({ themeMotion: k }),
       true,
     ));
-    if (Theme.reducedMotion() && DB.getSettings().themeMotion !== 'lava') {
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Animaciones en los menús' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'on', label: 'Activadas' }, { key: 'off', label: 'Reducidas' }],
+      cfg.ui,
+      (k) => save({ uiAnim: k }),
+      true,
+    ));
+    if (Theme.reducedMotion() && DB.getSettings().themeMotion !== 'lava' && DB.getSettings().themeMotion !== 'intenso') {
       card.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:-4px;', text: 'Tu teléfono pide reducir animaciones, por eso viene quieto. Toca "Activado" para ver la lava.' }));
     }
 
