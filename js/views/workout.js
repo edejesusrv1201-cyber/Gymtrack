@@ -216,6 +216,11 @@ const WorkoutView = (() => {
         Gamify.showSummary(iso, log, afterSummary);
       });
       view.appendChild(finishBtn);
+      if (log.exercises.some((e) => (e.sets || []).some((s) => !Metrics.isWarmup(s)))) {
+        const shareBtn = Utils.el('button', { class: 'btn-secondary btn-block', style: 'margin-top:8px;', text: '📤 Compartir este entreno como imagen' });
+        shareBtn.addEventListener('click', () => Share.open(iso, log));
+        view.appendChild(shareBtn);
+      }
     }
 
     root.appendChild(view);
@@ -389,6 +394,7 @@ const WorkoutView = (() => {
       up.disabled = idx === 0;
       down.disabled = idx === log.exercises.length - 1;
       add('📝  Nota y descanso de este ejercicio', () => { Modal.close(); openExerciseSettings(ex, rerender); });
+      if (ex && !isCardio && !ex.bodyweight) add('🔥  Calentamiento sugerido', () => { Modal.close(); startWarmup(); });
       if (!isCardio) add('🧮  Calcular discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w); });
       add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
       Modal.open(ex ? ex.name : 'Ejercicio', menu);
@@ -713,6 +719,34 @@ const WorkoutView = (() => {
         });
         card.appendChild(sgBtn);
       }
+    }
+    // calentamiento: series de aproximación para llegar al peso de hoy
+    function startWarmup() {
+      let kg = 0;
+      const typed = weightInput ? parseFloat(weightInput.value) : NaN;
+      if (typed > 0 && !bwSelected && !uniSelected) kg = Units.toKg(typed, inputUnit);
+      if (!kg) {
+        const sg = Progression.suggest(ex.id, { unit: inputUnit, range: target ? Progression.parseRange(target.targetReps) : [8, 12] });
+        if (sg) kg = sg.weightKg;
+      }
+      if (!kg && prev && !prev.best.bw) kg = Metrics.loadOf(prev.best);
+      Warmup.open({
+        name: ex.name,
+        workKg: kg,
+        onAdd: (sets) => {
+          const add = sets.map((s) => { const o = { weight: s.weight, reps: s.reps, felt: 'normal', type: 'warmup' }; if (uniSelected) o.uni = true; return o; });
+          entry.sets.unshift(...add);
+          saveLog(iso, log);
+          Utils.vibrate(30);
+          Utils.toast(`🔥 ${add.length} aproximaciones agregadas`);
+          rerender();
+        },
+      });
+    }
+    if (ex && !isCardio && !ex.bodyweight && workingN === 0 && warmN === 0) {
+      const wuBtn = Utils.el('button', { type: 'button', class: 'sugg-line warmup', text: '🔥 Calentamiento sugerido (aproximaciones)' });
+      wuBtn.addEventListener('click', startWarmup);
+      card.appendChild(wuBtn);
     }
     card.appendChild(form);
 

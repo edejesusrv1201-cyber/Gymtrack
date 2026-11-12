@@ -12,6 +12,7 @@ const App = (() => {
     mas: MoreView,
     workout: WorkoutView,
     calculadora: CalculatorView,
+    plancomidas: MealPlanView,
   };
   const HEADERS = {
     hoy: ['MiGymTrack', 'Tu progreso de hoy'],
@@ -21,9 +22,10 @@ const App = (() => {
     mas: ['Más', 'Ajustes, ejercicios y respaldo'],
     workout: ['Entrenamiento', ''],
     calculadora: ['Calculadora', 'Mantenimiento, déficit y superávit'],
+    plancomidas: ['Plan de comidas', 'Tu semana de comidas y lista de compras'],
   };
   // sub-vistas: a qué pestaña principal regresa la flecha "atrás"
-  const SUBVIEW_PARENT = { workout: 'hoy', calculadora: 'calorias' };
+  const SUBVIEW_PARENT = { workout: 'hoy', calculadora: 'calorias', plancomidas: 'calorias' };
 
   let currentView = 'hoy';
   let currentParams = {};
@@ -126,6 +128,7 @@ const App = (() => {
       scrollT = setTimeout(() => document.documentElement.classList.remove('scrolling'), 180);
     }, { passive: true });
     RestTimer.init();
+    AutoBackup.init();
     navigate('hoy');
     registerServiceWorker();
     setTimeout(checkForUpdate, 3500);

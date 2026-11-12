@@ -1421,3 +1421,68 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .plate-row { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); font-size: 1rem; }
 .plate-total { margin-top: 12px; text-align: center; font-size: 0.84rem; font-weight: 700; color: var(--green); }
 .plate-total.warn { color: var(--yellow); }
+
+/* ============ v34: calentamiento, compartir, récords, código de barras, plan de comidas, ajuste de calorías, copia automática ============ */
+.nut-actions.act-4 { grid-template-columns: 1fr auto auto auto; }
+.nut-actions.act-2 { grid-template-columns: 1fr 1fr; }
+.nut-actions.act-2 .btn-secondary, .nut-actions.act-2 .btn-primary { width: 100%; padding: 0 12px; }
+.nut-actions .btn-secondary svg { display: block; margin: 0 auto; }
+.nut-actions button:disabled, .btn-block:disabled { opacity: .45; }
+
+/* calentamiento */
+.sugg-line.warmup { background: rgba(255, 194, 71, 0.12); color: var(--yellow); border-color: rgba(255, 194, 71, 0.5); }
+.wu-list { display: grid; gap: 6px; margin: 6px 0 12px; }
+.wu-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); }
+.wu-row .set-badge { flex: none; }
+.wu-main { min-width: 0; line-height: 1.3; }
+.wu-main b { font-size: 1.02rem; }
+.wu-row.wu-work { background: var(--accent-soft); }
+
+/* compartir */
+.share-img { display: block; width: 100%; max-width: 360px; margin: 0 auto 14px; border-radius: 18px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0, 0, 0, .4); }
+
+/* línea de récords */
+.rec-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.rec-ico { flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 1.15rem; background: var(--accent-soft); }
+.rec-main { flex: 1; min-width: 0; }
+.rec-name { font-weight: 700; font-size: 0.94rem; }
+.rec-row .meta { font-size: 0.74rem; color: var(--text-dim); margin-top: 1px; }
+.rec-date { flex: none; font-size: 0.74rem; font-weight: 800; color: var(--accent-light); }
+.rec-month { margin: 14px 0 2px; text-transform: capitalize; }
+.rec-list { margin-top: 4px; }
+
+/* código de barras */
+.bc-frame { position: relative; border-radius: 18px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.bc-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bc-guide { position: absolute; left: 10%; right: 10%; top: 32%; bottom: 32%; border: 2px solid rgba(255, 255, 255, .85); border-radius: 12px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); }
+.bc-guide::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 2px; background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
+
+/* plan de comidas */
+.mp-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 12px; }
+.mp-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 0; border-radius: 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; }
+.mp-day .mp-d { font-weight: 800; font-size: 0.95rem; }
+.mp-day .mp-n { font-size: 0.66rem; color: var(--text-dim); font-weight: 700; }
+.mp-day.today .mp-d { color: var(--accent-light); }
+.mp-day.active { background: var(--accent-grad); color: var(--on-accent); }
+.mp-day.active .mp-d, .mp-day.active .mp-n { color: var(--on-accent); }
+.mp-kcal b { font-size: 1.5rem; letter-spacing: -0.02em; }
+.mp-macros { display: flex; gap: 14px; margin-top: 8px; font-weight: 800; font-size: 0.86rem; }
+.shop-cat { margin: 14px 0 4px; }
+.shop-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 0; background: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0; }
+.shop-box { flex: none; width: 24px; height: 24px; border-radius: 8px; border: 2px solid var(--border); display: grid; place-items: center; font-weight: 900; font-size: .8rem; color: var(--green); }
+.shop-name { flex: 1; min-width: 0; font-weight: 700; }
+.shop-qty { flex: none; font-weight: 800; color: var(--accent-light); font-size: 0.86rem; text-align: right; }
+.shop-row.done .shop-name, .shop-row.done .shop-qty { text-decoration: line-through; opacity: .45; }
+.shop-row.done .shop-box { background: rgba(53, 212, 154, .16); border-color: var(--green); }
+
+/* ajuste automático de calorías */
+.auto-res { margin-top: 12px; }
+.auto-line { font-size: 0.86rem; margin: 4px 0; line-height: 1.4; }
+.auto-sugg { margin: 12px 0 10px; padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid var(--border); text-align: center; }
+.auto-big b { font-size: 2rem; letter-spacing: -0.03em; }
+
+/* copia automática */
+.ab-status { padding: 10px 12px; border-radius: 12px; font-size: 0.84rem; font-weight: 700; margin-bottom: 10px; line-height: 1.4; }
+.ab-status.ok { background: rgba(53, 212, 154, 0.14); color: var(--green); }
+.ab-status.warn { background: rgba(255, 194, 71, 0.14); color: var(--yellow); }
+.ab-snap { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }

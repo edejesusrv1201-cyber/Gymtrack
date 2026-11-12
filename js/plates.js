@@ -131,5 +131,5 @@ const Plates = (() => {
     setTimeout(() => { if (!prefillKg) totalIn.focus(); }, 350);
   }
 
-  return { open, solve };
+  return { open, solve, config: cfg };
 })();

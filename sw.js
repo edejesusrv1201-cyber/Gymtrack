@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v33';
+const CACHE_NAME = 'migymtrack-v34';
 const ASSETS = [
   './',
   './index.html',
@@ -19,9 +19,13 @@ const ASSETS = [
   './js/progression.js',
   './js/gamify.js',
   './js/backup.js',
+  './js/autoBackup.js',
   './js/weekly.js',
   './js/muscles.js',
   './js/plates.js',
+  './js/warmup.js',
+  './js/share.js',
+  './js/records.js',
   './js/photos.js',
   './js/programs.js',
   './js/timer.js',
@@ -30,12 +34,14 @@ const ASSETS = [
   './js/nutrition.js',
   './js/foodDb.js',
   './js/labelScan.js',
+  './js/barcode.js',
   './js/excelBackup.js',
   './js/app.js',
   './js/views/today.js',
   './js/views/plan.js',
   './js/views/workout.js',
   './js/views/calories.js',
+  './js/views/mealplan.js',
   './js/views/measurements.js',
   './js/views/stats.js',
   './js/views/rewards.js',
@@ -66,6 +72,8 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // consultas a otros sitios (p. ej. el buscador de códigos de barras) no pasan por el caché de la app
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   // archivos del lector de etiquetas (OCR): son pesados, se guardan la primera vez y se leen del caché
   if (event.request.url.indexOf('/js/lib/ocr/') !== -1) {
     event.respondWith(

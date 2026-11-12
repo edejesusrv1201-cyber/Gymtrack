@@ -301,6 +301,9 @@ const Gamify = (() => {
       body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:12px 0 6px;', text: 'Retos cumplidos' }));
       res.challenges.forEach((c) => body.appendChild(Utils.el('div', { class: 'sum-pr' }, [Utils.el('span', { text: c.icon }), Utils.el('span', { text: `${c.title} · +60 XP` })])));
     }
+    const shareBtn = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '📤 Compartir como imagen' });
+    shareBtn.addEventListener('click', () => Share.open(iso, log, { onClose: done }));
+    body.appendChild(shareBtn);
     const go = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Continuar' });
     go.addEventListener('click', () => { Modal.close(); done(); });
     body.appendChild(go);

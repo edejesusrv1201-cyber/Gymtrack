@@ -232,6 +232,9 @@ const StatsView = (() => {
     // ---- mapa muscular (series o recuperación) ----
     view.appendChild(Muscles.card());
 
+    // ---- línea de tiempo de récords ----
+    view.appendChild(Records.card());
+
     // ---- volumen por semana ----
     const weeks = Metrics.weeklySeries(8);
     const volCard = card('Volumen por semana', 'Últimas 8');

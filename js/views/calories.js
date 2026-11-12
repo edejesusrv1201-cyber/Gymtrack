@@ -77,14 +77,20 @@ const CaloriesView = (() => {
     addQuick.addEventListener('click', () => openQuickAdd(isToday ? defaultMeal() : 'almuerzo'));
     const addScan = Utils.el('button', { class: 'btn-secondary', text: '📷', title: 'Escanear tabla nutricional' });
     addScan.addEventListener('click', () => scanLabel(isToday ? defaultMeal() : 'almuerzo'));
-    view.appendChild(Utils.el('div', { class: 'nut-actions' }, [addMain, addQuick, addScan]));
+    const addBar = Utils.el('button', { class: 'btn-secondary', html: '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M2 5h2v14H2zM6 5h1v14H6zM9 5h3v14H9zM14 5h1v14h-1zM17 5h2v14h-2zM21 5h1v14h-1z"/></svg>', title: 'Escanear código de barras', 'aria-label': 'Escanear código de barras' });
+    addBar.addEventListener('click', () => scanBarcode(isToday ? defaultMeal() : 'almuerzo'));
+    view.appendChild(Utils.el('div', { class: 'nut-actions act-4' }, [addMain, addQuick, addBar, addScan]));
 
     // ---- comidas ----
     MEALS.forEach((meal) => view.appendChild(renderMeal(meal, entries)));
 
     view.appendChild(renderWaterCard(cursorIso, settings));
     view.appendChild(renderWeekStrip(settings));
+    view.appendChild(renderAutoCard());
 
+    const planBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🗓️ Plan de comidas semanal y lista de compras' });
+    planBtn.addEventListener('click', () => App.navigate('plancomidas'));
+    view.appendChild(planBtn);
     const manageBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🍎 Mis alimentos y plantillas' });
     manageBtn.addEventListener('click', () => openFoodManager());
     view.appendChild(manageBtn);
@@ -203,6 +209,70 @@ const CaloriesView = (() => {
       actions.appendChild(tpl);
     }
     card.appendChild(actions);
+    return card;
+  }
+
+  // ---------------------------------------------------------------- ajuste automático de calorías
+  function renderAutoCard() {
+    const card = Utils.el('div', { class: 'card auto-card' });
+    const redo = () => card.replaceWith(renderAutoCard());
+    const cfg = Nutrition.autoConfig();
+    card.appendChild(Utils.el('h3', { text: '🎯 Ajuste automático de calorías' }));
+    card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:-2px 0 10px;', text: 'Cada semana comparo cómo cambia tu peso con lo que quieres lograr y te propongo una meta nueva.' }));
+
+    card.appendChild(Utils.segmented(
+      Object.keys(Nutrition.AUTO_MODES).map((k) => ({ key: k, label: Nutrition.AUTO_MODES[k].label })),
+      cfg.mode,
+      (k) => { Nutrition.saveAuto({ mode: k, rate: Nutrition.AUTO_MODES[k].def, snoozeUntil: null }); redo(); },
+      true,
+    ));
+    const rates = Nutrition.AUTO_MODES[cfg.mode].rates;
+    if (rates.length > 1) {
+      card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:10px 0 6px;', text: 'Ritmo (kg por semana)' }));
+      const chips = Utils.el('div', { class: 'rt-chips' });
+      rates.forEach((r) => {
+        const c = Utils.el('button', { type: 'button', class: `rt-chip plain${r === cfg.rate ? ' active' : ''}`, style: '--gc:var(--accent-light)', text: `${r > 0 ? '+' : '−'}${Math.abs(r)} kg` });
+        c.addEventListener('click', () => { Nutrition.saveAuto({ rate: r, snoozeUntil: null }); redo(); });
+        chips.appendChild(c);
+      });
+      card.appendChild(chips);
+      card.appendChild(Utils.el('div', { class: 'small text-dim', text: cfg.mode === 'perder' ? 'Un ritmo suave protege tu músculo; −0.75 kg es agresivo.' : 'Subir poco a poco evita ganar grasa de más.' }));
+    }
+
+    const sg = Nutrition.suggestGoal();
+    const box = Utils.el('div', { class: 'auto-res' });
+    if (!sg.ok) {
+      box.appendChild(Utils.el('div', { class: 'nut-hint', text: `Aún no puedo calcularlo. ${sg.reason}` }));
+    } else {
+      const sl = sg.slopeKgWeek;
+      box.appendChild(Utils.el('div', { class: 'auto-line', text: `📉 Tu peso cambia ${sl > 0 ? '+' : sl < 0 ? '−' : ''}${Math.abs(sl)} kg por semana (objetivo: ${cfg.rate > 0 ? '+' : cfg.rate < 0 ? '−' : ''}${Math.abs(cfg.rate)} kg).` }));
+      box.appendChild(Utils.el('div', { class: 'auto-line', text: `🔥 Tu gasto real estimado: ~${sg.tdee} kcal/día (comes ${sg.avgKcal} en promedio, ${sg.loggedDays} días registrados).` }));
+      const snoozed = cfg.snoozeUntil && cfg.snoozeUntil > Utils.todayISO();
+      if (Math.abs(sg.diff) < 75) {
+        box.appendChild(Utils.el('div', { class: 'nut-hint', style: 'color:var(--green);', text: sg.onTrack ? '✓ Vas en el camino. Tu meta actual está bien, no cambies nada.' : `Tu meta de ${sg.current} kcal ya es la que corresponde a tu objetivo. Dale unas semanas más.` }));
+      } else if (!snoozed) {
+        box.appendChild(Utils.el('div', { class: 'auto-sugg' }, [
+          Utils.el('div', { class: 'small text-dim', text: 'Meta sugerida' }),
+          Utils.el('div', { class: 'auto-big' }, [Utils.el('b', { text: `${sg.recommended}` }), ' kcal  ', Utils.el('span', { class: 'small', style: `color:${sg.diff > 0 ? 'var(--green)' : 'var(--accent-2)'}`, text: `(${sg.diff > 0 ? '+' : ''}${sg.diff} vs ahora: ${sg.current})` })]),
+        ]));
+        const row = Utils.el('div', { class: 'nut-actions act-2' });
+        const apply = Utils.el('button', { class: 'btn-primary', text: 'Aplicar' });
+        apply.addEventListener('click', () => { Nutrition.applyGoal(sg.recommended); Utils.toast(`Meta actualizada: ${sg.recommended} kcal ✓`); refresh(); });
+        const later = Utils.el('button', { class: 'btn-secondary', text: 'Más tarde' });
+        later.addEventListener('click', () => {
+          const d = Utils.parseISO(Utils.todayISO()); d.setDate(d.getDate() + 7);
+          Nutrition.saveAuto({ snoozeUntil: Utils.toISODate(d) });
+          redo();
+        });
+        row.appendChild(apply); row.appendChild(later);
+        box.appendChild(row);
+        box.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:6px;', text: 'Al aplicar, la proteína se queda igual, las grasas pasan a 25 % y el resto va a carbohidratos. Los cambios son graduales (unas 250 kcal como máximo cada vez).' }));
+      } else {
+        box.appendChild(Utils.el('div', { class: 'small text-dim', text: `Te lo recordaré después del ${Utils.shortDate(cfg.snoozeUntil)}.` }));
+      }
+    }
+    if (cfg.lastApplied) box.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:8px;', text: `Último ajuste: ${Utils.shortDate(cfg.lastApplied.date)} (${cfg.lastApplied.from} → ${cfg.lastApplied.to} kcal)` }));
+    card.appendChild(box);
     return card;
   }
 
@@ -392,7 +462,10 @@ const CaloriesView = (() => {
 
     search.addEventListener('input', () => { query = search.value.trim(); paintChips(); paintList(); });
 
-    const scan = Utils.el('button', { class: 'btn-primary btn-block', text: '📷 Escanear tabla nutricional' });
+    const barBtn = Utils.el('button', { class: 'btn-primary btn-block', text: '▮▮ Escanear código de barras' });
+    barBtn.addEventListener('click', () => scanBarcode(meal));
+    body.appendChild(barBtn);
+    const scan = Utils.el('button', { class: 'btn-secondary btn-block', text: '📷 Escanear tabla nutricional' });
     scan.addEventListener('click', () => scanLabel(meal));
     body.appendChild(scan);
     const create = Utils.el('button', { class: 'btn-secondary btn-block', text: '✍️ Crear alimento nuevo' });
@@ -414,6 +487,32 @@ const CaloriesView = (() => {
     paintChips();
     paintList();
     Modal.open('Agregar alimento', body, { onClose: refresh });
+  }
+
+  // ---------------------------------------------------------------- escanear código de barras
+  function scanBarcode(meal) {
+    const afterSave = (food) => openQuantity({ sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' });
+    Barcode.open({
+      onSaved: (code, food) => { Utils.toast('✓ Ya lo tenías guardado'); afterSave(food); },
+      onProduct: (code, info) => {
+        const extra = Utils.el('div', { class: 'scan-result' });
+        extra.appendChild(Utils.el('div', { class: 'sm-ok', text: `✓ Encontré el producto${info.brand ? ` (${info.brand})` : ''}. Los valores son por 100 g: compáralos con tu empaque antes de guardar.` }));
+        openFoodForm(null, afterSave, '', {
+          basis: 'g', name: [info.name, info.brand && !String(info.name).toLowerCase().includes(info.brand.toLowerCase()) ? `(${info.brand})` : ''].filter(Boolean).join(' '),
+          kcal: info.kcal, protein: info.protein, carbs: info.carbs, fat: info.fat,
+          servingLabel: info.servingG ? (info.servingLabel || `1 porción (${info.servingG} g)`) : '', portionG: info.servingG || null,
+          barcode: code, extra,
+        });
+      },
+      onMissing: (code, reason, info) => {
+        const extra = Utils.el('div', { class: 'scan-result' });
+        const msg = reason === 'offline' ? 'No pude conectarme a internet para buscar este código. Puedes llenar los datos a mano y quedará guardado con su código.'
+          : reason === 'sin-datos' ? 'El producto existe pero no trae información nutricional. Llénala desde la tabla de tu empaque.'
+          : 'Ese código no está en la base de datos. Llena los datos desde tu empaque y la próxima vez lo reconocerá.';
+        extra.appendChild(Utils.el('div', { class: 'sm-warn', text: msg }));
+        openFoodForm(null, afterSave, info && info.name ? info.name : '', { basis: 'g', barcode: code, extra });
+      },
+    });
   }
 
   // ---------------------------------------------------------------- escanear etiqueta
@@ -831,6 +930,7 @@ const CaloriesView = (() => {
       if (existing) food = foods.find((x) => x.id === existing.id);
       else { food = { id: DB.uid() }; foods.push(food); }
       Object.assign(food, { name, basis, kcal: r1(kcal), protein: r1(p), carbs: r1(c), fat: r1(f) });
+      if (prefill && prefill.barcode) food.barcode = prefill.barcode;
       if (basis === 'g') {
         const g = parseFloat(portionG.value);
         if (g > 0) { food.portionG = g; food.servingLabel = labelIn.value.trim() || `1 porción (${r0(g)} g)`; } else { delete food.portionG; food.servingLabel = labelIn.value.trim() || '100 g'; }
@@ -843,7 +943,7 @@ const CaloriesView = (() => {
       if (onSaved) onSaved(food);
     });
     body.appendChild(saveBtn);
-    Modal.open(existing ? 'Editar alimento' : (prefill ? 'Revisa los datos de la etiqueta' : 'Nuevo alimento'), body);
+    Modal.open(existing ? 'Editar alimento' : (prefill ? (prefill.barcode ? 'Revisa los datos del producto' : 'Revisa los datos de la etiqueta') : 'Nuevo alimento'), body);
   }
 
   // ---------------------------------------------------------------- recetas

@@ -78,5 +78,59 @@ const Nutrition = (() => {
     return { ok: true, tdee, avgKcal: Math.round(avgKcal), loggedDays: logged.length, slopeKgWeek: Utils.round1(slope * 7), weighIns: n };
   }
 
-  return { ACTIVITY_MULTIPLIERS, bmr, tdee, buildPlan, SCENARIOS, adaptiveTdee };
+  // ---------- Ajuste automático de calorías ----------
+  // Compara cómo cambia tu peso con lo que querías lograr (perder, mantener o ganar)
+  // y te propone una meta de calorías nueva, con cambios graduales (unas 250 kcal como máximo a la vez).
+  const AUTO_MODES = {
+    perder: { label: 'Perder grasa', rates: [-0.25, -0.5, -0.75], def: -0.5 },
+    mantener: { label: 'Mantener', rates: [0], def: 0 },
+    ganar: { label: 'Ganar músculo', rates: [0.15, 0.25, 0.5], def: 0.25 },
+  };
+  function autoConfig() {
+    const a = DB.getSettings().autoKcal || {};
+    const mode = AUTO_MODES[a.mode] ? a.mode : 'mantener';
+    const rate = typeof a.rate === 'number' && AUTO_MODES[mode].rates.includes(a.rate) ? a.rate : AUTO_MODES[mode].def;
+    return { mode, rate, snoozeUntil: a.snoozeUntil || null, lastApplied: a.lastApplied || null };
+  }
+  function saveAuto(patch) {
+    const s = DB.getSettings();
+    s.autoKcal = Object.assign({}, autoConfig(), patch);
+    DB.saveSettings(s);
+  }
+  const round25 = (n) => Math.round(n / 25) * 25;
+  function suggestGoal() {
+    const cfg = autoConfig();
+    const s = DB.getSettings();
+    const cur = Number(s.calorieGoal) || 0;
+    const t = adaptiveTdee(21);
+    if (!t.ok) return { ok: false, reason: t.reason, cfg };
+    const floor = s.sex === 'F' ? 1200 : 1500;
+    const target = t.tdee + (cfg.rate * 7700) / 7;
+    let rec = Math.max(floor, Math.min(t.tdee + 1000, target));
+    if (cur > 0) {
+      const delta = rec - cur;
+      if (Math.abs(delta) > 250) rec = cur + Math.sign(delta) * 250;
+    }
+    rec = round25(rec);
+    return {
+      ok: true, cfg, tdee: t.tdee, current: cur, recommended: rec, diff: cur ? rec - cur : 0,
+      slopeKgWeek: t.slopeKgWeek, avgKcal: t.avgKcal, loggedDays: t.loggedDays, weighIns: t.weighIns,
+      onTrack: Math.abs(t.slopeKgWeek - cfg.rate) <= 0.15,
+    };
+  }
+  // aplica la meta nueva y reparte los macros (proteína se mantiene, grasas 25 %, resto carbos)
+  function applyGoal(kcal) {
+    const s = DB.getSettings();
+    const prev = s.calorieGoal;
+    s.calorieGoal = kcal;
+    const p = Number(s.proteinGoal) || Math.round((kcal * 0.25) / 4);
+    const f = Math.round((kcal * 0.25) / 9);
+    s.proteinGoal = p;
+    s.fatGoal = f;
+    s.carbGoal = Math.max(0, Math.round((kcal - p * 4 - f * 9) / 4));
+    s.autoKcal = Object.assign({}, autoConfig(), { lastApplied: { date: Utils.todayISO(), from: prev, to: kcal }, snoozeUntil: null });
+    DB.saveSettings(s);
+  }
+
+  return { ACTIVITY_MULTIPLIERS, bmr, tdee, buildPlan, SCENARIOS, adaptiveTdee, AUTO_MODES, autoConfig, saveAuto, suggestGoal, applyGoal };
 })();

@@ -283,6 +283,8 @@ const MoreView = (() => {
       const ok = await Backup.run();
       if (ok) { lastLine.textContent = Backup.label(); lastLine.classList.remove('due'); Utils.toast('Respaldo guardado ✓'); }
     });
+    backupCard.appendChild(AutoBackup.card(() => render(root)));
+    backupCard.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:14px 0 8px;', text: '📁 Respaldo manual' }));
     backupCard.appendChild(lastLine);
     backupCard.appendChild(exportBtn);
 

@@ -13,6 +13,7 @@
    - gt_monthlyPlans   -> { 'YYYY-MM': { days: { '1': routineId, ... } } }
    - gt_workoutLog     -> { 'YYYY-MM-DD': { routineId, exercises:[...], notes } }
    - gt_waterLog       -> { 'YYYY-MM-DD': [{id, ml, time}] }
+   - gt_mealPlan       -> { '0'..'6' (día de la semana, 0 = domingo): { desayuno: [...], almuerzo, cena, snack } }
    ============================================================ */
 
 const DB = (() => {
@@ -26,6 +27,7 @@ const DB = (() => {
     monthlyPlans: 'gt_monthlyPlans',
     workoutLog: 'gt_workoutLog',
     waterLog: 'gt_waterLog',
+    mealPlan: 'gt_mealPlan',
   };
 
   function read(key, fallback) {
@@ -42,6 +44,7 @@ const DB = (() => {
   function write(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      if (key !== KEYS.settings && typeof AutoBackup !== 'undefined') AutoBackup.touch();
       return true;
     } catch (e) {
       console.error('Error guardando', key, e);
@@ -234,6 +237,7 @@ const DB = (() => {
     if (read(KEYS.monthlyPlans, null) === null) write(KEYS.monthlyPlans, {});
     if (read(KEYS.workoutLog, null) === null) write(KEYS.workoutLog, {});
     if (read(KEYS.waterLog, null) === null) write(KEYS.waterLog, {});
+    if (read(KEYS.mealPlan, null) === null) write(KEYS.mealPlan, {});
     migrateWeightUnits();
   }
 
@@ -266,6 +270,9 @@ const DB = (() => {
     // Water log
     getWaterLog: () => read(KEYS.waterLog, {}),
     saveWaterLog: (obj) => write(KEYS.waterLog, obj),
+    // Plan de comidas semanal
+    getMealPlan: () => read(KEYS.mealPlan, {}),
+    saveMealPlan: (obj) => write(KEYS.mealPlan, obj),
 
     // Asigna (o quita con null) la rutina planeada de un día. Si ese día ya
     // tenía un entrenamiento abierto pero sin ninguna serie registrada, lo
