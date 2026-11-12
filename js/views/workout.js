@@ -662,7 +662,9 @@ const WorkoutView = (() => {
       const sg = Progression.suggest(ex.id, { unit: inputUnit, range: target ? Progression.parseRange(target.targetReps) : [8, 12] });
       if (sg) {
         const lbl = `${Units.num(sg.weightKg, inputUnit)}${inputUnit}`;
-        const text = sg.kind === 'return'
+        const text = sg.kind === 'deload'
+          ? `🧘 Descarga: ~${lbl} × ${sg.reps} (≈ −10%) y 1–2 series menos de lo normal`
+          : sg.kind === 'return'
           ? `↩ Vuelves tras ${sg.weeks} sem sin este ejercicio: empieza con ~${lbl} × ${sg.reps} (≈${sg.pct}% de tu mejor)`
           : sg.kind === 'progress'
             ? `📈 Sube hoy a ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps} (la última vez hiciste ${sg.lastReps}+ reps en todas)`

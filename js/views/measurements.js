@@ -40,6 +40,7 @@ const MeasurementsView = (() => {
     view.appendChild(addBtn);
 
     view.appendChild(goalCard(measurements, () => render(root)));
+    view.appendChild(Photos.card());
 
     // ---- gráfico de progreso ----
     if (measurements.length >= 2) {

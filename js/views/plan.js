@@ -78,6 +78,10 @@ const PlanView = (() => {
     routinesBtn.addEventListener('click', () => openRoutineList(() => render(root)));
     view.appendChild(routinesBtn);
 
+    const programsBtn = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: '📋 Programas completos (Full body, Torso/Pierna, PPL)' });
+    programsBtn.addEventListener('click', () => Programs.open(() => render(root)));
+    view.appendChild(programsBtn);
+
     root.appendChild(view);
   }
 

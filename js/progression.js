@@ -78,7 +78,7 @@ const Progression = (() => {
 
   // ---------------------------------------------------------------- peso sugerido
   // opts: { unit, range:[lo,hi], today }
-  function suggest(exId, opts = {}) {
+  function suggestBase(exId, opts = {}) {
     const ex = DB.getExercises().find((e) => e.id === exId);
     if (!ex || ex.group === 'cardio' || ex.group === 'movilidad') return null;
     const logs = logsFor(exId);
@@ -110,6 +110,56 @@ const Progression = (() => {
       return { kind: 'progress', weightKg: W === 0 ? roundLoad(inc * 2, unit) : W + inc, reps: `${lo}-${hi}`, lastReps: minReps, unit };
     }
     return { kind: 'repeat', weightKg: W, reps: `${Math.min(hi, Math.max(lo, minReps + 1))}`, lastReps: minReps, unit };
+  }
+
+  // ---------------------------------------------------------------- descarga
+  const deloadUntil = () => DB.getSettings().deloadUntil || null;
+  const deloadActive = () => { const u = deloadUntil(); return !!u && u >= Utils.todayISO(); };
+  function activateDeload() {
+    const s = DB.getSettings();
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    s.deloadUntil = Utils.toISODate(d);
+    DB.saveSettings(s);
+  }
+  function endDeload() {
+    const s = DB.getSettings();
+    delete s.deloadUntil;
+    DB.saveSettings(s);
+  }
+
+  // ¿vienes cargado? mira cómo se sintieron tus últimas series y cuántas semanas llevas sin parar
+  function fatigue() {
+    if (deloadActive()) return null;
+    const wl = DB.getWorkoutLog();
+    const today = Utils.todayISO();
+    const dates = Object.keys(wl)
+      .filter((d) => d <= today && daysBetween(d, today) <= 14 && (wl[d].exercises || []).some((e) => (e.sets || []).some((s) => Metrics.isNormal(s) && s.reps)))
+      .sort().slice(-3);
+    let total = 0; let hard = 0;
+    dates.forEach((d) => (wl[d].exercises || []).forEach((e) => (e.sets || []).forEach((s) => {
+      if (!Metrics.isNormal(s) || !s.reps) return;
+      total += 1;
+      if (s.felt === 'dificil' || s.felt === 'fallo') hard += 1;
+    })));
+    if (dates.length >= 3 && total >= 15 && hard / total >= 0.5) {
+      return { why: 'sensacion', text: `El ${Math.round((hard / total) * 100)}% de tus últimas series se sintieron pesadas o fallidas.` };
+    }
+    const st = Gamify.computeStats();
+    if (st.streak >= 6) return { why: 'racha', text: `Llevas ${st.streak} semanas seguidas entrenando: una semana más suave ayuda a recuperar y seguir progresando.` };
+    return null;
+  }
+
+  // peso sugerido (con descarga activa: ~10 % menos que tu último peso)
+  function suggest(exId, opts = {}) {
+    const r = suggestBase(exId, opts);
+    if (!r || !deloadActive() || r.kind === 'return') return r;
+    const logs = logsFor(exId);
+    if (!logs.length) return r;
+    const last = logs[logs.length - 1];
+    const W = Math.max(...last.sets.map((s) => Number(s.weight) || 0));
+    if (!(W > 0)) return r;
+    return { kind: 'deload', weightKg: roundLoad(W * 0.9, opts.unit || Units.current()), reps: r.reps, unit: r.unit };
   }
 
   // ---------------------------------------------------------------- proyección y RM
@@ -268,5 +318,5 @@ const Progression = (() => {
     Modal.open('↩ Plan de regreso', body);
   }
 
-  return { suggest, projection, rmTable, returnPlan, recentExercises, gap, detrain, weightFor, parseRange, panel, openReturnPlan, logsFor };
+  return { fatigue, deloadActive, deloadUntil, activateDeload, endDeload, suggest, projection, rmTable, returnPlan, recentExercises, gap, detrain, weightFor, parseRange, panel, openReturnPlan, logsFor };
 })();

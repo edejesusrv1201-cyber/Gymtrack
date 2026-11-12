@@ -35,6 +35,26 @@ const RewardsView = (() => {
     ]));
     view.appendChild(hero);
 
+    // ---- retos de la semana ----
+    const chs = Gamify.currentChallenges();
+    const chCard = Utils.el('div', { class: 'card' });
+    chCard.appendChild(Utils.el('div', { class: 'card-title-row' }, [Utils.el('h3', { text: '🎯 Retos de la semana' }), Utils.el('span', { class: 'eyebrow', text: `${chs.filter((c) => c.done).length} / ${chs.length}` })]));
+    chs.forEach((c) => {
+      chCard.appendChild(Utils.el('div', { class: 'next-row' }, [
+        Utils.el('div', { class: `badge gold${c.done ? '' : ' locked'}` }, [Utils.el('span', { text: c.done ? '✓' : c.icon })]),
+        Utils.el('div', { style: 'flex:1;min-width:0;' }, [
+          Utils.el('div', { style: 'font-weight:700;', text: c.title }),
+          Utils.el('div', { class: 'meta', text: c.done ? '¡Cumplido! +60 XP' : `${c.curCapped} / ${c.target} · +60 XP al cumplirlo` }),
+          Utils.el('div', { class: 'macro-bar', style: 'margin-top:6px;' }, [Utils.el('div', { class: 'macro-bar-fill', style: `width:${Math.round((c.curCapped / c.target) * 100)}%;background:var(--accent-grad);` })]),
+        ]),
+      ]));
+    });
+    chCard.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:6px;', text: 'Cambian cada semana (domingo). El reto de series sale del grupo que más descuidaste.' }));
+    const wkBtn = Utils.el('button', { class: 'btn-secondary btn-block', style: 'margin-top:10px;', text: '📊 Ver el resumen de esta semana' });
+    wkBtn.addEventListener('click', () => WeeklyReview.openModal(0));
+    chCard.appendChild(wkBtn);
+    view.appendChild(chCard);
+
     // ---- más cerca de desbloquear ----
     const next = ev.list.filter((a) => !a.done).sort((a, b) => b.curCapped / b.target - a.curCapped / a.target).slice(0, 3);
     if (next.length) {

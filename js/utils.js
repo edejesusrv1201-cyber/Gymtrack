@@ -102,10 +102,10 @@ const Utils = (() => {
         const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: filename });
-          return;
+          return true;
         }
       } catch (e) {
-        if (e && e.name === 'AbortError') return;   // la persona cerró la hoja
+        if (e && e.name === 'AbortError') return false;   // la persona cerró la hoja
       }
     }
     const url = URL.createObjectURL(blob);
@@ -116,6 +116,7 @@ const Utils = (() => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return true;
   }
 
   function vibrate(pattern) {

@@ -364,7 +364,7 @@ const CaloriesView = (() => {
       });
       const r = Utils.el('div', { class: 'food-row' }, [
         Utils.el('div', { class: 'fr-main' }, [
-          Utils.el('div', { class: 'fr-name' }, [sp.name, sp.combo ? Utils.el('span', { class: 'uni-pill', text: 'plantilla' }) : null]),
+          Utils.el('div', { class: 'fr-name' }, [sp.name, sp.combo ? Utils.el('span', { class: 'uni-pill', text: sp.recipe ? 'receta' : 'plantilla' }) : null]),
           Utils.el('div', { class: 'meta', text: foodSub(sp) }),
         ]),
         star,
@@ -404,7 +404,10 @@ const CaloriesView = (() => {
     quick.addEventListener('click', () => openQuickAdd(meal));
     const done = Utils.el('button', { class: 'btn-primary btn-block', text: 'Listo' });
     done.addEventListener('click', () => Modal.close());
+    const recipeBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🍳 Crear receta (varios ingredientes)' });
+    recipeBtn.addEventListener('click', () => openRecipe(null, (food) => openQuantity({ sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' })));
     body.appendChild(create);
+    body.appendChild(recipeBtn);
     body.appendChild(quick);
     body.appendChild(done);
 
@@ -843,6 +846,152 @@ const CaloriesView = (() => {
     Modal.open(existing ? 'Editar alimento' : (prefill ? 'Revisa los datos de la etiqueta' : 'Nuevo alimento'), body);
   }
 
+  // ---------------------------------------------------------------- recetas
+  // Una receta suma varios alimentos (con sus cantidades) y se guarda como un alimento "por porción".
+  function recipeTotals(items) {
+    return items.reduce((a, i) => {
+      const sp = FoodDB.findSpec(i.foodId);
+      if (!sp) return a;
+      const m = FoodDB.macros(sp, Number(i.qty) || 0);
+      return { kcal: a.kcal + m.kcal, protein: a.protein + m.protein, carbs: a.carbs + m.carbs, fat: a.fat + m.fat };
+    }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  }
+
+  function openRecipe(existing, onSaved) {
+    const isRecipe = !!(existing && existing.recipe);
+    const state = {
+      name: existing ? existing.name : '',
+      servings: isRecipe ? existing.servings || 1 : 1,
+      items: isRecipe ? (existing.ingredients || []).map((i) => Object.assign({}, i)) : [],
+    };
+    show();
+
+    function show() {
+      const body = Utils.el('div');
+      body.appendChild(Utils.el('p', { class: 'small', text: 'Arma el plato con sus ingredientes y cantidades. Se guarda como un alimento por porción para agregarlo de un toque.' }));
+      const nameIn = Utils.el('input', { type: 'text', value: state.name, placeholder: 'ej. Bowl de pollo con arroz' });
+      nameIn.addEventListener('input', () => { state.name = nameIn.value; });
+      const servIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: String(state.servings) });
+      body.appendChild(Utils.el('div', { class: 'field-row' }, [
+        Utils.el('div', { class: 'field', style: 'flex:2;' }, [Utils.el('label', { text: 'Nombre de la receta' }), nameIn]),
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Rinde (porciones)' }), servIn]),
+      ]));
+
+      body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 2px;', text: 'Ingredientes' }));
+      const list = Utils.el('div');
+      const totalBox = Utils.el('div', { class: 'recipe-total' });
+      const paintTotals = () => {
+        const t = recipeTotals(state.items);
+        const n = Math.max(0.25, parseFloat(servIn.value) || 1);
+        state.servings = n;
+        totalBox.innerHTML = '';
+        totalBox.appendChild(Utils.el('div', { class: 'small text-dim', text: `Total: ${r0(t.kcal)} kcal · P ${r0(t.protein)} · C ${r0(t.carbs)} · G ${r0(t.fat)}` }));
+        totalBox.appendChild(Utils.el('div', { style: 'margin-top:4px;' }, [Utils.el('b', { style: 'font-size:1.5rem;', text: `${r0(t.kcal / n)}` }), ' kcal por porción']));
+        totalBox.appendChild(Utils.el('div', { class: 'small text-dim', text: `P ${r1(t.protein / n)} · C ${r1(t.carbs / n)} · G ${r1(t.fat / n)} g por porción` }));
+      };
+      state.items.forEach((it, idx) => {
+        const sp = FoodDB.findSpec(it.foodId);
+        const q = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: String(it.qty) });
+        q.addEventListener('input', () => { it.qty = parseFloat(q.value) || 0; paintTotals(); });
+        const del = Utils.el('button', { class: 'icon-btn', text: '✕' });
+        del.addEventListener('click', () => { state.items.splice(idx, 1); show(); });
+        list.appendChild(Utils.el('div', { class: 'ing-row' }, [
+          Utils.el('div', { class: 'ing-name', text: it.name }),
+          q,
+          Utils.el('span', { class: 'small text-dim', style: 'width:34px;', text: sp && sp.basis === 'g' ? 'g' : 'porc.' }),
+          del,
+        ]));
+      });
+      if (!state.items.length) list.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:8px 0;', text: 'Aún no hay ingredientes.' }));
+      body.appendChild(list);
+      servIn.addEventListener('input', paintTotals);
+      paintTotals();
+
+      const addIng = Utils.el('button', { class: 'btn-secondary btn-block', text: '➕ Agregar ingrediente' });
+      addIng.addEventListener('click', () => pickIngredient(state, show));
+      body.appendChild(addIng);
+      body.appendChild(totalBox);
+
+      const save = Utils.el('button', { class: 'btn-primary btn-block', text: isRecipe ? 'Guardar cambios' : 'Guardar receta' });
+      save.addEventListener('click', () => {
+        const name = state.name.trim();
+        if (!name) { Utils.toast('Ponle un nombre a la receta'); return; }
+        const items = state.items.filter((i) => i.qty > 0);
+        if (!items.length) { Utils.toast('Agrega al menos un ingrediente'); return; }
+        const t = recipeTotals(items);
+        const n = Math.max(0.25, state.servings || 1);
+        const foods = DB.getFoods();
+        let food = isRecipe ? foods.find((f) => f.id === existing.id) : null;
+        if (!food) { food = { id: DB.uid() }; foods.push(food); }
+        Object.assign(food, {
+          name, basis: 's', servingLabel: '1 porción', combo: true, recipe: true, servings: n, ingredients: items,
+          kcal: r1(t.kcal / n), protein: r1(t.protein / n), carbs: r1(t.carbs / n), fat: r1(t.fat / n),
+        });
+        DB.saveFoods(foods);
+        Modal.close();
+        Utils.toast('Receta guardada 🍳');
+        if (onSaved) onSaved(food);
+      });
+      body.appendChild(save);
+      Modal.open(isRecipe ? 'Editar receta' : '🍳 Nueva receta', body);
+    }
+  }
+
+  // elegir un ingrediente (buscador) y su cantidad
+  function pickIngredient(state, back) {
+    const body = Utils.el('div');
+    const search = Utils.el('input', { type: 'search', placeholder: '🔎 Buscar ingrediente…', class: 'ax-search' });
+    const list = Utils.el('div');
+    function paint() {
+      list.innerHTML = '';
+      const items = FoodDB.search(search.value.trim()).filter((f) => !f.recipe).slice(0, 60);
+      if (!items.length) list.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: 'No encontré ese alimento.' }));
+      items.forEach((sp) => {
+        const row = Utils.el('div', { class: 'food-row' }, [
+          Utils.el('div', { class: 'fr-main' }, [Utils.el('div', { class: 'fr-name', text: sp.name }), Utils.el('div', { class: 'meta', text: foodSub(sp) })]),
+          Utils.el('span', { class: 'fr-add', text: '+' }),
+        ]);
+        row.addEventListener('click', () => askQty(sp));
+        list.appendChild(row);
+      });
+    }
+    function askQty(sp) {
+      const b = Utils.el('div');
+      const isG = sp.basis === 'g';
+      const q = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', class: 'qty-input', value: String(isG ? ((sp.portions && sp.portions[0] && sp.portions[0].g) || 100) : 1) });
+      b.appendChild(Utils.el('div', { class: 'meta', style: 'margin:-4px 0 10px;', text: foodSub(sp) }));
+      b.appendChild(Utils.el('div', { class: 'qty-row' }, [q, Utils.el('span', { class: 'qty-unit', text: isG ? 'gramos' : (sp.servingLabel || 'porciones') })]));
+      if (isG && sp.portions && sp.portions.length) {
+        const chips = Utils.el('div', { class: 'rt-chips' });
+        sp.portions.forEach((p) => {
+          const c = Utils.el('button', { type: 'button', class: 'rt-chip plain', style: '--gc:var(--accent-light)', text: `${p.label} · ${r0(p.g)} g` });
+          c.addEventListener('click', () => { q.value = String(p.g); });
+          chips.appendChild(c);
+        });
+        b.appendChild(chips);
+      }
+      const ok = Utils.el('button', { class: 'btn-primary btn-block', text: 'Agregar a la receta' });
+      ok.addEventListener('click', () => {
+        const v = parseFloat(q.value);
+        if (!(v > 0)) { Utils.toast('Escribe una cantidad'); return; }
+        state.items.push({ foodId: sp.id, name: sp.name, qty: v });
+        Modal.close();
+        back();
+      });
+      b.appendChild(ok);
+      Modal.open(sp.name, b);
+      setTimeout(() => { try { q.focus(); q.select(); } catch (e) { /* sin foco */ } }, 120);
+    }
+    search.addEventListener('input', paint);
+    body.appendChild(search);
+    body.appendChild(list);
+    const cancel = Utils.el('button', { class: 'link-btn small', style: 'margin-top:8px;', text: '← Volver a la receta' });
+    cancel.addEventListener('click', back);
+    body.appendChild(cancel);
+    paint();
+    Modal.open('Agregar ingrediente', body);
+  }
+
   // ---------------------------------------------------------------- mis alimentos
   function openFoodManager() {
     const body = Utils.el('div');
@@ -857,7 +1006,7 @@ const CaloriesView = (() => {
         const sp = FoodDB.spec(f);
         const row = Utils.el('div', { class: 'list-item' }, [
           Utils.el('div', { style: 'min-width:0;' }, [
-            Utils.el('div', { style: 'font-weight:700;' }, [f.name, f.combo ? Utils.el('span', { class: 'uni-pill', text: 'plantilla' }) : null]),
+            Utils.el('div', { style: 'font-weight:700;' }, [f.name, f.combo ? Utils.el('span', { class: 'uni-pill', text: f.recipe ? 'receta' : 'plantilla' }) : null]),
             Utils.el('div', { class: 'meta', text: foodSub(sp) }),
           ]),
           Utils.el('div', { style: 'display:flex;gap:6px;flex:none;' }, [
@@ -866,7 +1015,7 @@ const CaloriesView = (() => {
           ]),
         ]);
         const [edit, del] = row.querySelectorAll('button');
-        edit.addEventListener('click', () => openFoodForm(f, () => openFoodManager()));
+        edit.addEventListener('click', () => (f.recipe ? openRecipe(f, () => openFoodManager()) : openFoodForm(f, () => openFoodManager())));
         del.addEventListener('click', () => {
           if (!Utils.confirmDialog(`¿Eliminar "${f.name}" de tus alimentos? Lo ya registrado se conserva.`)) return;
           DB.saveFoods(DB.getFoods().filter((x) => x.id !== f.id));
@@ -882,6 +1031,9 @@ const CaloriesView = (() => {
     const add = Utils.el('button', { class: 'btn-primary btn-block', text: '➕ Nuevo alimento' });
     add.addEventListener('click', () => openFoodForm(null, () => openFoodManager()));
     body.appendChild(add);
+    const addRecipe = Utils.el('button', { class: 'btn-secondary btn-block', text: '🍳 Nueva receta' });
+    addRecipe.addEventListener('click', () => openRecipe(null, () => openFoodManager()));
+    body.appendChild(addRecipe);
     body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:10px;', text: `La app ya incluye ${FoodDB.BUILTIN.length} alimentos comunes (valores promedio por 100 g). Aquí van solo los tuyos.` }));
     Modal.open('Mis alimentos', body, { onClose: refresh });
   }

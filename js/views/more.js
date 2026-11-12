@@ -239,11 +239,12 @@ const MoreView = (() => {
     backupCard.appendChild(Utils.el('p', { text: 'Tus datos viven solo en este celular/navegador. Exporta un archivo de respaldo de vez en cuando por si cambias de teléfono o borras el navegador.' }));
 
     const exportBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '⬇️ Exportar mis datos (.json)' });
-    exportBtn.addEventListener('click', () => {
-      const data = DB.exportAll();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      Utils.saveFile(blob, `migymtrack-backup-${Utils.todayISO()}.json`);
+    const lastLine = Utils.el('div', { class: 'backup-last' + (Backup.due() ? ' due' : ''), text: Backup.label() });
+    exportBtn.addEventListener('click', async () => {
+      const ok = await Backup.run();
+      if (ok) { lastLine.textContent = Backup.label(); lastLine.classList.remove('due'); Utils.toast('Respaldo guardado ✓'); }
     });
+    backupCard.appendChild(lastLine);
     backupCard.appendChild(exportBtn);
 
     const importLabel = Utils.el('label', { class: 'btn-secondary btn-block mt-8', style: 'display:block;text-align:center;', text: '⬆️ Importar respaldo (.json)' });

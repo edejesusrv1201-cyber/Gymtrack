@@ -214,7 +214,7 @@ const FoodDB = (() => {
     // alimento tuyo escrito "por 100 g" (nuevo formato)
     if (food.basis === 'g') {
       const portions = food.portionG > 0 ? [{ label: food.servingLabel || `1 porción (${food.portionG} g)`, g: Number(food.portionG) }] : [];
-      return { id: food.id, name: food.name, basis: 'g', kcal: food.kcal, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, portions, mine: true, combo: !!food.combo };
+      return { id: food.id, name: food.name, basis: 'g', kcal: food.kcal, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, portions, mine: true, combo: !!food.combo, recipe: !!food.recipe };
     }
     // formato antiguo con porción "100g" / "150 g": se convierte a por 100 g para poder anotar en gramos
     const m = GRAM_LABEL.exec(food.servingLabel || '');
@@ -225,11 +225,11 @@ const FoodDB = (() => {
         return {
           id: food.id, name: food.name, basis: 'g',
           kcal: (food.kcal || 0) * k, protein: (food.protein || 0) * k, carbs: (food.carbs || 0) * k, fat: (food.fat || 0) * k,
-          portions: n === 100 ? [] : [{ label: `${n} g`, g: n }], mine: true, combo: !!food.combo,
+          portions: n === 100 ? [] : [{ label: `${n} g`, g: n }], mine: true, combo: !!food.combo, recipe: !!food.recipe,
         };
       }
     }
-    return { id: food.id, name: food.name, basis: 's', kcal: food.kcal || 0, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, servingLabel: food.servingLabel || '1 porción', portions: [], mine: true, combo: !!food.combo };
+    return { id: food.id, name: food.name, basis: 's', kcal: food.kcal || 0, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, servingLabel: food.servingLabel || '1 porción', portions: [], mine: true, combo: !!food.combo, recipe: !!food.recipe };
   }
 
   // macros de una cantidad (gramos para basis 'g', porciones para basis 's')

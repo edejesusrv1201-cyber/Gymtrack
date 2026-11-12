@@ -765,7 +765,7 @@ const ExcelBackup = (() => {
     add(dataSheet(planRows), DATA.planMensual);
 
     add(dataSheet(measurements), DATA.medidas);
-    add(dataSheet(foods), DATA.alimentos);
+    add(dataSheet(foods.map((f) => Object.assign({}, f, { ingredients: f.ingredients ? JSON.stringify(f.ingredients) : undefined }))), DATA.alimentos);
 
     const calRows = [];
     Object.keys(calorieLog).forEach((date) => {
@@ -814,7 +814,7 @@ const ExcelBackup = (() => {
     const wb = buildWorkbook();
     const data = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
     const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    Utils.saveFile(blob, `migymtrack-reporte-${Utils.todayISO()}.xlsx`);
+    Utils.saveFile(blob, `migymtrack-reporte-${Utils.todayISO()}.xlsx`).then((ok) => { if (ok !== false) Backup.mark(); });
   }
 
   // ---------------- importar ----------------
@@ -890,6 +890,9 @@ const ExcelBackup = (() => {
       if (r.basis === 'g' || r.basis === 's') food.basis = r.basis;
       if (num(r.portionG) > 0) food.portionG = num(r.portionG);
       if (bool(r.combo)) food.combo = true;
+      if (bool(r.recipe)) food.recipe = true;
+      if (num(r.servings) > 0) food.servings = num(r.servings);
+      if (typeof r.ingredients === 'string' && r.ingredients.charAt(0) === '[') { try { food.ingredients = JSON.parse(r.ingredients); } catch (e) { /* sin ingredientes */ } }
       return food;
     });
 

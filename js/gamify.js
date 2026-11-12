@@ -77,6 +77,7 @@ const Gamify = (() => {
 
   // ---------------------------------------------------------------- nivel
   const TITLES = [[1, 'Novato'], [3, 'Aprendiz'], [5, 'Constante'], [8, 'Atleta'], [12, 'Fuerte'], [16, 'Élite'], [20, 'Leyenda']];
+  const addDays = (iso, n) => { const d = Utils.parseISO(iso); d.setDate(d.getDate() + n); return Utils.toISODate(d); };
   const baseXp = (st) => st.sessions * 100 + st.sets * 4 + st.prs * 60 + st.foodDays * 15 + st.waterDays * 10 + st.weighIns * 20 + st.streak * 50;
   function levelInfo(xp) {
     const level = 1 + Math.floor(Math.sqrt(xp / 120));
@@ -128,9 +129,43 @@ const Gamify = (() => {
       const raw = a.cur(st);
       return Object.assign({}, a, { raw, curCapped: Math.min(raw, a.target), done: raw >= a.target, date: saved[a.id] || null });
     });
-    const xp = baseXp(st) + list.filter((a) => a.done).length * 40;
+    const doneMap = DB.getSettings().challengeDone || {};
+    const chXp = Object.keys(doneMap).reduce((n, k) => n + (doneMap[k] || []).length, 0) * 60;
+    const xp = baseXp(st) + list.filter((a) => a.done).length * 40 + chXp;
     return { st, list, xp, lvl: levelInfo(xp) };
   }
+
+  // ---------------------------------------------------------------- retos de la semana
+  const GROUP_PREF = ['hombro', 'core', 'brazo', 'espalda', 'pecho', 'pierna'];
+
+  function challengesFor(start) {
+    const end = addDays(start, 6);
+    const goal = Metrics.weeklyGoal();
+    const week = Metrics.totals(start, end);
+    // grupo más descuidado en las 2 semanas anteriores (se fija al empezar la semana)
+    const before = Metrics.totals(addDays(start, -14), addDays(start, -1));
+    let pick = 'hombro';
+    if (before.sets > 0) {
+      pick = GROUP_PREF.slice().sort((a, b) => ((before.byGroup[a] || { sets: 0 }).sets - (before.byGroup[b] || { sets: 0 }).sets))[0];
+    }
+    const list = [
+      { id: `grp-${pick}`, icon: '🎯', title: `Suma ${goal.min} series de ${pick}`, target: goal.min, cur: (week.byGroup[pick] || { sets: 0 }).sets },
+      { id: 'days', icon: '📅', title: 'Entrena 3 días', target: 3, cur: week.days },
+    ];
+    // el tercero va rotando
+    const wl = DB.getWorkoutLog();
+    const rot = Math.floor(Utils.parseISO(start).getTime() / 86400000 / 7) % 4;
+    let prs = 0;
+    Object.keys(wl).filter((d) => d >= start && d <= end).forEach((d) => (wl[d].exercises || []).forEach((e) => (e.sets || []).forEach((s) => { if (s.pr) prs += 1; })));
+    const inWeek = (map, fn) => Object.keys(map).filter((d) => d >= start && d <= end && fn(map[d])).length;
+    if (rot === 0) list.push({ id: 'pr', icon: '🏆', title: 'Rompe 1 récord', target: 1, cur: prs });
+    else if (rot === 1) list.push({ id: 'food', icon: '🍽️', title: 'Registra tus comidas 3 días', target: 3, cur: inWeek(DB.getCalorieLog(), (l) => (l || []).length > 0) });
+    else if (rot === 2) { const g = DB.getSettings().waterGoalMl || 2500; list.push({ id: 'water', icon: '💧', title: 'Cumple tu meta de agua 3 días', target: 3, cur: inWeek(DB.getWaterLog(), (l) => (l || []).reduce((n, e) => n + e.ml, 0) >= g) }); }
+    else list.push({ id: 'weigh', icon: '⚖️', title: 'Pésate esta semana', target: 1, cur: DB.getMeasurements().filter((m) => m.weight && m.date >= start && m.date <= end).length });
+    const saved = (DB.getSettings().challengeDone || {})[start] || [];
+    return list.map((c) => Object.assign(c, { curCapped: Math.min(c.cur, c.target), done: c.cur >= c.target || saved.includes(c.id), xp: 60 }));
+  }
+  const currentChallenges = () => challengesFor(weekStart(Utils.todayISO()));
 
   // Marca logros nuevos y subidas de nivel. La primera vez solo se ponen al día en silencio.
   function check() {
@@ -150,8 +185,15 @@ const Gamify = (() => {
     else if (ev.lvl.level > s.gLevel) { up = { from: s.gLevel, to: ev.lvl.level }; s.gLevel = ev.lvl.level; }
     else s.gLevel = ev.lvl.level;
     s.achievements = saved;
+    // retos de la semana que acaban de cumplirse
+    const wkStart = weekStart(Utils.todayISO());
+    const doneMap = s.challengeDone || {};
+    const doneNow = doneMap[wkStart] || [];
+    const newlyDone = challengesFor(wkStart).filter((c) => c.cur >= c.target && !doneNow.includes(c.id));
+    if (newlyDone.length) { doneMap[wkStart] = doneNow.concat(newlyDone.map((c) => c.id)); s.challengeDone = doneMap; }
     DB.saveSettings(s);
-    return { fresh, up, ev };
+    if (newlyDone.length) { ev.xp += newlyDone.length * 60; ev.lvl = levelInfo(ev.xp); }
+    return { fresh, up, ev, challenges: newlyDone };
   }
 
   // XP ganado en un día concreto
@@ -175,7 +217,7 @@ const Gamify = (() => {
 
   // ventana de celebración con los logros nuevos / subida de nivel
   function announce(res) {
-    if (!res || (!res.fresh.length && !res.up)) return;
+    if (!res || (!res.fresh.length && !res.up && !(res.challenges || []).length)) return;
     if (document.querySelector('.modal-backdrop')) return; // no interrumpe otra ventana
     const body = Utils.el('div', { class: 'unlock-body' });
     if (res.up) {
@@ -190,13 +232,19 @@ const Gamify = (() => {
         Utils.el('div', { style: 'min-width:0;' }, [Utils.el('div', { class: 'ur-name', text: a.name }), Utils.el('div', { class: 'meta', text: a.desc })]),
       ]));
     });
+    (res.challenges || []).forEach((c) => {
+      body.appendChild(Utils.el('div', { class: 'unlock-row' }, [
+        Utils.el('div', { class: 'badge big gold' }, [Utils.el('span', { text: c.icon })]),
+        Utils.el('div', { style: 'min-width:0;' }, [Utils.el('div', { class: 'ur-name', text: '¡Reto cumplido!' }), Utils.el('div', { class: 'meta', text: `${c.title} · +60 XP` })]),
+      ]));
+    });
     const ok = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: '¡Genial!' });
     ok.addEventListener('click', () => Modal.close());
     body.appendChild(ok);
     const view = Utils.el('button', { class: 'link-btn small', style: 'margin-top:8px;', text: 'Ver todos mis logros →' });
     view.addEventListener('click', () => { Modal.close(); App.navigate('progreso', { section: 'logros' }); });
     body.appendChild(view);
-    Modal.open(res.fresh.length ? (res.fresh.length > 1 ? '🏆 ¡Logros desbloqueados!' : '🏆 ¡Logro desbloqueado!') : '⬆️ ¡Nivel nuevo!', body);
+    Modal.open(res.fresh.length ? (res.fresh.length > 1 ? '🏆 ¡Logros desbloqueados!' : '🏆 ¡Logro desbloqueado!') : res.up ? '⬆️ ¡Nivel nuevo!' : '🎯 ¡Reto cumplido!', body);
     Utils.vibrate([60, 40, 60, 40, 140]);
     if (motionOk()) Celebrate.fireworks();
   }
@@ -247,12 +295,16 @@ const Gamify = (() => {
       body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:12px 0 6px;', text: 'Logros desbloqueados' }));
       res.fresh.forEach((a) => body.appendChild(Utils.el('div', { class: 'unlock-row' }, [badgeEl(Object.assign({}, a, { done: true })), Utils.el('div', {}, [Utils.el('div', { class: 'ur-name', text: a.name }), Utils.el('div', { class: 'meta', text: a.desc })])])));
     }
+    if ((res.challenges || []).length) {
+      body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:12px 0 6px;', text: 'Retos cumplidos' }));
+      res.challenges.forEach((c) => body.appendChild(Utils.el('div', { class: 'sum-pr' }, [Utils.el('span', { text: c.icon }), Utils.el('span', { text: `${c.title} · +60 XP` })])));
+    }
     const go = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Continuar' });
     go.addEventListener('click', () => { Modal.close(); done(); });
     body.appendChild(go);
     Modal.open('🏁 Resumen del entreno', body, { onClose: done, dismissOnBackdrop: false });
-    if ((prList.length || res.fresh.length || res.up) && motionOk()) { Celebrate.fireworks(); Utils.vibrate([60, 40, 60, 40, 140]); }
+    if ((prList.length || res.fresh.length || res.up || (res.challenges || []).length) && motionOk()) { Celebrate.fireworks(); Utils.vibrate([60, 40, 60, 40, 140]); }
   }
 
-  return { computeStats, evaluate, check, levelInfo, xpOfDay, announce, showSummary, badgeEl, ACH, CATS, MIN_WEEKLY };
+  return { challengesFor, currentChallenges, computeStats, evaluate, check, levelInfo, xpOfDay, announce, showSummary, badgeEl, ACH, CATS, MIN_WEEKLY };
 })();

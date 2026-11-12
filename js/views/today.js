@@ -357,10 +357,64 @@ const TodayView = (() => {
       Utils.el('div', { class: 'pc-main' }, [
         Utils.el('div', { class: 'pc-top' }, [Utils.el('b', { text: lvl.title }), Utils.el('span', { class: 'pc-xp', text: `${ev.xp} XP` })]),
         Utils.el('div', { class: 'pc-bar' }, [Utils.el('i', { style: `width:${Math.max(4, Math.round(lvl.pct * 100))}%` })]),
+        (() => { const ch = Gamify.currentChallenges(); const d = ch.filter((c) => c.done).length; const open = ch.find((c) => !c.done); return Utils.el('div', { class: 'pc-ch', text: `🎯 Retos ${d}/${ch.length}${open ? ` · ${open.title.toLowerCase()} (${open.curCapped}/${open.target})` : ' · ¡todos cumplidos!'}` }); })(),
       ]),
       Utils.el('div', { class: 'pc-streak' }, [Utils.el('span', { class: 'flame', text: '🔥' }), Utils.el('b', { text: String(st.streak) })]),
     ]);
     card.addEventListener('click', () => App.navigate('progreso', { section: 'logros' }));
+    return card;
+  }
+
+  // ---------- aviso: haz un respaldo ----------
+  function renderBackupNudge(rerender) {
+    if (!Backup.due()) return null;
+    const today = Utils.todayISO();
+    let hidden = false;
+    try { hidden = localStorage.getItem('gt_backup_nudge') === today; } catch (e) { /* sin almacenamiento */ }
+    if (hidden) return null;
+    const d = Backup.daysSince();
+    const go = Utils.el('button', { class: 'btn-small', text: 'Respaldar' });
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      const ok = await Backup.run();
+      if (ok) { Utils.toast('Respaldo guardado ✓'); rerender(); } else go.disabled = false;
+    });
+    const later = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Recordármelo mañana' });
+    later.addEventListener('click', () => { try { localStorage.setItem('gt_backup_nudge', today); } catch (e) { /* sin almacenamiento */ } rerender(); });
+    return Utils.el('div', { class: 'banner' }, [
+      Utils.el('span', { text: d === null ? '💾 Tus datos solo viven en este celular. Haz tu primer respaldo.' : `💾 Hace ${d} días que no haces respaldo.` }),
+      Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;flex:none;' }, [go, later]),
+    ]);
+  }
+
+  // ---------- semana de descarga ----------
+  function renderDeload(rerender) {
+    if (Progression.deloadActive()) {
+      const until = Progression.deloadUntil();
+      const end = Utils.el('button', { class: 'btn-small', text: 'Terminar' });
+      end.addEventListener('click', () => { Progression.endDeload(); rerender(); });
+      return Utils.el('div', { class: 'banner' }, [
+        Utils.el('span', { text: `🧘 Semana de descarga activa hasta el ${Utils.friendlyDate(until)}: pesos ~10% menores y 1–2 series menos.` }),
+        end,
+      ]);
+    }
+    const f = Progression.fatigue();
+    if (!f) return null;
+    const wk = Metrics.weekRange(0).start;
+    let hidden = false;
+    try { hidden = localStorage.getItem('gt_deload_dismiss') === wk; } catch (e) { /* sin almacenamiento */ }
+    if (hidden) return null;
+    const card = Utils.el('div', { class: 'card comeback-card' });
+    card.appendChild(Utils.el('div', { class: 'cb-head' }, [
+      Utils.el('span', { class: 'cb-icon', text: '🧘' }),
+      Utils.el('div', {}, [Utils.el('div', { class: 'cb-title', text: '¿Semana de descarga?' }), Utils.el('div', { class: 'small text-dim', text: f.text })]),
+    ]));
+    const yes = Utils.el('button', { class: 'btn-primary btn-block', text: 'Activar descarga 7 días' });
+    yes.addEventListener('click', () => { Progression.activateDeload(); Utils.toast('Descarga activada 🧘'); rerender(); });
+    const no = Utils.el('button', { class: 'btn-secondary btn-block', text: 'Ahora no' });
+    no.addEventListener('click', () => { try { localStorage.setItem('gt_deload_dismiss', wk); } catch (e) { /* sin almacenamiento */ } rerender(); });
+    card.appendChild(yes);
+    card.appendChild(no);
     return card;
   }
 
@@ -412,7 +466,8 @@ const TodayView = (() => {
     const sinceW = MeasurementsView.daysSinceWeight();
     let nudgeHidden = false;
     try { nudgeHidden = localStorage.getItem('gt_weight_nudge') === todayIso; } catch (e) { /* sin almacenamiento */ }
-    if ((sinceW === null || sinceW >= 7) && !nudgeHidden) {
+    const backupNudge = renderBackupNudge(rerender);
+    if ((sinceW === null || sinceW >= 7) && !nudgeHidden && !backupNudge) {
       const reg = Utils.el('button', { class: 'btn-small', text: 'Pesarme' });
       reg.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
       const later = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Recordármelo mañana' });
@@ -426,9 +481,15 @@ const TodayView = (() => {
       ]));
     }
 
+    if (backupNudge) view.appendChild(backupNudge);
+
     view.appendChild(renderPlayer());
+    const wkCard = WeeklyReview.card(rerender);
+    if (wkCard) view.appendChild(wkCard);
     const comeback = renderComeback();
     if (comeback) view.appendChild(comeback);
+    const deload = renderDeload(rerender);
+    if (deload) view.appendChild(deload);
 
     view.appendChild(renderHero(todayIso, routine, log, rerender));
     if (routine && routine.exercises.length > 0) view.appendChild(renderExerciseList(todayIso, routine, log));
