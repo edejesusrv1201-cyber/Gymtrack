@@ -168,7 +168,9 @@ const Theme = (() => {
   function makeParticles() {
     const glow = document.getElementById('bgGlow');
     if (!glow || glow.querySelector('b')) return;
-    for (let i = 0; i < 16; i += 1) {
+    // menos partículas en celulares modestos (cada una es una capa más que dibujar)
+    const weak = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 3;
+    for (let i = 0; i < (weak ? 6 : 10); i += 1) {
       const b = document.createElement('b');
       b.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`);
       b.style.setProperty('--s', `${(3 + Math.random() * 7).toFixed(1)}px`);

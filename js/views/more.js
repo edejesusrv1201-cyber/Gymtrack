@@ -125,6 +125,14 @@ const MoreView = (() => {
     const settings = DB.getSettings();
 
     view.appendChild(buildThemeCard());
+
+    const toolsCard = Utils.el('div', { class: 'card' });
+    toolsCard.appendChild(Utils.el('h3', { text: '🧰 Herramientas' }));
+    const platesBtn = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', text: '🧮 Calculadora de discos' });
+    platesBtn.addEventListener('click', () => Plates.open());
+    toolsCard.appendChild(platesBtn);
+    toolsCard.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Dime el peso total y te digo qué discos poner por lado. También está en el menú ⋯ de cada ejercicio.' }));
+    view.appendChild(toolsCard);
     view.appendChild(buildInstallCard());
 
     // ---- ajustes ----

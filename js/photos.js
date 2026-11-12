@@ -116,7 +116,7 @@ const Photos = (() => {
     const first = same[0];
     if (first && first.id !== p.id) {
       const cmp = Utils.el('button', { class: 'btn-primary btn-block', text: `Comparar con la primera (${Utils.shortDate(first.date)})` });
-      cmp.addEventListener('click', () => openCompare(first, p));
+      cmp.addEventListener('click', () => openCompare(first, p, list));
       body.appendChild(cmp);
     }
     const del = Utils.el('button', { class: 'btn-secondary btn-block', style: 'color:var(--red);', text: '🗑️ Eliminar foto' });
@@ -130,19 +130,65 @@ const Photos = (() => {
     Modal.open('Foto de progreso', body);
   }
 
-  function openCompare(a, b) {
+  // antes / ahora: deslizador sobre la misma foto o lado a lado; se puede cambiar cualquiera de las dos
+  let cmpMode = 'slide';
+  function openCompare(a, b, list) {
+    const pool = (list || []).filter((x) => x.angle === a.angle);
     const body = Utils.el('div');
-    const col = (p, tag) => Utils.el('div', { class: 'cmp-col' }, [
-      Utils.el('div', { class: 'eyebrow', text: tag }),
-      Utils.el('img', { src: p.data, alt: tag }),
-      Utils.el('div', { class: 'small', text: infoLine(p) }),
-    ]);
-    body.appendChild(Utils.el('div', { class: 'cmp-grid' }, [col(a, 'Antes'), col(b, 'Ahora')]));
-    const days = Math.round((Utils.parseISO(b.date) - Utils.parseISO(a.date)) / 86400000);
-    const wa = weightNear(a.date); const wb = weightNear(b.date);
-    let txt = `${days} días entre las dos fotos.`;
-    if (wa && wb) txt += ` Peso: ${Units.label(wa)} → ${Units.label(wb)} (${wb - wa >= 0 ? '+' : ''}${Utils.round1(Units.fromKg(wb - wa))} ${Units.current()}).`;
-    body.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:8px;', text: txt }));
+    let pa = a; let pb = b;
+    const stage = Utils.el('div');
+    const info = Utils.el('p', { class: 'small', style: 'margin-top:8px;' });
+
+    const pick = (label, get, set) => {
+      const sel = Utils.el('select', {});
+      pool.forEach((p) => sel.appendChild(Utils.el('option', { value: p.id, text: `${Utils.shortDate(p.date)}${weightNear(p.date) ? ` · ${Units.label(weightNear(p.date))}` : ''}` })));
+      sel.value = get().id;
+      sel.addEventListener('change', () => { set(pool.find((p) => p.id === sel.value)); draw(); });
+      return Utils.el('div', { class: 'field' }, [Utils.el('label', { text: label }), sel]);
+    };
+    if (pool.length > 2) body.appendChild(Utils.el('div', { class: 'field-row' }, [pick('Antes', () => pa, (p) => { pa = p; }), pick('Ahora', () => pb, (p) => { pb = p; })]));
+    body.appendChild(Utils.segmented([{ key: 'slide', label: 'Deslizar' }, { key: 'side', label: 'Lado a lado' }], cmpMode, (k) => { cmpMode = k; paintSeg(); draw(); }, true));
+    const segHolder = body.lastChild;
+    function paintSeg() { segHolder.querySelectorAll('.seg-btn').forEach((bt, i) => bt.classList.toggle('active', (i === 0) === (cmpMode === 'slide'))); }
+    body.appendChild(Utils.el('div', { style: 'height:10px' }));
+    body.appendChild(stage);
+    body.appendChild(info);
+
+    function draw() {
+      stage.innerHTML = '';
+      if (cmpMode === 'side') {
+        const col = (p, tag) => Utils.el('div', { class: 'cmp-col' }, [
+          Utils.el('div', { class: 'eyebrow', text: tag }),
+          Utils.el('img', { src: p.data, alt: tag }),
+          Utils.el('div', { class: 'small', text: infoLine(p) }),
+        ]);
+        stage.appendChild(Utils.el('div', { class: 'cmp-grid' }, [col(pa, 'Antes'), col(pb, 'Ahora')]));
+      } else {
+        const wrap = Utils.el('div', { class: 'cmp-slider' });
+        const under = Utils.el('img', { src: pb.data, alt: 'Ahora', draggable: 'false' });
+        const over = Utils.el('img', { class: 'cmp-over', src: pa.data, alt: 'Antes', draggable: 'false' });
+        const handle = Utils.el('div', { class: 'cmp-handle' }, [Utils.el('span', { text: '⇆' })]);
+        wrap.appendChild(under); wrap.appendChild(over); wrap.appendChild(handle);
+        wrap.appendChild(Utils.el('span', { class: 'cmp-tag l', text: `Antes · ${Utils.shortDate(pa.date)}` }));
+        wrap.appendChild(Utils.el('span', { class: 'cmp-tag r', text: `Ahora · ${Utils.shortDate(pb.date)}` }));
+        const setPos = (pct) => {
+          const p = Math.max(0, Math.min(100, pct));
+          over.style.clipPath = `inset(0 ${100 - p}% 0 0)`;
+          handle.style.left = `${p}%`;
+        };
+        setPos(50);
+        const move = (e) => { const r = wrap.getBoundingClientRect(); setPos(((e.clientX - r.left) / r.width) * 100); };
+        wrap.addEventListener('pointerdown', (e) => { wrap.setPointerCapture(e.pointerId); move(e); wrap.onpointermove = move; });
+        wrap.addEventListener('pointerup', () => { wrap.onpointermove = null; });
+        stage.appendChild(wrap);
+      }
+      const days = Math.round((Utils.parseISO(pb.date) - Utils.parseISO(pa.date)) / 86400000);
+      const wa = weightNear(pa.date); const wb = weightNear(pb.date);
+      let txt = `${days} días entre las dos fotos.`;
+      if (wa && wb) txt += ` Peso: ${Units.label(wa)} → ${Units.label(wb)} (${wb - wa >= 0 ? '+' : ''}${Utils.round1(Units.fromKg(wb - wa))} ${Units.current()}).`;
+      info.textContent = txt;
+    }
+    draw();
     Modal.open('Antes y ahora', body);
   }
 
@@ -178,7 +224,7 @@ const Photos = (() => {
         const same = list.filter((x) => x.angle === ang);
         if (same.length >= 2) {
           const cmp = Utils.el('button', { class: 'btn-primary btn-block', style: 'margin-top:10px;', text: 'Comparar primera y última' });
-          cmp.addEventListener('click', () => openCompare(same[0], same[same.length - 1]));
+          cmp.addEventListener('click', () => openCompare(same[0], same[same.length - 1], list));
           cmp.classList.add('cmp-quick');
           c.insertBefore(cmp, add);
         }

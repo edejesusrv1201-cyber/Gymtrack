@@ -389,6 +389,7 @@ const WorkoutView = (() => {
       up.disabled = idx === 0;
       down.disabled = idx === log.exercises.length - 1;
       add('📝  Nota y descanso de este ejercicio', () => { Modal.close(); openExerciseSettings(ex, rerender); });
+      if (!isCardio) add('🧮  Calcular discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w); });
       add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
       Modal.open(ex ? ex.name : 'Ejercicio', menu);
     };

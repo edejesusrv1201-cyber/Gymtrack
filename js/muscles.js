@@ -203,25 +203,74 @@ const Muscles = (() => {
     },
   };
 
-  const HEAD = '<circle cx="80" cy="24" r="14"/><path d="M73 36 L87 36 L88 47 L72 47 Z"/>';
-  const HAND = { front: '<ellipse cx="133" cy="166" rx="6" ry="9" transform="rotate(-8 133 166)"/>', back: '<ellipse cx="133" cy="166" rx="6" ry="9" transform="rotate(-8 133 166)"/>' };
-  const FOOT = '<ellipse cx="97" cy="340" rx="11" ry="6"/>';
+  // ---- cuerpo de hombre / mujer: la forma base se deforma por zonas (hombros, cintura, cadera, brazos) ----
+  const ARM_IDS = ['hombro_ant', 'hombro_lat', 'hombro_post', 'biceps', 'triceps', 'antebrazo'];
+  const BODY = {
+    // [y, factor horizontal del tronco y las piernas]; k = grosor de los brazos, dx = separación del tronco
+    M: { torso: [[0, 1], [44, 1.04], [70, 1.08], [95, 1.05], [128, 0.94], [150, 0.95], [168, 1.0], [200, 1.0], [245, 0.98], [340, 1]], k: 1.1, dx: 1, head: 14 },
+    F: { torso: [[0, 1], [44, 0.93], [70, 0.9], [95, 0.9], [128, 0.8], [150, 0.9], [168, 1.14], [190, 1.2], [220, 1.08], [245, 0.95], [300, 0.9], [340, 0.9]], k: 0.8, dx: 1.5, head: 12.5 },
+  };
+  // formas propias de la mujer (antes de deformar)
+  const F_OVERRIDE = { front: { pecho: 'M83 63 Q96 57 107 66 Q110 78 101 85 Q91 89 83 83 Z' } };
+
+  const lerpY = (pts, y) => {
+    for (let i = 1; i < pts.length; i += 1) {
+      if (y <= pts[i][0]) { const [y0, f0] = pts[i - 1]; const [y1, f1] = pts[i]; return f0 + ((f1 - f0) * (y - y0)) / (y1 - y0); }
+    }
+    return pts[pts.length - 1][1];
+  };
+  // aplica una función (x, y) → (x', y') a todas las coordenadas de un trazo (solo M, L, Q absolutos)
+  function warpPath(d, fn) {
+    return d.replace(/([MLQ])([^MLQZ]*)/g, (m, c, rest) => {
+      const n = rest.trim().split(/[\s,]+/).map(Number);
+      const out = [];
+      for (let i = 0; i < n.length; i += 2) { const p = fn(n[i], n[i + 1]); out.push(`${Math.round(p[0] * 10) / 10} ${Math.round(p[1] * 10) / 10}`); }
+      return c + out.join(' ');
+    });
+  }
+  const geoCache = {};
+  function geo(sex) {
+    if (geoCache[sex]) return geoCache[sex];
+    const cfg = BODY[sex];
+    const torso = (x, y) => [80 + (x - 80) * lerpY(cfg.torso, y), y];
+    const arm = (x, y) => [80 + (x - 80) * cfg.k + cfg.dx, y];
+    const g = { base: {}, shapes: {}, hand: [0, 0], foot: [0, 0], head: cfg.head };
+    ['front', 'back'].forEach((side) => {
+      g.base[side] = BASE[side].map((d, i) => warpPath(d, i === 1 || i === 2 ? arm : torso));
+      g.shapes[side] = {};
+      Object.keys(SHAPES[side]).forEach((id) => {
+        const src = (sex === 'F' && F_OVERRIDE[side] && F_OVERRIDE[side][id]) || SHAPES[side][id];
+        g.shapes[side][id] = warpPath(src, ARM_IDS.includes(id) ? arm : torso);
+      });
+    });
+    g.hand = [80 + 53 * cfg.k + cfg.dx, 166, 6 * Math.max(0.85, cfg.k)];
+    g.foot = [80 + 17 * lerpY(cfg.torso, 340), 340];
+    geoCache[sex] = g;
+    return g;
+  }
+  const currentSex = () => (DB.getSettings().sex === 'F' ? 'F' : 'M');
 
   // fills: { id: { color, opacity } }
   function bodySvg(fills, opts = {}) {
+    const sex = opts.sex || currentSex();
+    const G = geo(sex);
     const mirror = `transform="translate(${W} 0) scale(-1 1)"`;
+    const hand = `<ellipse cx="${G.hand[0].toFixed(1)}" cy="${G.hand[1]}" rx="${G.hand[2].toFixed(1)}" ry="9" transform="rotate(-8 ${G.hand[0].toFixed(1)} ${G.hand[1]})"/>`;
+    const foot = `<ellipse cx="${G.foot[0].toFixed(1)}" cy="${G.foot[1]}" rx="11" ry="6"/>`;
+    const head = `<circle cx="80" cy="24" r="${G.head}"/><path d="M73 36 L87 36 L88 47 L72 47 Z"/>${sex === 'F' ? '<circle cx="80" cy="8" r="6.5"/>' : ''}`;
     const view = (side) => {
-      const base = BASE[side].map((d) => `<path d="${d}"/>`).join('') + HAND[side] + FOOT;
-      const baseBoth = `<g class="bm-base">${HEAD}<g>${base}</g><g ${mirror}>${base}</g></g>`;
-      const mus = Object.keys(SHAPES[side]).map((id) => {
-        const d = SHAPES[side][id];
+      const base = G.base[side].map((d) => `<path d="${d}"/>`).join('') + hand + foot;
+      const baseBoth = `<g class="bm-base">${head}<g>${base}</g><g ${mirror}>${base}</g></g>`;
+      const mus = Object.keys(G.shapes[side]).map((id) => {
+        const d = G.shapes[side][id];
         const f = fills[id] || {};
         const style = f.color ? ` style="fill:${f.color};fill-opacity:${f.opacity === undefined ? 0.9 : f.opacity}"` : '';
         return `<g class="bm-m${f.color ? ' on' : ''}" data-m="${id}"${style}><path d="${d}"/><path d="${d}" ${mirror}/></g>`;
       }).join('');
-      const lines = side === 'front'
-        ? '<g class="bm-lines"><path d="M80 94 L80 154"/><path d="M82 106 L96 106 M82 119 L97 119 M82 132 L97 132"/><path d="M78 106 L64 106 M78 119 L63 119 M78 132 L63 132"/></g>'
-        : '<g class="bm-lines"><path d="M80 48 L80 160"/></g>';
+      let lines;
+      if (side === 'back') lines = '<g class="bm-lines"><path d="M80 48 L80 160"/></g>';
+      else if (sex === 'F') lines = '<g class="bm-lines"><path d="M80 98 L80 150"/></g>';
+      else lines = '<g class="bm-lines"><path d="M80 94 L80 154"/><path d="M82 106 L96 106 M82 119 L97 119 M82 132 L97 132"/><path d="M78 106 L64 106 M78 119 L63 119 M78 132 L63 132"/></g>';
       return `<g transform="translate(${side === 'front' ? 0 : 170} 0)">${baseBoth}${mus}${lines}</g>`;
     };
     const labels = '<text class="bm-cap" x="80" y="362" text-anchor="middle">FRENTE</text><text class="bm-cap" x="250" y="362" text-anchor="middle">ESPALDA</text>';
@@ -291,9 +340,26 @@ const Muscles = (() => {
 
   function card(opts = {}) {
     const wrap = Utils.el('div', { class: 'card bm-card' });
+    const sexBox = Utils.el('div', { class: 'sex-toggle' });
+    const paintSex = () => {
+      sexBox.innerHTML = '';
+      [['M', '♂', 'Hombre'], ['F', '♀', 'Mujer']].forEach(([k, sym, label]) => {
+        const b = Utils.el('button', { type: 'button', class: currentSex() === k ? 'on' : '', title: label, 'aria-label': label, text: sym });
+        b.addEventListener('click', () => {
+          const s = DB.getSettings();
+          s.sex = k;
+          DB.saveSettings(s);
+          paintSex();
+          firstDraw = true;
+          draw();
+        });
+        sexBox.appendChild(b);
+      });
+    };
+    paintSex();
     const head = Utils.el('div', { class: 'card-title-row' }, [
       Utils.el('h3', { text: '🧍 Mapa muscular' }),
-      Utils.el('span', { class: 'eyebrow', text: 'toca un músculo' }),
+      sexBox,
     ]);
     wrap.appendChild(head);
     const controls = Utils.el('div');

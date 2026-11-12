@@ -118,6 +118,13 @@ const App = (() => {
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     Theme.init();
     initNav();
+    // mientras haces scroll, el fondo animado se pausa: la pantalla se mueve fluida aunque el celular sea modesto
+    let scrollT = null;
+    window.addEventListener('scroll', () => {
+      document.documentElement.classList.add('scrolling');
+      clearTimeout(scrollT);
+      scrollT = setTimeout(() => document.documentElement.classList.remove('scrolling'), 180);
+    }, { passive: true });
     RestTimer.init();
     navigate('hoy');
     registerServiceWorker();

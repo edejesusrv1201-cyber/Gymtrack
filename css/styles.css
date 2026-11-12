@@ -1374,3 +1374,50 @@ p { line-height: 1.5; }
 .bm-home-line.ok { color: var(--green); }
 :root[data-ui="on"] .bm-host.fresh .bm-m.on { animation: bmpop .5s cubic-bezier(.2, 1.4, .4, 1) both; transform-box: fill-box; transform-origin: center; }
 @keyframes bmpop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+
+/* ============================================================
+   v31 — rendimiento: sin desenfoque en cada tarjeta y fondo pausado al hacer scroll
+   El desenfoque de "cristal" obliga al celular a recalcular el fondo detrás de cada
+   tarjeta en cada cuadro; con el fondo en movimiento eso lo hacía ir a tirones.
+   Se reemplaza por una base más sólida (se lee igual de bien y cuesta mucho menos).
+   ============================================================ */
+.card, .tile, .week-day, .stat-box, .btn-secondary, .action-row button, .quick-row button, .seg, .chip-btn, .pill, .link-btn.small, .banner, .bm-card-sel, .bm-sum, .rpe-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.card { background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)), rgba(16, 19, 27, max(var(--card-alpha), 0.86)); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24); }
+.tile { background: rgba(16, 19, 27, max(var(--card-alpha), 0.86)); }
+.week-day, .stat-box { background-color: rgba(16, 19, 27, 0.82); }
+.btn-secondary, .action-row button, .quick-row button, .seg, .chip-btn, .pill, .link-btn.small { background-color: rgba(18, 21, 30, 0.9); }
+.banner { background-color: rgba(16, 19, 28, 0.94); }
+.modal-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(4, 6, 10, 0.7); }
+.rest-panel { backdrop-filter: none; }
+html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::before, html.scrolling .bg-glow::after { animation-play-state: paused !important; }
+
+/* ---- interruptor hombre / mujer del mapa muscular ---- */
+.sex-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(18, 21, 30, 0.9); border: 1px solid var(--border-strong); }
+.sex-toggle button { width: 34px; height: 28px; border-radius: 999px; font-size: 1.05rem; font-weight: 800; color: var(--text-dim); background: none; padding: 0; line-height: 1; }
+.sex-toggle button.on { background: var(--accent-grad); color: var(--on-accent); }
+
+/* ---- comparador de fotos con deslizador ---- */
+.cmp-slider { position: relative; width: 100%; border-radius: 14px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background: #0b0d14; cursor: ew-resize; }
+.cmp-slider img { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; margin: 0 auto; pointer-events: none; }
+.cmp-slider .cmp-over { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: contain; }
+.cmp-handle { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 10px rgba(0, 0, 0, 0.6); transform: translateX(-1px); pointer-events: none; }
+.cmp-handle span { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #12151c; display: flex; align-items: center; justify-content: center; font-weight: 800; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5); }
+.cmp-tag { position: absolute; top: 8px; padding: 3px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; background: rgba(9, 11, 16, 0.72); color: #fff; pointer-events: none; }
+.cmp-tag.l { left: 8px; } .cmp-tag.r { right: 8px; }
+
+/* ---- calculadora de discos ---- */
+.plate-chips { flex-wrap: wrap; }
+.plate-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; font-size: 0.82rem; font-weight: 800; background: rgba(18, 21, 30, 0.9); border: 1px solid var(--border-strong); color: var(--text-dim); text-decoration: line-through; opacity: 0.6; }
+.plate-chip.on { color: var(--text); text-decoration: none; opacity: 1; border-color: rgba(var(--accent-rgb), 0.55); }
+.plate-chip i, .plate-row i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.plate-box { margin-top: 12px; padding: 14px; border-radius: 16px; background: rgba(14, 17, 25, 0.85); border: 1px solid var(--border-strong); }
+.plate-svg-wrap { display: flex; justify-content: center; }
+.plate-svg { width: 100%; max-height: 120px; }
+.plate-cap { text-align: center; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin: 6px 0 10px; }
+.plate-rows { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.plate-row { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); font-size: 1rem; }
+.plate-total { margin-top: 12px; text-align: center; font-size: 0.84rem; font-weight: 700; color: var(--green); }
+.plate-total.warn { color: var(--yellow); }
