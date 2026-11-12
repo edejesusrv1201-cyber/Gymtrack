@@ -105,11 +105,20 @@ const Progression = (() => {
     const reps = atTop.map((s) => Number(s.reps) || 0);
     const minReps = Math.min(...reps);
     const minStep = Units.toKg(Units.step(unit), unit);
+    // esfuerzo (RPE) de esas series, si lo anotaste
+    const rp = atTop.map((s) => Number(s.rpe) || 0).filter(Boolean);
+    const rpe = rp.length ? rp.reduce((a, b) => a + b, 0) / rp.length : null;
+    const inc = Math.max(minStep, roundLoad(W * 0.025, unit, true));
     if (atTop.length >= 2 && minReps >= hi) {
-      const inc = Math.max(minStep, roundLoad(W * 0.025, unit, true));
-      return { kind: 'progress', weightKg: W === 0 ? roundLoad(inc * 2, unit) : W + inc, reps: `${lo}-${hi}`, lastReps: minReps, unit };
+      // llegaste al tope pero al límite (RPE ≥ 9.5): consolida antes de subir
+      if (rpe !== null && rpe >= 9.5) return { kind: 'repeat', hold: true, rpe, weightKg: W, reps: `${hi}`, lastReps: minReps, unit };
+      return { kind: 'progress', weightKg: W === 0 ? roundLoad(inc * 2, unit) : W + inc, reps: `${lo}-${hi}`, lastReps: minReps, rpe, unit };
     }
-    return { kind: 'repeat', weightKg: W, reps: `${Math.min(hi, Math.max(lo, minReps + 1))}`, lastReps: minReps, unit };
+    // iba muy sobrado (RPE ≤ 7): se puede subir aunque no hayas llegado al tope de repeticiones
+    if (rpe !== null && rpe <= 7 && atTop.length >= 2 && minReps >= lo && W > 0) {
+      return { kind: 'progress', easy: true, weightKg: W + inc, reps: `${lo}-${hi}`, lastReps: minReps, rpe, unit };
+    }
+    return { kind: 'repeat', weightKg: W, reps: `${Math.min(hi, Math.max(lo, minReps + 1))}`, lastReps: minReps, rpe, unit };
   }
 
   // ---------------------------------------------------------------- descarga
@@ -140,7 +149,7 @@ const Progression = (() => {
     dates.forEach((d) => (wl[d].exercises || []).forEach((e) => (e.sets || []).forEach((s) => {
       if (!Metrics.isNormal(s) || !s.reps) return;
       total += 1;
-      if (s.felt === 'dificil' || s.felt === 'fallo') hard += 1;
+      if (s.felt === 'dificil' || s.felt === 'fallo' || Number(s.rpe) >= 10) hard += 1;
     })));
     if (dates.length >= 3 && total >= 15 && hard / total >= 0.5) {
       return { why: 'sensacion', text: `El ${Math.round((hard / total) * 100)}% de tus últimas series se sintieron pesadas o fallidas.` };

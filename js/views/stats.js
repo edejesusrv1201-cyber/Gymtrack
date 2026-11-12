@@ -107,7 +107,7 @@ const StatsView = (() => {
             const s = sessions[i];
             note.textContent = isCardio
               ? `${Utils.friendlyDate(s.date)} · ${Utils.round1(s.duration)} min${s.distance ? ` · ${Utils.round1(s.distance)} km` : ''}`
-              : `${Utils.friendlyDate(s.date)} · ${Units.label(s.weight)} × ${s.reps} · ${s.sets} serie${s.sets === 1 ? '' : 's'}`;
+              : `${Utils.friendlyDate(s.date)} · ${Units.label(s.weight)} × ${s.reps} · ${s.sets} serie${s.sets === 1 ? '' : 's'}${s.rpe ? ` · RPE ${Utils.round1(s.rpe)}` : ''}`;
           },
         });
       });
@@ -228,6 +228,9 @@ const StatsView = (() => {
       kpi('Volumen', Utils.compact(Units.fromKg(t.volume)), Units.current(), t.volume, p.volume, vs),
       kpi('Cardio', String(Math.round(t.minutes)), 'min', t.minutes, p.minutes, vs),
     ]));
+
+    // ---- mapa muscular (series o recuperación) ----
+    view.appendChild(Muscles.card());
 
     // ---- volumen por semana ----
     const weeks = Metrics.weeklySeries(8);

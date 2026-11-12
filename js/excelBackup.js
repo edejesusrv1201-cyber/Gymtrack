@@ -501,15 +501,16 @@ const ExcelBackup = (() => {
         { v: s.distance ? Number(s.distance) : '', s: grey, z: '0.00' },
         { v: s.calories ? Number(s.calories) : '', s: grey },
         { v: warm ? '' : FELT[s.felt] || '', s: grey },
+        { v: s.rpe ? Number(s.rpe) : '', s: Object.assign({ h: 'center' }, grey) },
         { v: vol > 0 ? Math.round(Units.fromKg(vol)) : '', z: '#,##0' },
         { v: e1 > 0 ? Units.num(e1) : '', z: '0.0' },
         { v: s.pr ? `🏆 ${String(s.pr).replace(',', ' y ')}` : '', s: { bold: true, color: accentHex() } },
       ];
     });
     return tableSheet(
-      ['Fecha', 'Día', 'Rutina', 'Ejercicio', 'Grupo', 'Tipo', 'Serie', `Peso (${units}, por lado si es unilateral)`, 'Reps', 'Duración (min)', 'Distancia (km)', 'Calorías', 'Sensación', `Volumen (${units})`, `1RM est. (${units})`, 'Récord'],
+      ['Fecha', 'Día', 'Rutina', 'Ejercicio', 'Grupo', 'Tipo', 'Serie', `Peso (${units}, por lado si es unilateral)`, 'Reps', 'Duración (min)', 'Distancia (km)', 'Calorías', 'Sensación', 'RPE', `Volumen (${units})`, `1RM est. (${units})`, 'Récord'],
       rows,
-      [{ w: 12 }, { w: 6, h: 'center' }, { w: 22 }, { w: 32 }, { w: 12 }, { w: 22 }, { w: 7 }, { w: 11 }, { w: 7 }, { w: 12 }, { w: 12 }, { w: 10 }, { w: 12 }, { w: 13 }, { w: 13 }, { w: 22 }],
+      [{ w: 12 }, { w: 6, h: 'center' }, { w: 22 }, { w: 32 }, { w: 12 }, { w: 22 }, { w: 7 }, { w: 11 }, { w: 7 }, { w: 12 }, { w: 12 }, { w: 10 }, { w: 12 }, { w: 7 }, { w: 13 }, { w: 13 }, { w: 22 }],
     );
   }
 
@@ -792,7 +793,7 @@ const ExcelBackup = (() => {
           entry.sets.forEach((set, sIdx) => {
             seriesRows.push({
               date, orden: idx, exerciseId: entry.exerciseId, fromRoutine: !!entry.fromRoutine, setIndex: sIdx,
-              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type, pr: set.pr, uni: set.uni ? 1 : undefined, bw: set.bw ? 1 : undefined, bwKg: set.bw ? set.bwKg : undefined,
+              weight: set.weight, reps: set.reps, duration: set.duration, distance: set.distance, calories: set.calories, felt: set.felt, type: set.type, pr: set.pr, rpe: set.rpe, uni: set.uni ? 1 : undefined, bw: set.bw ? 1 : undefined, bwKg: set.bw ? set.bwKg : undefined,
             });
           });
         }
@@ -934,6 +935,7 @@ const ExcelBackup = (() => {
         const set = { felt: r.felt || 'normal' };
         if (r.type === 'warmup' || r.type === 'drop') set.type = r.type;
         if (r.pr) set.pr = String(r.pr);
+        if (num(r.rpe) >= 5 && num(r.rpe) <= 10) set.rpe = num(r.rpe);
         if (r.uni === 1 || r.uni === '1' || r.uni === true) set.uni = true;
         if (r.bw === 1 || r.bw === '1' || r.bw === true) { set.bw = true; set.bwKg = num(r.bwKg) || 0; }
         if (r.duration !== undefined && r.duration !== '') {

@@ -539,6 +539,9 @@ const TodayView = (() => {
     const gapCard = renderGaps(rerender);
     if (gapCard) view.appendChild(gapCard);
 
+    const bodyCard = Muscles.homeCard();
+    if (bodyCard) view.appendChild(bodyCard);
+
     view.appendChild(renderWeek(workoutLog, rerender));
 
     const hist = Utils.el('button', { class: 'btn-secondary', text: '🕘 Historial' });

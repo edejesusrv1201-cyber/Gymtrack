@@ -280,6 +280,8 @@ const Gamify = (() => {
       tile(String(sets), 'series'),
       tile(`${Utils.compact(Units.fromKg(vol))} ${Units.current()}`, 'volumen'),
     ]));
+    const mini = Muscles.dayMini(iso);
+    if (mini) body.appendChild(mini);
     if (prList.length) {
       body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:6px;', text: `Récords (${prList.length})` }));
       prList.forEach((p) => body.appendChild(Utils.el('div', { class: 'sum-pr' }, [Utils.el('span', { text: '🏆' }), Utils.el('span', { text: `${p.name} · ${p.kinds.map((k) => ({ peso: 'peso', reps: 'repeticiones', tiempo: 'tiempo', distancia: 'distancia' }[k] || k)).join(' y ')}` })])));

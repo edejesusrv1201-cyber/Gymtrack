@@ -157,6 +157,7 @@ const Metrics = (() => {
         e1rm: Math.max(...work.map((s) => e1rm(loadOf(s), s.reps))),
         volume: entry.sets.reduce((s, x) => s + volumeOfSet(x), 0),
         sets: work.length,
+        rpe: (() => { const r = work.map((x) => Number(x.rpe) || 0).filter(Boolean); return r.length ? r.reduce((a, b) => a + b, 0) / r.length : null; })(),
       });
     });
     return rows;

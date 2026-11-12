@@ -18,6 +18,32 @@ const WorkoutView = (() => {
     { key: 'drop', label: 'Dropset' },
   ];
 
+  // esfuerzo percibido (RPE 6–10): cuántas repeticiones te quedaban al terminar la serie
+  const RPE_OPTS = [[6, '≤6', 'sobrado'], [7, '7', '≈3 reps en reserva'], [8, '8', '≈2 reps en reserva'], [9, '9', '≈1 rep en reserva'], [10, '10', 'al fallo']];
+  const rpeText = (v) => { const o = RPE_OPTS.find((x) => x[0] === v); return o ? `RPE ${o[1]} · ${o[2]}` : ''; };
+  function rpeControl(getV, setV) {
+    const wrap = Utils.el('div', { class: 'rpe-wrap' });
+    const row = Utils.el('div', { class: 'rpe-row' });
+    const hint = Utils.el('div', { class: 'rpe-hint' });
+    const paint = () => {
+      row.querySelectorAll('.rpe-btn').forEach((b) => b.classList.toggle('selected', Number(b.dataset.v) === getV()));
+      hint.textContent = getV() ? rpeText(getV()) : 'Opcional: ¿cuántas repeticiones te quedaban?';
+      hint.classList.toggle('on', !!getV());
+    };
+    RPE_OPTS.forEach(([v, lbl]) => {
+      const b = Utils.el('button', { class: `rpe-btn r${v}`, type: 'button', 'data-v': String(v), text: lbl });
+      b.addEventListener('click', () => { setV(getV() === v ? 0 : v); paint(); });
+      row.appendChild(b);
+    });
+    wrap.appendChild(Utils.el('div', { class: 'rpe-label', text: 'Esfuerzo (RPE)' }));
+    wrap.appendChild(row);
+    wrap.appendChild(hint);
+    paint();
+    return wrap;
+  }
+  // el último RPE usado por ejercicio y día (para no marcarlo en cada serie)
+  const rpeMemory = {};
+
   // Un solo ejercicio abierto a la vez (el "activo"); los demás son filas compactas.
   // activo por fecha: exerciseId
   const activeByDate = {};
@@ -452,6 +478,7 @@ const WorkoutView = (() => {
         badge,
         Utils.el('span', { class: 'set-main', text: mainLabel }),
         set.pr ? Utils.el('span', { title: `Récord de ${set.pr.replace(',', ' y ')}`, text: '🏆' }) : null,
+        set.rpe ? Utils.el('span', { class: `set-rpe r${set.rpe}`, title: rpeText(set.rpe), text: `RPE ${set.rpe}` }) : null,
         Metrics.isWarmup(set) ? Utils.el('span', { class: 'set-felt', text: 'aprox.' }) : Utils.el('span', { class: 'set-felt', text: `${feltOpt.icon} ${feltOpt.label}` }),
         Utils.el('button', { class: 'icon-btn', text: '✏️', title: 'Editar esta serie', onclick: () => openEditSet(iso, log, entry, sIdx, ex, isCardio, rerender) }),
         Utils.el('button', { class: 'icon-btn', text: '✕', onclick: () => {
@@ -604,6 +631,8 @@ const WorkoutView = (() => {
       feltRow.appendChild(b);
     });
     feltWrap.appendChild(feltRow);
+    let rpeSelected = !isCardio ? (rpeMemory[key] || 0) : 0;
+    if (!isCardio) feltWrap.appendChild(rpeControl(() => rpeSelected, (v) => { rpeSelected = v; }));
     form.appendChild(feltWrap);
     if (form.refreshType) form.refreshType();
     if (form.paintUni) form.paintUni();
@@ -637,6 +666,9 @@ const WorkoutView = (() => {
       }
       const set = { weight, reps, felt: typeSelected === 'warmup' ? 'normal' : feltSelected };
       if (typeSelected !== 'normal') set.type = typeSelected;
+      if (typeSelected !== 'warmup') {
+        if (rpeSelected) { set.rpe = rpeSelected; rpeMemory[key] = rpeSelected; } else delete rpeMemory[key];
+      }
       if (uniSelected) set.uni = true;
       if (bwSelected) {
         set.bw = true;
@@ -651,7 +683,7 @@ const WorkoutView = (() => {
       if (typeSelected === 'drop') typeMemory[key] = 'drop';
       else delete typeMemory[key];
       // descanso solo tras una serie efectiva (las aproximaciones y los drops van seguidos)
-      if (typeSelected === 'normal') RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault);
+      if (typeSelected === 'normal' && DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : '');
       rerender();
       Celebrate.record(prs, ex ? ex.name : '');
     });
@@ -667,7 +699,11 @@ const WorkoutView = (() => {
           : sg.kind === 'return'
           ? `↩ Vuelves tras ${sg.weeks} sem sin este ejercicio: empieza con ~${lbl} × ${sg.reps} (≈${sg.pct}% de tu mejor)`
           : sg.kind === 'progress'
-            ? `📈 Sube hoy a ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps} (la última vez hiciste ${sg.lastReps}+ reps en todas)`
+            ? (sg.easy
+            ? `📈 Sube hoy a ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps} (la última vez fue sobrado: RPE ${Math.round(sg.rpe * 10) / 10})`
+            : `📈 Sube hoy a ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps} (la última vez hiciste ${sg.lastReps}+ reps en todas)`)
+          : sg.hold
+            ? `🎯 Repite ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps}: llegaste al tope pero casi al fallo (RPE ${Math.round(sg.rpe * 10) / 10}). Consolida antes de subir`
             : `🎯 Hoy: ${lbl}${ex.bodyweight ? ' extra' : ''} × ${sg.reps}`;
         const sgBtn = Utils.el('button', { type: 'button', class: `sugg-line ${sg.kind}`, text });
         sgBtn.addEventListener('click', () => {
@@ -717,6 +753,8 @@ const WorkoutView = (() => {
       feltRow.appendChild(b);
     });
     feltWrap.appendChild(feltRow);
+    let rpe = set.rpe || 0;
+    if (!isCardio) feltWrap.appendChild(rpeControl(() => rpe, (v) => { rpe = v; }));
 
     if (isCardio) {
       durIn = Utils.el('input', { type: 'number', inputmode: 'decimal', value: set.duration !== undefined ? String(set.duration) : '' });
@@ -803,6 +841,7 @@ const WorkoutView = (() => {
         next.weight = Units.toKg(entered, unit);
         next.reps = reps;
         if (type !== 'normal') next.type = type;
+        if (rpe && type !== 'warmup') next.rpe = rpe;
         if (uni) next.uni = true;
         if (bw) { next.bw = true; next.bwKg = set.bwKg || Metrics.bodyWeightKg(iso); }
       }

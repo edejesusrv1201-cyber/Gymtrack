@@ -140,6 +140,30 @@ const MoreView = (() => {
     const restInput = Utils.el('input', { type: 'number', value: settings.restDefault });
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Descanso por defecto entre series (segundos)' }), restInput]));
 
+    // interruptores que se guardan al instante
+    const onOff = (label, key, hint) => {
+      const holder = Utils.el('div', { class: 'field' });
+      const paint = () => {
+        holder.innerHTML = '';
+        holder.appendChild(Utils.el('label', { text: label }));
+        const cur = DB.getSettings()[key] === false ? 'off' : 'on';
+        holder.appendChild(Utils.segmented([{ key: 'on', label: 'Sí' }, { key: 'off', label: 'No' }], cur, (k) => {
+          const s = DB.getSettings();
+          s[key] = k === 'on';
+          DB.saveSettings(s);
+          if (typeof RestTimer !== 'undefined') RestTimer.syncWake();
+          paint();
+        }, true));
+        if (hint) holder.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:4px;', text: hint }));
+      };
+      paint();
+      return holder;
+    };
+    settingsCard.appendChild(onOff('Iniciar el descanso al registrar una serie', 'restAuto'));
+    settingsCard.appendChild(onOff('Sonido y vibración al terminar el descanso', 'restSound'));
+    settingsCard.appendChild(onOff('Mantener la pantalla encendida al entrenar', 'keepAwake',
+      RestTimer.wakeSupported() ? 'Solo mientras estás en el entrenamiento o descansando, para que no se bloquee entre series.' : 'Tu navegador no permite mantener la pantalla encendida.'));
+
     const kcalInput = Utils.el('input', { type: 'number', value: settings.calorieGoal });
     const proteinInput = Utils.el('input', { type: 'number', value: settings.proteinGoal });
     const carbInput = Utils.el('input', { type: 'number', value: settings.carbGoal });

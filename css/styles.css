@@ -1316,3 +1316,61 @@ p { line-height: 1.5; }
 :root[data-ui="on"] .badge-tile.done .badge { animation: glow 3.2s ease-in-out infinite; }
 :root[data-ui="on"] .list-item:active, :root[data-ui="on"] .meal-row:active, :root[data-ui="on"] .food-row:active, :root[data-ui="on"] .ex-row:active { background: rgba(255, 255, 255, 0.06); transition: background .1s; }
 @media (prefers-reduced-motion: reduce) { :root[data-ui="off"] *, :root[data-ui="off"] *::before, :root[data-ui="off"] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
+
+/* ============================================================
+   v30 — temporizador con anillo, RPE y mapa muscular
+   ============================================================ */
+/* ---- temporizador ---- */
+.rest-fab { position: relative; overflow: hidden; }
+.rest-fab-prog { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: rgba(255, 255, 255, 0.75); transition: width .3s linear; }
+.rest-fab.paused { background: linear-gradient(135deg, #8a93a8, #aab2c6); box-shadow: none; }
+.rest-ring { position: relative; width: 150px; height: 150px; margin: 4px auto 12px; }
+.rest-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.rest-ring .rr-bg { fill: none; stroke: rgba(255, 255, 255, 0.08); stroke-width: 7; }
+.rest-ring .rr-fg { fill: none; stroke: #35d49a; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset .3s linear; }
+.rest-ring .rest-display { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+.rest-display.idle { color: var(--text-dim); }
+.rest-display.last { color: #ffc247; animation: flash .5s ease infinite; }
+.rest-presets { grid-template-columns: repeat(3, 1fr); }
+
+/* ---- RPE ---- */
+.rpe-wrap { margin-top: 10px; }
+.rpe-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+.rpe-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.rpe-btn { padding: 9px 0; border-radius: 12px; font-weight: 800; font-size: 0.9rem; background: rgba(14, 17, 25, 0.72); border: 1px solid var(--border-strong); color: var(--text-dim); }
+.rpe-btn.selected { color: #12151c; border-color: transparent; }
+.rpe-btn.selected.r6 { background: #7be0b0; }
+.rpe-btn.selected.r7 { background: #35d49a; }
+.rpe-btn.selected.r8 { background: #ffd23f; }
+.rpe-btn.selected.r9 { background: #ff9f43; }
+.rpe-btn.selected.r10 { background: #ff5c6c; }
+.rpe-hint { margin-top: 6px; font-size: 0.76rem; color: var(--text-dim); min-height: 1.1em; }
+.rpe-hint.on { color: var(--text); font-weight: 700; }
+.set-rpe { font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 999px; color: #12151c; background: #35d49a; white-space: nowrap; }
+.set-rpe.r6 { background: #7be0b0; } .set-rpe.r7 { background: #35d49a; } .set-rpe.r8 { background: #ffd23f; }
+.set-rpe.r9 { background: #ff9f43; } .set-rpe.r10 { background: #ff5c6c; }
+
+/* ---- mapa muscular ---- */
+.bm-host { margin: 10px auto 0; max-width: 360px; }
+.bodymap { width: 100%; height: auto; display: block; overflow: visible; -webkit-tap-highlight-color: transparent; }
+.bodymap .bm-base { fill: rgba(255, 255, 255, 0.06); stroke: rgba(255, 255, 255, 0.14); stroke-width: 0.8; }
+.bodymap .bm-m { fill: rgba(255, 255, 255, 0.09); stroke: rgba(255, 255, 255, 0.2); stroke-width: 0.7; stroke-linejoin: round; cursor: pointer; transition: fill-opacity .25s, filter .2s; }
+.bodymap .bm-m:active { filter: brightness(1.25); }
+.bodymap .bm-m.sel { stroke: #fff; stroke-width: 1.6; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55)); }
+.bodymap .bm-lines { fill: none; stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.9; stroke-linecap: round; pointer-events: none; }
+.bodymap .bm-cap { fill: var(--text-dim); font-size: 9px; font-weight: 800; letter-spacing: 0.14em; }
+.bodymap.mini .bm-m { cursor: default; }
+.bm-legend { justify-content: center; }
+.bm-card-sel { margin-top: 10px; padding: 12px; border-radius: 14px; background: rgba(14, 17, 25, 0.72); border: 1px solid var(--border-strong); }
+.bm-badge { font-size: 0.74rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+.bm-sum { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 10px 12px; border-radius: 14px; background: rgba(14, 17, 25, 0.6); border: 1px solid var(--border); }
+.bm-sum-map { width: 96px; flex: none; }
+.bm-sum-txt { min-width: 0; }
+.bm-sum-list { font-weight: 700; font-size: 0.88rem; margin-top: 4px; line-height: 1.35; }
+.bm-home { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; color: var(--text); }
+.bm-home-map { width: 84px; flex: none; }
+.bm-home-txt { min-width: 0; flex: 1; }
+.bm-home-line { font-size: 0.84rem; font-weight: 700; margin-top: 3px; line-height: 1.3; }
+.bm-home-line.ok { color: var(--green); }
+:root[data-ui="on"] .bm-host.fresh .bm-m.on { animation: bmpop .5s cubic-bezier(.2, 1.4, .4, 1) both; transform-box: fill-box; transform-origin: center; }
+@keyframes bmpop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
