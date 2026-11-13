@@ -95,7 +95,7 @@ const Leaderboard = (() => {
   const bestOfExercise = (id) => bestFor((e) => e.id === id);
 
   // ---------------------------------------------------------------- pantalla
-  let ui = { sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
+  let ui = { joining: false, sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
   let rootRef = null;
   const refresh = () => { if (rootRef) render(rootRef); };
 
@@ -106,8 +106,8 @@ const Leaderboard = (() => {
     root.appendChild(view);
     if (!configured()) return renderSetup(view);
     const u = user();
-    if (!u) return renderJoin(view);
-    renderMain(view, u);
+    if (!u && ui.joining) return renderJoin(view);
+    renderMain(view, u);          // sin usuario también se pueden ver las listas
   }
 
   // --- sin servidor
@@ -175,7 +175,7 @@ const Leaderboard = (() => {
           const r = mode === 'new' ? await rpc('gt_register', { p_name: n, p_sex: sex, p_pass: pass.value || null }) : await rpc('gt_login', { p_name: n, p_pass: pass.value });
           setUser({ id: r.id, secret: r.secret, name: r.name, sex: r.sex || null });
           Utils.toast(mode === 'new' ? `¡Bienvenido, ${r.name}!` : `Hola de nuevo, ${r.name}`);
-          ui.mine = []; ui.list = null;
+          ui.mine = []; ui.list = null; ui.joining = false;
           refresh();
         } catch (e) {
           msg.textContent = e.message; msg.classList.remove('hidden');
@@ -183,6 +183,7 @@ const Leaderboard = (() => {
         }
       });
       card.appendChild(go);
+      card.appendChild(Utils.el('button', { class: 'link-btn small', type: 'button', style: 'margin-top:10px;', text: '← Solo ver el ranking', onclick: () => { ui.joining = false; refresh(); } }));
     }
     paint();
   }
@@ -190,13 +191,20 @@ const Leaderboard = (() => {
   // --- usuario dentro
   function renderMain(view, u) {
     const head = Utils.el('div', { class: 'card lb-head' });
-    head.appendChild(Utils.el('div', { class: 'flex-between' }, [
-      Utils.el('div', {}, [Utils.el('div', { class: 'eyebrow', text: '🌍 Ranking global' }), Utils.el('h3', { class: 'mb-0', text: `${u.name}${u.sex === 'M' ? ' ♂' : u.sex === 'F' ? ' ♀' : ''}` })]),
-      Utils.el('button', { class: 'btn-small', type: 'button', text: 'Cuenta', onclick: () => openAccount(u) }),
-    ]));
+    if (u) {
+      head.appendChild(Utils.el('div', { class: 'flex-between' }, [
+        Utils.el('div', {}, [Utils.el('div', { class: 'eyebrow', text: '🌍 Ranking global' }), Utils.el('h3', { class: 'mb-0', text: `${u.name}${u.sex === 'M' ? ' ♂' : u.sex === 'F' ? ' ♀' : ''}` })]),
+        Utils.el('button', { class: 'btn-small', type: 'button', text: 'Cuenta', onclick: () => openAccount(u) }),
+      ]));
+    } else {
+      head.appendChild(Utils.el('div', { class: 'eyebrow', text: '🌍 Ranking global' }));
+      head.appendChild(Utils.el('p', { class: 'small', style: 'margin:6px 0 10px;', text: 'Mira las listas cuando quieras. Para publicar tus marcas y salir en ellas, crea un usuario (solo un nombre, sin correo).' }));
+      head.appendChild(Utils.el('button', { class: 'btn-primary btn-block', type: 'button', text: '➕ Crear usuario / Entrar', onclick: () => { ui.joining = true; refresh(); } }));
+    }
     view.appendChild(head);
 
     view.appendChild(boardCard(u));
+    if (!u) return;
     const mineHost = Utils.el('div');
     view.appendChild(mineHost);
     paintMine(mineHost, u);
@@ -244,7 +252,7 @@ const Leaderboard = (() => {
       body.innerHTML = '';
       if (!rows.length) { body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'text-align:center;padding:14px 0;', text: 'Nadie ha publicado esta marca todavía. ¡Sé la primera persona!' })); return; }
       rows.forEach((r) => {
-        const me = norm(r.name) === norm(u.name);
+        const me = !!u && norm(r.name) === norm(u.name);
         const medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : String(r.rank);
         body.appendChild(Utils.el('div', { class: `lb-row${me ? ' me' : ''}` }, [
           Utils.el('div', { class: 'lb-rank', text: medal }),
@@ -381,7 +389,7 @@ const Leaderboard = (() => {
     const body = Utils.el('div');
     body.appendChild(Utils.el('p', { text: `Sesión: ${u.name}${u.sex === 'M' ? ' (hombre)' : u.sex === 'F' ? ' (mujer)' : ''}` }));
     const out = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', text: 'Cerrar sesión en este celular' });
-    out.addEventListener('click', () => { setUser(null); ui.mine = []; Modal.close(); refresh(); });
+    out.addEventListener('click', () => { setUser(null); ui.mine = []; ui.joining = false; Modal.close(); refresh(); });
     const del = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:8px;color:var(--red);', text: '🗑️ Borrar mi usuario y todas mis marcas' });
     del.addEventListener('click', async () => {
       if (!Utils.confirmDialog('Se borrará tu usuario y todas tus marcas publicadas. No se puede deshacer. ¿Continuar?')) return;
