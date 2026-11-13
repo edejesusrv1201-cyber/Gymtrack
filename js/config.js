@@ -5,6 +5,6 @@
    a las tablas, solo a las funciones del ranking.
    ============================================================ */
 window.GT_CONFIG = {
-  supabaseUrl: '',   // ej. https://abcdxyz.supabase.co
-  supabaseKey: '',   // clave pública (anon o publishable)
+  supabaseUrl: 'https://hbcruzvypyzuqyabjskx.supabase.co',
+  supabaseKey: 'sb_publishable_UxH6DEYxMsSTdCOEcORyzg_LoXGDbrP',   // clave pública (publishable)
 };
