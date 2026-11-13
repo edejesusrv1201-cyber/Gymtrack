@@ -16,6 +16,7 @@ const ProgressView = (() => {
         { key: 'cuerpo', label: '📏 Cuerpo' },
         { key: 'nutricion', label: '🍽️ Nutrición' },
         { key: 'logros', label: '🏆 Logros' },
+        { key: 'ranking', label: '🌍 Ranking' },
       ],
       section,
       (k) => { section = k; render(root); },
@@ -28,6 +29,7 @@ const ProgressView = (() => {
     if (section === 'cuerpo') MeasurementsView.render(body);
     else if (section === 'nutricion') StatsView.renderNutrition(body);
     else if (section === 'logros') RewardsView.render(body);
+    else if (section === 'ranking') Leaderboard.render(body);
     else StatsView.renderTraining(body);
   }
 

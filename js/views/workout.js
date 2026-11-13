@@ -394,8 +394,8 @@ const WorkoutView = (() => {
       up.disabled = idx === 0;
       down.disabled = idx === log.exercises.length - 1;
       add('📝  Nota y descanso de este ejercicio', () => { Modal.close(); openExerciseSettings(ex, rerender); });
-      if (ex && !isCardio && !ex.bodyweight) add('🔥  Calentamiento sugerido', () => { Modal.close(); startWarmup(); });
-      if (!isCardio) add('🧮  Calcular discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w); });
+      if (ex && !isCardio && !ex.bodyweight) add('🔥  Agregar calentamiento completo', () => { Modal.close(); startWarmup(); });
+      if (!isCardio) add('🧮  Calcular discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w, { onUse: (kg) => { if (weightInput) weightInput.value = String(Units.num(kg, inputUnit)); } }); });
       add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
       Modal.open(ex ? ex.name : 'Ejercicio', menu);
     };
@@ -743,10 +743,54 @@ const WorkoutView = (() => {
         },
       });
     }
-    if (ex && !isCardio && !ex.bodyweight && workingN === 0 && warmN === 0) {
-      const wuBtn = Utils.el('button', { type: 'button', class: 'sugg-line warmup', text: '🔥 Calentamiento sugerido (aproximaciones)' });
-      wuBtn.addEventListener('click', startWarmup);
-      card.appendChild(wuBtn);
+    // peso de trabajo de hoy (lo escrito arriba, si no la sugerencia o tu última marca) en kg
+    function workKgToday() {
+      let kg = 0;
+      const typed = weightInput ? parseFloat(weightInput.value) : NaN;
+      if (typed > 0 && !bwSelected && !uniSelected) kg = Units.toKg(typed, inputUnit);
+      if (!kg && ex && !bwSelected) {
+        const sg = Progression.suggest(ex.id, { unit: inputUnit, range: target ? Progression.parseRange(target.targetReps) : [8, 12] });
+        if (sg) kg = sg.weightKg;
+      }
+      if (!kg && prev && !prev.best.bw) kg = Metrics.loadOf(prev.best);
+      return kg;
+    }
+    if (ex && !isCardio && !ex.bodyweight) {
+      const tools = Utils.el('div', { class: 'ex-tools' });
+      if (workingN === 0) {
+        const flowNode = Warmup.flow({
+          key, name: ex.name, unit: inputUnit,
+          getWorkKg: workKgToday,
+          doneKgs: entry.sets.filter(Metrics.isWarmup).map((s) => Number(s.weight) || 0),
+          onDone: (kg, reps) => {
+            const o = { weight: kg, reps, felt: 'normal', type: 'warmup' };
+            if (uniSelected) o.uni = true;
+            entry.sets.push(o);
+            saveLog(iso, log);
+            Utils.vibrate(30);
+          },
+          rerender,
+        });
+        weightInput.addEventListener('input', flowNode.refresh);
+        tools.appendChild(flowNode);
+      }
+      const prBtn = Utils.el('button', { type: 'button', class: 'sugg-line prcalc', text: '🎯 Sacar PR · estimar el peso' });
+      prBtn.addEventListener('click', () => {
+        const refSet = [...entry.sets].reverse().find(Metrics.isNormal);
+        PRCalc.open({
+          ex, exerciseId: entry.exerciseId, unit: inputUnit,
+          ref: refSet && !refSet.bw ? { kg: Number(refSet.weight) || 0, reps: Number(refSet.reps) || 0, rpe: refSet.rpe || 0 } : (prev && !prev.best.bw ? { kg: Metrics.loadOf(prev.best), reps: Number(prev.best.reps) || 0, rpe: prev.best.rpe || 0 } : null),
+          onUse: (kg, reps) => {
+            typeSelected = 'normal';
+            if (form.refreshType) form.refreshType();
+            weightInput.value = String(Units.num(kg, inputUnit));
+            repsInput.value = String(reps);
+            Utils.toast(`🎯 Intento de PR: ${Units.num(kg, inputUnit)}${inputUnit} × ${reps}`);
+          },
+        });
+      });
+      tools.appendChild(prBtn);
+      card.appendChild(tools);
     }
     card.appendChild(form);
 
