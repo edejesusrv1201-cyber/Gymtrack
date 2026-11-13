@@ -55,19 +55,71 @@ const Plates = (() => {
     return { list, per, made: Math.round((bar + used * 2) * 100) / 100, exact: rest < 0.001, rest };
   }
 
+  // Dibujo a escala (1 unidad = 1 mm): barra olímpica de 2.2 m con discos de ~45 cm, o mancuerna ajustable.
+  // El grosor de los discos va un poco exagerado para que se vean, pero el largo y el diámetro son reales.
+  const BAR_D_KG = { 25: 450, 20: 450, 15: 450, 10: 450, 5: 230, 2.5: 185, 1.25: 150, 0.5: 115 };
+  const BAR_D_LB = { 45: 450, 35: 410, 25: 340, 10: 260, 5: 210, 2.5: 165, 1.25: 135 };
+  const BAR_T = [42, 36, 31, 26, 20, 16, 12, 9];          // grosor según lo grande que es el disco (del más pesado al más ligero)
+  const DB_D = [210, 172, 138, 108, 86];
+  const DB_T = [40, 33, 27, 21, 16];
+
   function barSvg(list, unit, type) {
+    const isDb = type === 'db';
+    const all = setOf(unit, type).plates.slice().sort((x, y) => y - x);
     const flat = [];
     list.forEach(([p, n]) => { for (let i = 0; i < n; i += 1) flat.push(p); });
-    const top = type === 'db' ? 10 : (unit === 'lb' ? 45 : 25);
-    const hOf = (p) => 34 + 76 * Math.sqrt(p / top);
-    let x = 40; let parts = '';
+    flat.sort((x, y) => y - x);                             // el más grande pegado al tope, los chicos por fuera
+    const dOf = (p) => (isDb ? DB_D[Math.min(DB_D.length - 1, all.indexOf(p))] : (unit === 'lb' ? BAR_D_LB : BAR_D_KG)[p] || 150);
+    const tOf = (p) => (isDb ? DB_T : BAR_T)[Math.min((isDb ? DB_T : BAR_T).length - 1, Math.max(0, all.indexOf(p)))];
+    const W = isDb ? 700 : 2200;
+    const H = isDb ? 250 : 480;
+    const cy = H / 2;
+    const inner = isDb ? 250 : 440;                         // dónde empieza el tope de discos (por lado)
+    const room = inner - (isDb ? 22 : 40);                  // espacio disponible hacia afuera
+    const gap = isDb ? 2 : 3;
+    const raw = flat.reduce((a, p) => a + tOf(p) + gap, 0);
+    const k = raw > room - 30 ? (room - 30) / raw : 1;       // si hay muchísimos discos, se aprietan
+    let defs = '<defs>'
+      + '<linearGradient id="gtPlate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset=".3" stop-color="#fff" stop-opacity="0"/><stop offset=".72" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></linearGradient>'
+      + '<linearGradient id="gtSteel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3e7f0"/><stop offset=".45" stop-color="#a3abbd"/><stop offset="1" stop-color="#5f677a"/></linearGradient>'
+      + '</defs>';
+    let steel = ''; let plates = '';
+    const shaftH = isDb ? 30 : 30;
+    const sleeveH = isDb ? 30 : 50;
+    if (isDb) {
+      // mango + topes
+      steel += `<rect x="${inner}" y="${cy - shaftH / 2}" width="${W - 2 * inner}" height="${shaftH}" rx="8" fill="url(#gtSteel)"/>`;
+      for (let i = 0; i < 6; i += 1) steel += `<rect x="${inner + 40 + i * 20}" y="${cy - shaftH / 2 + 3}" width="3" height="${shaftH - 6}" fill="#000" opacity=".22"/>`;
+      steel += `<rect x="${inner - 26}" y="${cy - 62}" width="26" height="124" rx="8" fill="url(#gtSteel)" stroke="rgba(0,0,0,.4)"/>`;
+      steel += `<rect x="${W - inner}" y="${cy - 62}" width="26" height="124" rx="8" fill="url(#gtSteel)" stroke="rgba(0,0,0,.4)"/>`;
+      steel += `<rect x="${inner - 70}" y="${cy - 12}" width="46" height="24" rx="6" fill="url(#gtSteel)"/><rect x="${W - inner + 24}" y="${cy - 12}" width="46" height="24" rx="6" fill="url(#gtSteel)"/>`;
+    } else {
+      // barra completa: manga izquierda, eje central con marcas de agarre, manga derecha
+      steel += `<rect x="0" y="${cy - sleeveH / 2}" width="${W}" height="${sleeveH}" rx="6" fill="url(#gtSteel)" stroke="rgba(0,0,0,.35)"/>`;
+      steel += `<rect x="${inner + 30}" y="${cy - shaftH / 2}" width="${W - 2 * inner - 60}" height="${shaftH}" fill="url(#gtSteel)"/>`;
+      [695, 1505].forEach((x) => { steel += `<rect x="${x}" y="${cy - shaftH / 2}" width="7" height="${shaftH}" fill="#000" opacity=".35"/>`; });
+      steel += `<rect x="${W / 2 - 150}" y="${cy - shaftH / 2 + 3}" width="300" height="${shaftH - 6}" fill="#000" opacity=".16"/>`;
+      // topes fijos junto al eje
+      steel += `<rect x="${inner}" y="${cy - 38}" width="24" height="76" rx="4" fill="url(#gtSteel)" stroke="rgba(0,0,0,.4)"/>`;
+      steel += `<rect x="${W - inner - 24}" y="${cy - 38}" width="24" height="76" rx="4" fill="url(#gtSteel)" stroke="rgba(0,0,0,.4)"/>`;
+    }
+    const startL = isDb ? inner - 26 : inner;               // las mancuernas apoyan en el tope exterior
+    let xl = startL - 2; let xr = W - startL + 2;
     flat.forEach((p) => {
-      const h = Math.min(116, hOf(p)); const w = p >= 10 ? 15 : p >= 2.5 ? 11 : 8;
-      parts += `<rect x="${x}" y="${60 - h / 2}" width="${w}" height="${h}" rx="3" fill="${colorOf(p, unit)}" stroke="rgba(0,0,0,.45)" stroke-width="1"/>`;
-      x += w + 2;
+      const h = dOf(p); const t = Math.max(5, Math.round(tOf(p) * k));
+      const col = colorOf(p, unit);
+      plates += `<rect x="${xl - t}" y="${cy - h / 2}" width="${t}" height="${h}" rx="${isDb ? 6 : 8}" fill="${col}" stroke="rgba(0,0,0,.5)" stroke-width="2"/>`
+        + `<rect x="${xl - t}" y="${cy - h / 2}" width="${t}" height="${h}" rx="${isDb ? 6 : 8}" fill="url(#gtPlate)"/>`;
+      plates += `<rect x="${xr}" y="${cy - h / 2}" width="${t}" height="${h}" rx="${isDb ? 6 : 8}" fill="${col}" stroke="rgba(0,0,0,.5)" stroke-width="2"/>`
+        + `<rect x="${xr}" y="${cy - h / 2}" width="${t}" height="${h}" rx="${isDb ? 6 : 8}" fill="url(#gtPlate)"/>`;
+      xl -= t + Math.max(1, Math.round(gap * k)); xr += t + Math.max(1, Math.round(gap * k));
     });
-    const end = Math.max(x + 14, 150);
-    return `<svg viewBox="0 0 ${end + 10} 120" class="plate-svg" role="img" aria-label="Discos por lado"><rect x="0" y="56" width="${end + 10}" height="8" rx="3" fill="#8d95a8"/><rect x="26" y="40" width="10" height="40" rx="2" fill="#aab2c6"/>${parts}</svg>`;
+    // seguro (collar) al final de cada lado
+    if (flat.length && !isDb) {
+      plates += `<rect x="${xl - 24}" y="${cy - 34}" width="24" height="68" rx="5" fill="#2a2f3b" stroke="rgba(255,255,255,.25)" stroke-width="2"/>`;
+      plates += `<rect x="${xr}" y="${cy - 34}" width="24" height="68" rx="5" fill="#2a2f3b" stroke="rgba(255,255,255,.25)" stroke-width="2"/>`;
+    }
+    return `<svg viewBox="0 0 ${W} ${H}" class="plate-svg${isDb ? ' db' : ''}" role="img" aria-label="${isDb ? 'Mancuerna con sus discos' : 'Barra con sus discos'}">${defs}${steel}${plates}</svg>`;
   }
 
   const fmt = (n) => String(Math.round(n * 100) / 100);
