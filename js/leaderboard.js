@@ -137,13 +137,13 @@ const Leaderboard = (() => {
     let mode = 'new';
     const card = Utils.el('div', { class: 'card' });
     view.appendChild(card);
-    let sex = ui.sex;
+    let sex = ui.sex !== null ? ui.sex : (DB.getSettings().userSex || null);
     function paint() {
       card.innerHTML = '';
       card.appendChild(Utils.el('h3', { text: '🌍 Ranking global' }));
       card.appendChild(Utils.segmented([{ key: 'new', label: 'Crear usuario' }, { key: 'login', label: 'Ya tengo usuario' }], mode, (k) => { mode = k; paint(); }, true));
       const msg = Utils.el('div', { class: 'sm-warn hidden', style: 'margin-bottom:10px;' });
-      const name = Utils.el('input', { type: 'text', maxlength: '24', placeholder: 'Tu nombre (o apodo)', autocomplete: 'off' });
+      const name = Utils.el('input', { type: 'text', maxlength: '24', placeholder: 'Tu nombre (o apodo)', autocomplete: 'off', value: DB.getSettings().userName || '' });
       const pass = Utils.el('input', { type: 'password', placeholder: mode === 'new' ? 'Contraseña (opcional, mín. 4)' : 'Contraseña', autocomplete: 'off' });
       if (mode === 'new') {
         card.appendChild(Utils.el('p', { class: 'small', text: 'Sin correo ni datos personales: solo un nombre visible en las listas. Publicas únicamente las marcas que tú decidas.' }));

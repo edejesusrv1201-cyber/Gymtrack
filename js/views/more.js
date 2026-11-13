@@ -102,6 +102,35 @@ const MoreView = (() => {
     return card;
   }
 
+  // ---------- perfil: tu nombre en la app ----------
+  function buildProfileCard() {
+    const card = Utils.el('div', { class: 'card' });
+    card.appendChild(Utils.el('h3', { text: '👤 Tu perfil' }));
+    const s = DB.getSettings();
+    const name = Utils.el('input', { type: 'text', maxlength: '24', placeholder: 'Tu nombre o apodo', autocomplete: 'off', value: s.userName || '' });
+    card.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Nombre' }), name]));
+    const save = () => {
+      const cur = DB.getSettings();
+      cur.userName = name.value.trim().slice(0, 24);
+      DB.saveSettings(cur);
+    };
+    name.addEventListener('change', () => { save(); Utils.toast(name.value.trim() ? `Listo, ${name.value.trim()}` : 'Nombre quitado'); });
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:4px 0 6px;', text: 'Sexo (para las listas de hombres / mujeres)' }));
+    const chips = Utils.el('div', { class: 'rt-chips' });
+    [['M', 'Hombre'], ['F', 'Mujer'], ['', 'Prefiero no decir']].forEach(([v, t]) => {
+      const c = Utils.el('button', { type: 'button', class: `rt-chip plain${(s.userSex || '') === v ? ' active' : ''}`, style: '--gc:var(--accent-light)', text: t });
+      c.addEventListener('click', () => {
+        const cur = DB.getSettings(); cur.userSex = v; DB.saveSettings(cur);
+        chips.querySelectorAll('.rt-chip').forEach((x) => x.classList.remove('active'));
+        c.classList.add('active');
+      });
+      chips.appendChild(c);
+    });
+    card.appendChild(chips);
+    card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Tu nombre sale en el saludo de Hoy y en las imágenes que compartes. Se queda en tu celular; solo se publica si creas un usuario en Progreso → 🌍 Ranking (ahí ya viene prellenado).' }));
+    return card;
+  }
+
   // ---------- cómo instalar la app ----------
   function buildInstallCard() {
     const card = Utils.el('div', { class: 'card' });
@@ -124,6 +153,7 @@ const MoreView = (() => {
     const view = Utils.el('div', { class: 'view' });
     const settings = DB.getSettings();
 
+    view.appendChild(buildProfileCard());
     view.appendChild(buildThemeCard());
 
     const toolsCard = Utils.el('div', { class: 'card' });

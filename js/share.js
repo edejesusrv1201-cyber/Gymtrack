@@ -168,7 +168,8 @@ const Share = (() => {
 
     // pie
     ctx.fillStyle = 'rgba(255,255,255,.38)'; ctx.font = `600 24px ${FONT}`; ctx.textAlign = 'center';
-    ctx.fillText('Hecho con MiGymTrack', W / 2, H - 30);
+    const who = (DB.getSettings().userName || '').trim();
+    ctx.fillText(who ? `${who} · Hecho con MiGymTrack` : 'Hecho con MiGymTrack', W / 2, H - 30);
     ctx.textAlign = 'left';
     return canvas;
   }

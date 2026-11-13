@@ -117,7 +117,7 @@ const TodayView = (() => {
     const dateLabel = `${Utils.DIAS[Utils.parseISO(todayIso).getDay()]} ${Utils.shortDate(todayIso)}`;
 
     const top = Utils.el('div', { class: 'hero-top' }, [
-      Utils.el('span', { class: 'eyebrow', text: `Hoy · ${dateLabel}` }),
+      Utils.el('span', { class: 'eyebrow', text: `${(DB.getSettings().userName || '').trim() ? `Hola, ${DB.getSettings().userName.trim().split(/\s+/)[0]} · ` : ''}Hoy · ${dateLabel}` }),
     ]);
     const changeChip = Utils.el('button', { class: 'chip-btn', type: 'button', text: routine ? '🔁 Cambiar' : '📅 Elegir' });
     changeChip.addEventListener('click', () => openRoutinePicker(todayIso, rerender));
