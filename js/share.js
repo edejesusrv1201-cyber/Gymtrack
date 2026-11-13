@@ -97,7 +97,7 @@ const Share = (() => {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
     // cabecera: logo + nombre
-    const icon = await loadImg('icons/icon-192.png');
+    const icon = await loadImg('icons/logo-192.png');
     if (icon) { ctx.save(); rrect(ctx, 70, 64, 92, 92, 22); ctx.clip(); ctx.drawImage(icon, 70, 64, 92, 92); ctx.restore(); }
     ctx.fillStyle = '#fff'; ctx.textBaseline = 'alphabetic';
     ctx.font = `800 46px ${FONT}`; ctx.fillText('MiGymTrack', 184, 120);

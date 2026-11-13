@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v39';
+const CACHE_NAME = 'migymtrack-v40';
 const ASSETS = [
   './',
   './index.html',
@@ -52,6 +52,7 @@ const ASSETS = [
   './js/views/more.js',
   './js/views/calculator.js',
   './icons/icon-192.png',
+  './icons/logo-192.png',
   './icons/apple-touch-icon.png',
   './icons/icon-512.png',
   './icons/icon-512-maskable.png',
