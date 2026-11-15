@@ -15,7 +15,7 @@ const App = (() => {
     plancomidas: MealPlanView,
   };
   const HEADERS = {
-    hoy: ['MiGymTrack', 'Tu progreso de hoy'],
+    hoy: ['MyGymTrack', 'Tu progreso de hoy'],
     plan: ['Plan mensual', 'Organiza tus rutinas por día'],
     calorias: ['Calorías', 'Registro diario de comidas'],
     progreso: ['Progreso', 'Entreno, cuerpo y nutrición'],
@@ -52,7 +52,7 @@ const App = (() => {
   }
 
   function updateChrome() {
-    const [title, subtitle] = HEADERS[currentView] || ['MiGymTrack', ''];
+    const [title, subtitle] = HEADERS[currentView] || ['MyGymTrack', ''];
     document.getElementById('headerTitle').textContent = title;
     document.getElementById('headerSubtitle').textContent = subtitle;
 
@@ -96,7 +96,7 @@ const App = (() => {
       const l = txt.match(/migymtrack-v(\d+)/);
       if (!l || l[1] === running || document.getElementById('updateBanner')) return;
       const bar = Utils.el('div', { class: 'update-banner', id: 'updateBanner' }, [
-        Utils.el('span', { text: '🆕 Hay una versión nueva de MiGymTrack' }),
+        Utils.el('span', { text: '🆕 Hay una versión nueva de MyGymTrack' }),
       ]);
       const go = Utils.el('button', { class: 'btn-small', text: 'Actualizar' });
       go.addEventListener('click', async () => {

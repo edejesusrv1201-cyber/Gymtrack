@@ -417,6 +417,7 @@ const WorkoutView = (() => {
       const noteLine = Utils.el('button', { type: 'button', class: 'ex-note' + (ex.note ? '' : ' empty'), text: ex.note ? `📝 ${ex.note}` : '＋ Nota (asiento, agarre…)' });
       noteLine.addEventListener('click', () => openExerciseSettings(ex, rerender));
       card.appendChild(noteLine);
+      if (typeof Guide !== 'undefined' && !isCardio) card.appendChild(Guide.inline(ex));
     }
 
     // --- series de este grupo muscular en la semana ---

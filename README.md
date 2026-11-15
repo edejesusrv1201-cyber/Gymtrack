@@ -1,4 +1,4 @@
-# MiGymTrack 🏋️
+# MyGymTrack 🏋️
 
 App personal (offline, sin servidor) para llevar tu progreso de gym:
 

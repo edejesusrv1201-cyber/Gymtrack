@@ -413,13 +413,15 @@ const ExerciseUI = (() => {
         const has = owned.has(norm(name));
         const btn = Utils.el('button', { class: 'btn-small', text: has ? '✓' : '+' });
         btn.disabled = has;
+        const gbtn = Utils.el('button', { class: 'btn-small', type: 'button', text: '🎓', title: 'Cómo se hace' });
         const row = Utils.el('div', { class: `list-item${has ? ' ax-added' : ''}` }, [
           Utils.el('div', { style: 'min-width:0;' }, [
             Utils.el('div', { style: 'font-weight:700;' }, [name, uni ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null, bw ? Utils.el('span', { class: 'uni-pill', text: 'peso corporal' }) : null]),
             Utils.el('div', { class: `meta grp-${g}`, text: `${g} · ${eqLabel(eq)}${has ? ' · ya en tu catálogo' : ''}` }),
           ]),
-          btn,
+          Utils.el('div', { class: 'gd-btns' }, [gbtn, btn]),
         ]);
+        gbtn.addEventListener('click', () => Guide.open({ name, group: g, equipment: eq }));
         btn.addEventListener('click', () => {
           const all = DB.getExercises();
           const ex = { id: DB.uid(), name, group: g, equipment: eq };

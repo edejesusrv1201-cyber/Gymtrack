@@ -15,8 +15,8 @@
 const AutoBackup = (() => {
   const DB_NAME = 'migymtrack_backup';
   const KEEP = 7;
-  const FILE = 'migymtrack-respaldo.json';
-  const DATED = /^migymtrack-respaldo-(\d{4}-\d{2}-\d{2})\.json$/;
+  const FILE = 'mygymtrack-respaldo.json';
+  const DATED = /^(?:my|mi)gymtrack-respaldo-(\d{4}-\d{2}-\d{2})\.json$/;
 
   let dirty = false;
   let timer = null;
@@ -108,7 +108,7 @@ const AutoBackup = (() => {
     await writeFile(h, FILE, text);
     // una copia con fecha por día, y se conservan las últimas 7
     const today = Utils.todayISO();
-    await writeFile(h, `migymtrack-respaldo-${today}.json`, text);
+    await writeFile(h, `mygymtrack-respaldo-${today}.json`, text);
     try {
       const dated = [];
       for await (const [name] of h.entries()) { const m = DATED.exec(name); if (m) dated.push(name); }

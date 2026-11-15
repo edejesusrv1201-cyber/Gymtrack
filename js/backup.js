@@ -34,7 +34,7 @@ const Backup = (() => {
   async function run() {
     const data = DB.exportAll();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const ok = await Utils.saveFile(blob, `migymtrack-backup-${Utils.todayISO()}.json`);
+    const ok = await Utils.saveFile(blob, `mygymtrack-backup-${Utils.todayISO()}.json`);
     if (ok !== false) mark();
     return ok !== false;
   }

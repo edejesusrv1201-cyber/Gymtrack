@@ -1,5 +1,5 @@
 /* ============================================================
-   styles.css — MiGymTrack · tema "ink + brasa"
+   styles.css — MyGymTrack · tema "ink + brasa"
    Fondo tinta con brillos cálidos, tarjetas con relieve,
    acento brasa (naranja→ámbar) y azul eléctrico para datos.
    ============================================================ */
@@ -1654,3 +1654,35 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .mn-meal { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.07); margin-bottom: 8px; }
 .mn-item { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 0.86rem; }
 .mn-item span:first-child { min-width: 0; }
+
+/* ===== v46: guía de ejercicios ===== */
+.gd-fig { width: 100%; max-width: 280px; aspect-ratio: 1 / 1; margin: 0 auto 6px; border-radius: 20px; background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)); border: 1px solid rgba(255, 255, 255, 0.07); overflow: hidden; }
+.gd-fig.sm { flex: none; width: 112px; max-width: 112px; margin: 0; border-radius: 16px; }
+.gd-svg { width: 100%; height: 100%; display: block; }
+.gd-svg polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.gd-leg, .gd-torso { stroke: var(--accent-light); stroke-width: 4.6; }
+.gd-leg2 { stroke: var(--accent-light); stroke-width: 4.2; opacity: 0.45; }
+.gd-arm { stroke: #f4f6fb; stroke-width: 3.6; }
+.gd-head { fill: none; stroke: var(--accent-light); stroke-width: 3; }
+.gd-floor { stroke: rgba(255, 255, 255, 0.2); stroke-width: 1.2; }
+.gd-static line { stroke: rgba(255, 255, 255, 0.38); stroke-width: 2; stroke-linecap: round; }
+.gd-static .gd-thick { stroke-width: 4; }
+.gd-solid { fill: rgba(255, 255, 255, 0.3); stroke: none; }
+.gd-cable { stroke: rgba(255, 255, 255, 0.5); stroke-width: 1; stroke-dasharray: 2 2; }
+.gd-plate { fill: #e8403a; stroke: #7a1d19; stroke-width: 1; }
+.gd-db { fill: #b6bdcf; stroke: #626a7d; stroke-width: 1; }
+.gd-pad { fill: rgba(255, 194, 71, 0.95); }
+.gd-cap { text-align: center; font-weight: 800; margin: 2px 0 10px; }
+.gd-sec { margin-top: 12px; }
+.gd-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 7px; font-size: 0.9rem; line-height: 1.35; }
+.gd-list li { display: flex; gap: 10px; align-items: flex-start; }
+.gd-n { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; background: var(--accent-soft); color: var(--accent-light); }
+.gd-sec.tips li::before { content: '💡'; flex: none; }
+.gd-sec.mistakes li::before { content: '⚠️'; flex: none; }
+.gd-note { margin-top: 12px; font-size: 0.76rem; color: var(--text-dim); text-align: center; }
+.gd-inline { padding: 12px; margin: 8px 0; border-radius: 16px; background: rgba(91, 140, 255, 0.09); border: 1px solid rgba(91, 140, 255, 0.4); }
+.gd-in-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.gd-in-row { display: flex; gap: 10px; align-items: flex-start; }
+.gd-mini { margin: 0; padding-left: 16px; font-size: 0.78rem; line-height: 1.3; display: grid; gap: 4px; }
+.gd-link { margin: 2px 0 6px; }
+.gd-btns { display: flex; gap: 6px; flex: none; }

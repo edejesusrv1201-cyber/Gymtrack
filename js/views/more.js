@@ -127,6 +127,12 @@ const MoreView = (() => {
       chips.appendChild(c);
     });
     card.appendChild(chips);
+    const beg = Utils.el('button', { type: 'button', class: 'uni-chip', style: 'margin-top:12px;' });
+    const paintBeg = () => { const on = DB.getSettings().beginner === true; beg.classList.toggle('on', on); beg.textContent = on ? '🎓 Modo principiante: activado' : '🎓 Modo principiante (guía animada de cada ejercicio)'; };
+    beg.addEventListener('click', () => { const s2 = DB.getSettings(); s2.beginner = !(s2.beginner === true); if (s2.beginner) s2.guideSeen = {}; DB.saveSettings(s2); paintBeg(); });
+    paintBeg();
+    card.appendChild(beg);
+    card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:6px;', text: 'Con el modo principiante, la primera vez que abres cada ejercicio te muestro cómo se hace, con un dibujo animado y consejos. Siempre puedes verlo con «🎓 Cómo se hace».' }));
     card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Tu nombre sale en el saludo de Hoy y en las imágenes que compartes. Se queda en tu celular; solo se publica si creas un usuario en Progreso → 🌍 Ranking (ahí ya viene prellenado).' }));
     return card;
   }
@@ -136,7 +142,7 @@ const MoreView = (() => {
     const card = Utils.el('div', { class: 'card' });
     card.appendChild(Utils.el('h3', { text: '📲 Instalar en tu celular' }));
     if (Utils.isStandalone()) {
-      card.appendChild(Utils.el('p', { text: '✅ Ya la tienes instalada: estás usando MiGymTrack como app.' }));
+      card.appendChild(Utils.el('p', { text: '✅ Ya la tienes instalada: estás usando MyGymTrack como app.' }));
     }
     const step = (title, lines) => Utils.el('div', { style: 'margin-top:10px;' }, [
       Utils.el('div', { class: 'eyebrow', text: title }),
@@ -386,7 +392,7 @@ const MoreView = (() => {
 
     // ---- acerca de ----
     const aboutCard = Utils.el('div', { class: 'card' });
-    aboutCard.appendChild(Utils.el('h3', { text: 'ℹ️ Acerca de MiGymTrack' }));
+    aboutCard.appendChild(Utils.el('h3', { text: 'ℹ️ Acerca de MyGymTrack' }));
     aboutCard.appendChild(Utils.el('p', { text: 'App personal para llevar tu progreso de gym: rutinas mensuales, series normales, aproximaciones y dropsets, cardio, calentamiento, cronómetro de descanso, calorías, agua y medidas, con métricas y gráficas de progreso por semana, grupo muscular y ejercicio. Todo se guarda localmente en tu celular.' }));
     // versión en uso y botón para forzar la actualización (por si el celular guarda la versión vieja)
     const running = ((document.querySelector('script[src*="app.js"]') || {}).src || '').match(/v=(\d+)/);

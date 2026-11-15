@@ -100,7 +100,7 @@ const Share = (() => {
     const icon = await loadImg('icons/logo-192.png');
     if (icon) { ctx.save(); rrect(ctx, 70, 64, 92, 92, 22); ctx.clip(); ctx.drawImage(icon, 70, 64, 92, 92); ctx.restore(); }
     ctx.fillStyle = '#fff'; ctx.textBaseline = 'alphabetic';
-    ctx.font = `800 46px ${FONT}`; ctx.fillText('MiGymTrack', 184, 120);
+    ctx.font = `800 46px ${FONT}`; ctx.fillText('MyGymTrack', 184, 120);
     ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = `600 28px ${FONT}`;
     ctx.fillText(Utils.friendlyDate(iso), 184, 154);
 
@@ -169,7 +169,7 @@ const Share = (() => {
     // pie
     ctx.fillStyle = 'rgba(255,255,255,.38)'; ctx.font = `600 24px ${FONT}`; ctx.textAlign = 'center';
     const who = (DB.getSettings().userName || '').trim();
-    ctx.fillText(who ? `${who} · Hecho con MiGymTrack` : 'Hecho con MiGymTrack', W / 2, H - 30);
+    ctx.fillText(who ? `${who} · Hecho con MyGymTrack` : 'Hecho con MyGymTrack', W / 2, H - 30);
     ctx.textAlign = 'left';
     return canvas;
   }
@@ -186,7 +186,7 @@ const Share = (() => {
     const blob = await toBlob(canvas);
     if (!blob) { body.innerHTML = ''; body.appendChild(Utils.el('p', { text: 'No pude crear la imagen.' })); return; }
     const url = URL.createObjectURL(blob);
-    const name = `migymtrack-${iso}.png`;
+    const name = `mygymtrack-${iso}.png`;
     body.innerHTML = '';
     body.appendChild(Utils.el('img', { class: 'share-img', src: url, alt: 'Tarjeta de tu entreno' }));
     const file = typeof File === 'function' ? new File([blob], name, { type: 'image/png' }) : null;

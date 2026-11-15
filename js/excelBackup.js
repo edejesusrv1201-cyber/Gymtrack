@@ -274,7 +274,7 @@ const ExcelBackup = (() => {
 
     let r = 1;
     // --- portada ---
-    sh.merge(r, FIRST, r, LAST, 'MiGymTrack · Resumen', st({ sz: 22, bold: true, color: PAL.white, bg: PAL.ink, indent: 1, border: bd('bottom', 'thick', acc) }));
+    sh.merge(r, FIRST, r, LAST, 'MyGymTrack · Resumen', st({ sz: 22, bold: true, color: PAL.white, bg: PAL.ink, indent: 1, border: bd('bottom', 'thick', acc) }));
     sh.height(r, 40);
     r += 1;
     sh.merge(r, FIRST, r, LAST, `Exportado el ${Utils.friendlyDate(Utils.todayISO())} · ${all.days} entrenos registrados`, st({ sz: 10, color: 'B8BFD2', bg: PAL.ink, indent: 1 }));
@@ -807,7 +807,7 @@ const ExcelBackup = (() => {
     add(dataSheet(warmupRows), DATA.calentamiento);
 
     wb.Workbook = { Sheets: wb.SheetNames.map((n) => ({ Hidden: n.indexOf('_datos_') === 0 ? 1 : 0 })) };
-    wb.Props = { Title: 'MiGymTrack — respaldo y reporte', Author: 'MiGymTrack', CreatedDate: new Date() };
+    wb.Props = { Title: 'MyGymTrack — respaldo y reporte', Author: 'MyGymTrack', CreatedDate: new Date() };
     return wb;
   }
 
@@ -815,7 +815,7 @@ const ExcelBackup = (() => {
     const wb = buildWorkbook();
     const data = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
     const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    Utils.saveFile(blob, `migymtrack-reporte-${Utils.todayISO()}.xlsx`).then((ok) => { if (ok !== false) Backup.mark(); });
+    Utils.saveFile(blob, `mygymtrack-reporte-${Utils.todayISO()}.xlsx`).then((ok) => { if (ok !== false) Backup.mark(); });
   }
 
   // ---------------- importar ----------------
@@ -828,7 +828,7 @@ const ExcelBackup = (() => {
       return ws ? XLSX.utils.sheet_to_json(ws, { defval: '' }) : [];
     };
     if (!wb.Sheets[names.ajustes] && !wb.Sheets[names.rutinas]) {
-      throw new Error('No parece un respaldo de MiGymTrack');
+      throw new Error('No parece un respaldo de MyGymTrack');
     }
 
     // Ajustes (una sola fila, columnas = cada ajuste)

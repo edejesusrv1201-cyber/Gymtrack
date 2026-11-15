@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "MiGymTrack",
+  "name": "MyGymTrack",
   "lang": "es",
-  "short_name": "GymTrack",
+  "short_name": "MyGymTrack",
   "description": "Progreso de gym, medidas, calorías y rutinas mensuales",
   "start_url": "./index.html",
   "scope": "./",
@@ -11,8 +11,8 @@
   "background_color": "#090b10",
   "theme_color": "#090b10",
   "icons": [
-    { "src": "icons/icon-192.png?v=45", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png?v=45", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512-maskable.png?v=45", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-192.png?v=46", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=46", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png?v=46", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
