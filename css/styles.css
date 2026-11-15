@@ -1548,3 +1548,32 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 
 /* logo del encabezado (vector, no depende de imágenes en caché) */
 .app-header .brand .brand-logo { flex: none; width: 40px; height: 40px; border-radius: 12px; box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.28), 0 0 0 1px var(--border); }
+
+/* ===== v42: registro de series más claro + drop set dentro de la serie ===== */
+.pill-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.pill { flex: 1; min-width: 0; padding: 9px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; white-space: nowrap; color: var(--text-dim); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+.pill.active { color: var(--text); background: var(--accent-soft); border-color: rgba(var(--accent-rgb), 0.6); box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15) inset; }
+.pill-drop.active { background: rgba(163, 132, 255, 0.2); border-color: rgba(163, 132, 255, 0.7); color: #e4dbff; }
+.pill-warmup.active { background: rgba(255, 194, 71, 0.16); border-color: rgba(255, 194, 71, 0.6); color: #ffe3a3; }
+.pill:disabled { opacity: 0.4; }
+.sf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+.sf-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 5px; min-height: 26px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.sf-label .unit-btn { margin: 0; padding: 3px 9px; font-size: 0.72rem; }
+.sf-step { display: flex; align-items: stretch; border-radius: 16px; background: rgba(10, 12, 19, 0.7); border: 1px solid var(--border-strong); overflow: hidden; }
+.sf-btn { flex: none; width: 40px; font-size: 1.35rem; font-weight: 800; color: var(--accent-light); background: rgba(255, 255, 255, 0.04); }
+.sf-btn:active { background: var(--accent-soft); }
+.sf-step input.sf-num { flex: 1; min-width: 0; width: 100%; text-align: center; font-size: 1.45rem !important; font-weight: 900; letter-spacing: -0.02em; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 12px 2px !important; }
+.sf-step input.sf-num::placeholder { font-size: 0.72rem; font-weight: 600; letter-spacing: 0; }
+.set-groups { display: grid; gap: 8px; }
+.set-group { border-radius: 16px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 2px 12px; }
+.set-group.warm { background: rgba(255, 194, 71, 0.05); border-color: rgba(255, 194, 71, 0.18); }
+.set-group .set-line { border-bottom: 0; }
+.set-group .set-line.drop-line { margin-left: 12px; padding-left: 12px; border-left: 2px solid rgba(163, 132, 255, 0.55); border-radius: 0; }
+.set-group .set-line.drop-line .set-main { color: #d9ccff; }
+.sugg-line.dropset { color: #d9ccff; border-color: rgba(163, 132, 255, 0.5); }
+.df-flow { background: rgba(163, 132, 255, 0.09); border-color: rgba(163, 132, 255, 0.5); }
+.df-flow.doing { background: rgba(163, 132, 255, 0.15); }
+.df-host { margin-top: 8px; }
+.set-group .set-line .set-main { white-space: nowrap; }
+.set-group .set-line.drop-line .set-felt { display: none; }
+.set-group .set-line.drop-line { gap: 8px; }

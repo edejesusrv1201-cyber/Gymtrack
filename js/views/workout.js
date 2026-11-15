@@ -15,8 +15,8 @@ const WorkoutView = (() => {
   const SET_TYPES = [
     { key: 'normal', label: 'Normal' },
     { key: 'warmup', label: 'Aprox.' },
-    { key: 'drop', label: 'Dropset' },
   ];
+  const SET_TYPES_ALL = SET_TYPES.concat([{ key: 'drop', label: 'Dropset' }]);
 
   // esfuerzo percibido (RPE 6–10): cuántas repeticiones te quedaban al terminar la serie
   const RPE_OPTS = [[6, '≤6', 'sobrado'], [7, '7', '≈3 reps en reserva'], [8, '8', '≈2 reps en reserva'], [9, '9', '≈1 rep en reserva'], [10, '10', 'al fallo']];
@@ -469,9 +469,18 @@ const WorkoutView = (() => {
       card.appendChild(guide);
     }
 
-    // --- series registradas ---
-    const setsWrap = Utils.el('div', { class: 'mt-8' });
+    // --- series registradas (los drops van dentro de su serie) ---
+    const setsWrap = Utils.el('div', { class: 'mt-8 set-groups' });
     let normalIdx = 0;
+    let group = null;
+    const removeSet = (sIdx) => {
+      let n = 1;
+      const st0 = entry.sets[sIdx];
+      if (st0 && !Metrics.isDrop(st0) && !Metrics.isWarmup(st0)) while (entry.sets[sIdx + n] && Metrics.isDrop(entry.sets[sIdx + n])) n += 1;
+      entry.sets.splice(sIdx, n);
+      saveLog(iso, log);
+      rerender();
+    };
     entry.sets.forEach((set, sIdx) => {
       const feltOpt = FELT_OPTIONS.find((f) => f.key === set.felt) || FELT_OPTIONS[1];
       const mainLabel = isCardio
@@ -479,23 +488,29 @@ const WorkoutView = (() => {
         : Metrics.formatSet(set, false);
       let badge;
       if (Metrics.isWarmup(set)) badge = Utils.el('span', { class: 'set-badge warm', title: 'Aproximación', text: 'A' });
-      else if (Metrics.isDrop(set)) badge = Utils.el('span', { class: 'set-badge drop', title: 'Dropset', text: '↓' });
+      else if (Metrics.isDrop(set)) badge = Utils.el('span', { class: 'set-badge drop', title: 'Drop set', text: '↓' });
       else { normalIdx += 1; badge = Utils.el('span', { class: 'set-badge work', text: `${normalIdx}` }); }
-      setsWrap.appendChild(Utils.el('div', { class: 'set-line' }, [
+      const row = Utils.el('div', { class: 'set-line' }, [
         badge,
         Utils.el('span', { class: 'set-main', text: mainLabel }),
         set.pr ? Utils.el('span', { title: `Récord de ${set.pr.replace(',', ' y ')}`, text: '🏆' }) : null,
         set.rpe ? Utils.el('span', { class: `set-rpe r${set.rpe}`, title: rpeText(set.rpe), text: `RPE ${set.rpe}` }) : null,
         Metrics.isWarmup(set) ? Utils.el('span', { class: 'set-felt', text: 'aprox.' }) : Utils.el('span', { class: 'set-felt', text: `${feltOpt.icon} ${feltOpt.label}` }),
         Utils.el('button', { class: 'icon-btn', text: '✏️', title: 'Editar esta serie', onclick: () => openEditSet(iso, log, entry, sIdx, ex, isCardio, rerender) }),
-        Utils.el('button', { class: 'icon-btn', text: '✕', onclick: () => {
-          entry.sets.splice(sIdx, 1);
-          saveLog(iso, log);
-          rerender();
-        } }),
-      ]));
+        Utils.el('button', { class: 'icon-btn', text: '✕', title: Metrics.isDrop(set) ? 'Quitar este drop' : 'Quitar la serie (y sus drops)', onclick: () => removeSet(sIdx) }),
+      ]);
+      if (Metrics.isDrop(set) && group) {
+        row.classList.add('drop-line');
+        group.appendChild(row);
+      } else {
+        group = Utils.el('div', { class: `set-group${Metrics.isWarmup(set) ? ' warm' : ''}` });
+        group.appendChild(row);
+        setsWrap.appendChild(group);
+      }
     });
     card.appendChild(setsWrap);
+    const dropSlot = Utils.el('div');
+    card.appendChild(dropSlot);
 
     // --- formulario para nueva serie / sesión ---
     const form = Utils.el('div', { class: 'mt-8' });
@@ -509,7 +524,8 @@ const WorkoutView = (() => {
     const placeholderFor = (u) => (bwSelected ? `Carga extra (${u}) · 0 = tu peso` : uniSelected ? `Peso por lado (${u})` : `Peso (${u})`);
 
     let weightInput, repsInput, durationInput, distanceInput, caloriesInput;
-    let typeSelected = isCardio ? 'normal' : (typeMemory[key] || 'normal');
+    let typeSelected = 'normal';
+    let withDrop = !isCardio && typeMemory[key] === 'drop';   // «esta serie lleva drop set»
     const feltWrap = Utils.el('div', { class: 'mt-8' });
 
     // unidad con la que se escribe el peso de este ejercicio (cada máquina es distinta)
@@ -536,7 +552,7 @@ const WorkoutView = (() => {
 
     const addSetBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8' });
     const BTN_TEXT = {
-      normal: '✓ Registrar serie e iniciar descanso',
+      get normal() { return withDrop ? '✓ Registrar serie y seguir con el drop ↓' : '✓ Registrar serie e iniciar descanso'; },
       warmup: '✓ Registrar aproximación',
       drop: '✓ Registrar dropset',
     };
@@ -567,22 +583,25 @@ const WorkoutView = (() => {
       repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
       weightInput.value = suggestWeight(typeSelected);
 
-      const typeRow = Utils.el('div', { class: 'seg small' });
+      const pillRow = Utils.el('div', { class: 'pill-row' });
+      const pillBtns = {};
       const refreshType = () => {
-        typeRow.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.type === typeSelected));
-        addSetBtn.textContent = BTN_TEXT[typeSelected];
+        Object.keys(pillBtns).forEach((k) => pillBtns[k].classList.toggle('active', k === 'drop' ? (withDrop && typeSelected === 'normal') : k === typeSelected));
+        pillBtns.drop.disabled = typeSelected === 'warmup';
+        addSetBtn.textContent = BTN_TEXT[typeSelected === 'normal' ? 'normal' : typeSelected];
         feltWrap.classList.toggle('hidden', typeSelected === 'warmup');
       };
-      SET_TYPES.forEach((t) => {
-        const b = Utils.el('button', { class: 'seg-btn', type: 'button', 'data-type': t.key, text: t.label });
+      [['normal', '💪 Serie'], ['warmup', '🔥 Aprox.'], ['drop', '↓ Drop set']].forEach(([k, label]) => {
+        const b = Utils.el('button', { class: `pill pill-${k}`, type: 'button', text: label });
         b.addEventListener('click', () => {
-          typeSelected = t.key;
-          weightInput.value = suggestWeight(typeSelected);
+          if (k === 'drop') { withDrop = !withDrop; if (typeSelected === 'warmup') typeSelected = 'normal'; }
+          else { typeSelected = k; weightInput.value = suggestWeight(typeSelected); }
           refreshType();
         });
-        typeRow.appendChild(b);
+        pillBtns[k] = b;
+        pillRow.appendChild(b);
       });
-      form.appendChild(typeRow);
+      form.appendChild(pillRow);
 
       // bilateral / unilateral (peso por lado): una pastilla que se enciende o apaga
       const uniChip = Utils.el('button', { class: 'uni-chip', type: 'button' });
@@ -615,9 +634,24 @@ const WorkoutView = (() => {
         paintUni();
       });
       form.paintUni = paintUni;
-      form.appendChild(Utils.el('div', { class: 'field-row' }, [
-        Utils.el('div', { class: 'field' }, [Utils.el('div', { class: 'input-unit' }, [weightInput, unitBtn])]),
-        Utils.el('div', { class: 'field' }, [repsInput]),
+      const stepBtns = (input, getStep, min) => {
+        const minus = Utils.el('button', { type: 'button', class: 'sf-btn', text: '−', 'aria-label': 'Menos' });
+        const plus = Utils.el('button', { type: 'button', class: 'sf-btn', text: '+', 'aria-label': 'Más' });
+        const bump = (dir) => {
+          const cur = parseFloat(input.value);
+          const v = Math.max(min, Math.round(((isNaN(cur) ? 0 : cur) + dir * getStep()) * 100) / 100);
+          input.value = String(v);
+        };
+        minus.addEventListener('click', () => bump(-1));
+        plus.addEventListener('click', () => bump(1));
+        return Utils.el('div', { class: 'sf-step' }, [minus, input, plus]);
+      };
+      weightInput.classList.add('sf-num');
+      repsInput.classList.add('sf-num');
+      if (lastWork && lastWork.reps) repsInput.value = String(lastWork.reps);
+      form.appendChild(Utils.el('div', { class: 'sf-grid' }, [
+        Utils.el('div', { class: 'sf-col' }, [Utils.el('div', { class: 'sf-label' }, [Utils.el('span', { text: 'Peso' }), unitBtn]), stepBtns(weightInput, () => Units.step(inputUnit, true), -9999)]),
+        Utils.el('div', { class: 'sf-col' }, [Utils.el('div', { class: 'sf-label' }, [Utils.el('span', { text: 'Repeticiones' })]), stepBtns(repsInput, () => 1, 0)]),
       ]));
       form.appendChild(Utils.el('div', { class: 'chip-pair' }, [uniChip, bwChip]));
       addSetBtn.textContent = BTN_TEXT[typeSelected];
@@ -687,10 +721,11 @@ const WorkoutView = (() => {
       entry.sets.push(set);
       saveLog(iso, log);
       Utils.vibrate(40);
-      if (typeSelected === 'drop') typeMemory[key] = 'drop';
+      if (typeSelected === 'normal' && withDrop) typeMemory[key] = 'drop';
       else delete typeMemory[key];
-      // descanso solo tras una serie efectiva (las aproximaciones y los drops van seguidos)
-      if (typeSelected === 'normal' && DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : '');
+      // con drop set: primero el drop y el descanso llega al terminarlo; si no, descanso normal
+      if (typeSelected === 'normal' && withDrop) DropFlow.open(key);
+      else if (typeSelected === 'normal' && DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : '');
       rerender();
       Celebrate.record(prs, ex ? ex.name : '');
     });
@@ -792,6 +827,24 @@ const WorkoutView = (() => {
       tools.appendChild(prBtn);
       card.appendChild(tools);
     }
+    // drop set: dentro de la misma serie, con el mismo flujo que las aproximaciones
+    const lastAny = entry.sets[entry.sets.length - 1];
+    if (!isCardio && lastAny && !Metrics.isWarmup(lastAny)) {
+      dropSlot.appendChild(DropFlow.flow({
+        key, name: ex ? ex.name : '', unit: inputUnit,
+        getLast: () => { const l = entry.sets[entry.sets.length - 1]; return l && !Metrics.isWarmup(l) ? { kg: Number(l.weight) || 0, reps: Number(l.reps) || 8 } : null; },
+        onDone: (kg, reps) => {
+          const o = { weight: kg, reps, felt: 'normal', type: 'drop' };
+          if (uniSelected) o.uni = true;
+          if (bwSelected) { o.bw = true; o.bwKg = Metrics.bodyWeightKg(iso); }
+          entry.sets.push(o);
+          saveLog(iso, log);
+          Utils.vibrate(30);
+        },
+        onFinish: () => { if (DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : ''); },
+        rerender,
+      }));
+    }
     card.appendChild(form);
 
     // pasar al siguiente ejercicio (cierra este y abre el otro)
@@ -858,7 +911,7 @@ const WorkoutView = (() => {
       };
       body.appendChild(Utils.el('div', { class: 'field' }, [
         Utils.el('label', { text: 'Tipo de serie' }),
-        segFor(SET_TYPES.map((t) => [t.key, t.label]), () => type, (k) => { type = k; feltWrap.classList.toggle('hidden', type === 'warmup'); }),
+        segFor(SET_TYPES_ALL.map((t) => [t.key, t.label]), () => type, (k) => { type = k; feltWrap.classList.toggle('hidden', type === 'warmup'); }),
       ]));
       body.appendChild(Utils.el('div', { class: 'field' }, [
         Utils.el('label', { text: '¿Unilateral?' }),
