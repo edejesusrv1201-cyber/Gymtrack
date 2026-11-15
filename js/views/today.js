@@ -496,6 +496,7 @@ const TodayView = (() => {
 
     // ---- accesos rápidos: calorías, agua, semana ----
     const kcalToday = (DB.getCalorieLog()[todayIso] || []).reduce((s, e) => s + e.kcal, 0);
+    const goalToday = (settings.calorieGoal || 0) + Treats.bonusOf(todayIso);
     const waterMl = (DB.getWaterLog()[todayIso] || []).reduce((s, e) => s + e.ml, 0);
     const waterGoal = settings.waterGoalMl || 2500;
     const wk = Metrics.weekRange(0);
@@ -512,7 +513,7 @@ const TodayView = (() => {
       return t;
     }
     view.appendChild(Utils.el('div', { class: 'tiles' }, [
-      tile('Calorías', `${Math.round(kcalToday)}`, `de ${settings.calorieGoal} kcal`, kcalToday / (settings.calorieGoal || 1), 'linear-gradient(90deg,var(--acc-a),var(--acc-c))', { view: 'calorias' }),
+      tile('Calorías', `${Math.round(kcalToday)}`, `de ${goalToday} kcal`, kcalToday / (goalToday || 1), 'linear-gradient(90deg,var(--acc-a),var(--acc-c))', { view: 'calorias' }),
       tile('Agua', `${Utils.round1(waterMl / 1000)} L`, `de ${Utils.round1(waterGoal / 1000)} L`, waterMl / waterGoal, 'linear-gradient(90deg,#5b8cff,#3de0c2)', { view: 'calorias' }),
       tile('Semana', `${weekDays}`, weekDays === 1 ? 'día entrenado' : 'días entrenados', weekDays / 5, 'linear-gradient(90deg,#35d49a,#3de0c2)', { view: 'progreso', params: { section: 'entreno' } }),
     ]));
@@ -533,7 +534,10 @@ const TodayView = (() => {
     });
     const qWeight = Utils.el('button', { type: 'button', text: '⚖️ Peso' });
     qWeight.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
-    [qFood, qWater, qWeight].forEach((b) => quick.appendChild(b));
+    const sl = Treats.sleepOf(todayIso);
+    const qSleep = Utils.el('button', { type: 'button', text: sl ? `😴 ${sl} h` : '😴 Sueño' });
+    qSleep.addEventListener('click', () => Treats.openSleep(todayIso, rerender));
+    [qFood, qWater, qWeight, qSleep].forEach((b) => quick.appendChild(b));
     view.appendChild(quick);
 
     const gapCard = renderGaps(rerender);
@@ -553,7 +557,7 @@ const TodayView = (() => {
     root.appendChild(view);
 
     // celebra logros o nivel nuevos (si los hay) sin interrumpir otra ventana
-    setTimeout(() => { try { Gamify.announce(Gamify.check()); } catch (e) { /* sin logros por ahora */ } }, 700);
+    setTimeout(() => { try { Gamify.announce(Gamify.check()); Treats.check(); } catch (e) { /* sin logros por ahora */ } }, 700);
   }
 
   function showHistory() {

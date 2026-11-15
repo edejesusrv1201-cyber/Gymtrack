@@ -34,6 +34,7 @@ const RewardsView = (() => {
       stat(`${Utils.compact(Units.fromKg(st.volume))} ${Units.current()}`, 'volumen'),
     ]));
     view.appendChild(hero);
+    try { view.appendChild(Treats.card(() => render(container))); } catch (e) { /* premios no disponibles */ }
 
     // ---- retos de la semana ----
     const chs = Gamify.currentChallenges();
@@ -94,6 +95,7 @@ const RewardsView = (() => {
   const stat = (v, l) => Utils.el('div', { class: 'lv-stat' }, [Utils.el('div', { class: 'v', text: String(v) }), Utils.el('div', { class: 'l', text: l })]);
 
   function fmtVal(a, v) {
+    if (a.fmt) return a.fmt(v);
     if (a.id[0] === 'v' && a.id !== 'var10' && a.id !== 'var20') return `${Utils.compact(Units.fromKg(v))}${Units.current()}`;
     return String(Math.round(v));
   }

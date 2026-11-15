@@ -13,6 +13,8 @@
    - gt_monthlyPlans   -> { 'YYYY-MM': { days: { '1': routineId, ... } } }
    - gt_workoutLog     -> { 'YYYY-MM-DD': { routineId, exercises:[...], notes } }
    - gt_waterLog       -> { 'YYYY-MM-DD': [{id, ml, time}] }
+   - gt_sleepLog       -> { 'YYYY-MM-DD': { h: horas dormidas } }
+   - gt_rewards        -> { since, awarded: { semana: [retos] }, spent: [canjes] }
    - gt_mealPlan       -> { '0'..'6' (día de la semana, 0 = domingo): { desayuno: [...], almuerzo, cena, snack } }
    ============================================================ */
 
@@ -28,6 +30,8 @@ const DB = (() => {
     workoutLog: 'gt_workoutLog',
     waterLog: 'gt_waterLog',
     mealPlan: 'gt_mealPlan',
+    sleepLog: 'gt_sleepLog',
+    rewards: 'gt_rewards',
   };
 
   function read(key, fallback) {

@@ -72,7 +72,29 @@ const Gamify = (() => {
     const waterDays = Object.keys(water).filter((d) => (water[d] || []).reduce((s, e) => s + e.ml, 0) >= waterGoal).length;
     const weighIns = DB.getMeasurements().filter((m) => m.weight).length;
 
-    return { sessions: dates.length, sets, volume, prs, exercises: exerciseIds.size, streak, bestStreak, comebacks, perfectWeeks, foodDays, waterDays, weighIns, lastDate: dates[dates.length - 1] || null };
+    // básicos: mejor 1RM estimado de cada uno y cuántos récords en ellos
+    const lifts = {}; let basicPrs = 0;
+    const bw = Metrics.bodyWeightKg(Utils.todayISO()) || 0;
+    if (typeof Leaderboard !== 'undefined' && Leaderboard.liftOf) {
+      const baseKeys = Leaderboard.BASICS.map((b) => b.key);
+      const keyOf = {};
+      DB.getExercises().forEach((e) => { const l = Leaderboard.liftOf(e); if (l && baseKeys.includes(l.key)) keyOf[e.id] = l.key; });
+      Object.keys(wl).forEach((d) => (wl[d].exercises || []).forEach((en) => {
+        const k = keyOf[en.exerciseId];
+        if (!k) return;
+        (en.sets || []).forEach((s) => {
+          if (s.pr && !Metrics.isWarmup(s)) basicPrs += 1;
+          if (!Metrics.isNormal(s) || s.uni) return;
+          const kg = Metrics.loadOf(s); const reps = Number(s.reps) || 0;
+          if (!(kg > 0) || reps < 1 || reps > 30) return;
+          const e1 = Metrics.e1rm(kg, reps);
+          if (e1 > (lifts[k] || 0)) lifts[k] = e1;
+        });
+      }));
+    }
+    const tr = typeof Treats !== 'undefined' ? Treats.stats() : { vales: 0, redeemed: 0, goodNights: 0, perfectTreatWeeks: 0 };
+
+    return { lifts, basicPrs, bw, vales: tr.vales, redeemed: tr.redeemed, goodNights: tr.goodNights, perfectTreatWeeks: tr.perfectTreatWeeks, sessions: dates.length, sets, volume, prs, exercises: exerciseIds.size, streak, bestStreak, comebacks, perfectWeeks, foodDays, waterDays, weighIns, lastDate: dates[dates.length - 1] || null };
   }
 
   // ---------------------------------------------------------------- nivel
@@ -120,7 +142,42 @@ const Gamify = (() => {
     { id: 'b4', cat: 'Cuerpo', icon: '📏', name: 'Seguimiento', desc: '4 pesajes registrados', tier: 1, target: 4, cur: (s) => s.weighIns },
     { id: 'b12', cat: 'Cuerpo', icon: '📈', name: 'Tendencia clara', desc: '12 pesajes registrados', tier: 2, target: 12, cur: (s) => s.weighIns },
   ];
-  const CATS = ['Constancia', 'Fuerza', 'Volumen', 'Nutrición', 'Cuerpo'];
+  // ---- básicos: fuerza relativa a tu peso corporal (1RM estimado ÷ peso)
+  const ratio = (id, icon, name, key, mult, tier, label) => ({
+    id, cat: 'Básicos', icon, name, tier, target: Math.round(mult * 100),
+    desc: `${label} con ${mult === 1 ? 'tu peso corporal' : `${String(mult).replace('.', ',')}× tu peso corporal`} (1RM est.)`,
+    cur: (s) => (s.bw > 0 && s.lifts[key] ? Math.round((s.lifts[key] / s.bw) * 100) : 0),
+    fmt: (v) => `${(v / 100).toFixed(2)}×`,
+  });
+  ACH.push(
+    ratio('bp75', '🏋️', 'Banca en camino', 'banca', 0.75, 1, 'Press de banca'),
+    ratio('bp100', '🛡️', 'Banca sólida', 'banca', 1, 2, 'Press de banca'),
+    ratio('bp150', '🦍', 'Banca bestial', 'banca', 1.5, 3, 'Press de banca'),
+    ratio('sq100', '🦵', 'Sentadilla firme', 'sentadilla', 1, 1, 'Sentadilla'),
+    ratio('sq150', '🏰', 'Sentadilla poderosa', 'sentadilla', 1.5, 2, 'Sentadilla'),
+    ratio('sq200', '🐘', 'Sentadilla de élite', 'sentadilla', 2, 3, 'Sentadilla'),
+    ratio('dl125', '⛓️', 'Tirón fuerte', 'peso_muerto', 1.25, 1, 'Peso muerto'),
+    ratio('dl175', '🏗️', 'Tirón poderoso', 'peso_muerto', 1.75, 2, 'Peso muerto'),
+    ratio('dl225', '🌋', 'Tirón legendario', 'peso_muerto', 2.25, 3, 'Peso muerto'),
+    ratio('oh50', '🙌', 'Hombros de acero', 'press_militar', 0.5, 1, 'Press militar'),
+    ratio('oh75', '🔩', 'Press militar sólido', 'press_militar', 0.75, 2, 'Press militar'),
+    ratio('oh100', '☄️', 'Press militar élite', 'press_militar', 1, 3, 'Press militar'),
+    { id: 'tot300', cat: 'Básicos', icon: '🥉', name: 'Club de los 300', desc: 'Banca + sentadilla + peso muerto: 300 kg de 1RM estimado en total', tier: 1, target: 300, cur: (s) => Math.round((s.lifts.banca || 0) + (s.lifts.sentadilla || 0) + (s.lifts.peso_muerto || 0)), fmt: (v) => `${v} kg` },
+    { id: 'tot400', cat: 'Básicos', icon: '🥈', name: 'Club de los 400', desc: 'Banca + sentadilla + peso muerto: 400 kg en total', tier: 2, target: 400, cur: (s) => Math.round((s.lifts.banca || 0) + (s.lifts.sentadilla || 0) + (s.lifts.peso_muerto || 0)), fmt: (v) => `${v} kg` },
+    { id: 'tot500', cat: 'Básicos', icon: '🥇', name: 'Club de los 500', desc: 'Banca + sentadilla + peso muerto: 500 kg en total', tier: 3, target: 500, cur: (s) => Math.round((s.lifts.banca || 0) + (s.lifts.sentadilla || 0) + (s.lifts.peso_muerto || 0)), fmt: (v) => `${v} kg` },
+    { id: 'bpr1', cat: 'Básicos', icon: '📌', name: 'Récord en un básico', desc: 'Rompe un récord en banca, sentadilla, peso muerto, press militar, remo o hip thrust', tier: 1, target: 1, cur: (s) => s.basicPrs },
+    { id: 'bpr5', cat: 'Básicos', icon: '🎖️', name: 'Cinco récords básicos', desc: '5 récords en los ejercicios básicos', tier: 2, target: 5, cur: (s) => s.basicPrs },
+    { id: 'bpr15', cat: 'Básicos', icon: '🏅', name: 'Quince récords básicos', desc: '15 récords en los ejercicios básicos', tier: 3, target: 15, cur: (s) => s.basicPrs },
+    // ---- premios y sueño
+    { id: 'tk1', cat: 'Premios', icon: '🎟️', name: 'Primer vale', desc: 'Gana tu primer vale de la semana', tier: 1, target: 1, cur: (s) => s.vales },
+    { id: 'tk10', cat: 'Premios', icon: '🎫', name: 'Coleccionista de vales', desc: 'Gana 10 vales', tier: 2, target: 10, cur: (s) => s.vales },
+    { id: 'tk30', cat: 'Premios', icon: '💰', name: 'Banco de vales', desc: 'Gana 30 vales', tier: 3, target: 30, cur: (s) => s.vales },
+    { id: 'tkr1', cat: 'Premios', icon: '🍺', name: 'Premio merecido', desc: 'Canjea tu primer premio', tier: 1, target: 1, cur: (s) => s.redeemed },
+    { id: 'tkw4', cat: 'Premios', icon: '🌟', name: 'Semana perfecta', desc: 'Gana los 4 vales en una misma semana', tier: 3, target: 1, cur: (s) => s.perfectTreatWeeks },
+    { id: 'sl7', cat: 'Premios', icon: '😴', name: 'Buen dormir', desc: '7 noches de 7 h o más', tier: 1, target: 7, cur: (s) => s.goodNights },
+    { id: 'sl30', cat: 'Premios', icon: '🌙', name: 'Sueño reparador', desc: '30 noches de 7 h o más', tier: 2, target: 30, cur: (s) => s.goodNights },
+  );
+  const CATS = ['Constancia', 'Fuerza', 'Básicos', 'Volumen', 'Nutrición', 'Premios', 'Cuerpo'];
 
   function evaluate() {
     const st = computeStats();

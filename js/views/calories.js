@@ -69,6 +69,7 @@ const CaloriesView = (() => {
     view.appendChild(dayNav);
 
     view.appendChild(renderSummary(settings, entries));
+    try { view.appendChild(Treats.card(refresh)); } catch (e) { /* premios no disponibles */ }
 
     // ---- acciones principales ----
     const addMain = Utils.el('button', { class: 'btn-primary', text: '➕ Agregar alimento' });
@@ -111,7 +112,8 @@ const CaloriesView = (() => {
   // ---------------------------------------------------------------- resumen
   function renderSummary(settings, entries) {
     const t = sumOf(entries);
-    const goal = settings.calorieGoal || 0;
+    const bonus = entries.reduce((n, e) => n + (e.treat ? (Number(e.kcal) || 0) : 0), 0);   // calorías de premios: se suman a la meta
+    const goal = (settings.calorieGoal || 0) + bonus;
     const pct = goal ? t.kcal / goal : 0;
     const over = goal && t.kcal > goal * 1.05;
     const remaining = goal - t.kcal;
@@ -122,7 +124,7 @@ const CaloriesView = (() => {
       Utils.el('div', { class: 'nut-rem' }, [
         Utils.el('div', { class: 'eyebrow', text: over ? 'Te pasaste' : 'Te quedan' }),
         Utils.el('div', { class: 'nut-rem-val', text: `${Math.abs(r0(remaining))}` }),
-        Utils.el('div', { class: 'small text-dim', text: `de ${goal} kcal` }),
+        Utils.el('div', { class: 'small text-dim', text: bonus ? `de ${goal} kcal (🎁 +${r0(bonus)} de premio)` : `de ${goal} kcal` }),
         Utils.el('button', { class: 'link-btn small', text: '✏️ Cambiar metas', onclick: () => openGoals() }),
       ]),
     ]));
@@ -181,7 +183,7 @@ const CaloriesView = (() => {
     mealEntries.forEach((e) => {
       const row = Utils.el('div', { class: 'meal-row' }, [
         Utils.el('div', { class: 'mr-main' }, [
-          Utils.el('div', { class: 'mr-name', text: e.foodName }),
+          Utils.el('div', { class: 'mr-name', text: e.treat && !/🎁|🍺|🍻|🥂|🍷|🥃|🍹|🍕|🍔|🌮|🍟|🍰|🍦|🍫/.test(e.foodName) ? `🎁 ${e.foodName}` : e.foodName }),
           Utils.el('div', { class: 'meta', text: `${qtyText(e)} · P ${r0(e.protein)} · C ${r0(e.carbs)} · G ${r0(e.fat)}` }),
         ]),
         Utils.el('div', { class: 'mr-kcal', text: `${r0(e.kcal)}` }),
@@ -189,6 +191,7 @@ const CaloriesView = (() => {
       ]);
       row.querySelector('button').addEventListener('click', (ev) => {
         ev.stopPropagation();
+        if (e.treat) Treats.refund(e.id);
         saveEntries(cursorIso, entriesOf(cursorIso).filter((x) => x.id !== e.id));
         refresh();
       });
@@ -285,7 +288,7 @@ const CaloriesView = (() => {
       const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i);
       const iso = Utils.toISODate(d);
       const list = entriesOf(iso);
-      days.push({ iso, d, t: sumOf(list), has: list.length > 0 });
+      days.push({ iso, d, t: sumOf(list), has: list.length > 0, g: goal + Treats.bonusOf(iso) });
     }
     const logged = days.filter((x) => x.has);
     const max = Math.max(goal * 1.25, ...days.map((x) => x.t.kcal), 1);
@@ -298,7 +301,7 @@ const CaloriesView = (() => {
     days.forEach((x) => {
       const pct = x.t.kcal / max;
       let color = 'rgba(255,255,255,0.18)';
-      if (x.has && goal) color = x.t.kcal > goal * 1.1 ? 'var(--red)' : x.t.kcal >= goal * 0.9 ? 'var(--green)' : 'var(--accent-2)';
+      if (x.has && goal) color = x.t.kcal > x.g * 1.1 ? 'var(--red)' : x.t.kcal >= x.g * 0.9 ? 'var(--green)' : 'var(--accent-2)';
       const col = Utils.el('button', { class: 'wk-col' + (x.iso === cursorIso ? ' sel' : ''), type: 'button' }, [
         Utils.el('div', { class: 'wk-val', text: x.has ? String(r0(x.t.kcal)) : '' }),
         Utils.el('div', { class: 'wk-bar' }, [
@@ -490,8 +493,8 @@ const CaloriesView = (() => {
   }
 
   // ---------------------------------------------------------------- escanear código de barras
-  function scanBarcode(meal) {
-    const afterSave = (food) => openQuantity({ sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' });
+  function scanBarcode(meal, topts = {}) {
+    const afterSave = (food) => openQuantity(topts.treat ? { sp: FoodDB.spec(food), meal, treat: true } : { sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' });
     Barcode.open({
       onSaved: (code, food) => { Utils.toast('✓ Ya lo tenías guardado'); afterSave(food); },
       onProduct: (code, info) => {
@@ -516,7 +519,7 @@ const CaloriesView = (() => {
   }
 
   // ---------------------------------------------------------------- escanear etiqueta
-  function scanLabel(meal) {
+  function scanLabel(meal, topts = {}) {
     LabelScan.open({
       onResult: (p, raw, thumb) => {
         const extra = Utils.el('div', { class: 'scan-result' });
@@ -533,7 +536,7 @@ const CaloriesView = (() => {
           msgs.appendChild(det);
         }
         openFoodForm(null, (food) => {
-          openQuantity({ sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' });
+          openQuantity(topts.treat ? { sp: FoodDB.spec(food), meal, treat: true } : { sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' });
         }, '', {
           basis: p.basis, kcal: p.kcal, protein: p.protein, carbs: p.carbs, fat: p.fat, servingLabel: p.servingLabel, portionG: p.portionG, extra,
         });
@@ -627,12 +630,18 @@ const CaloriesView = (() => {
         meal, time: entry ? entry.time : new Date().toISOString(),
       };
       if (isG) rec.grams = r1(q); else rec.servings = r1(q);
+      if (opts.treat && !entry) {
+        const need = Treats.costOf(rec.kcal);
+        if (Treats.balance() < need) { Utils.toast(`Te faltan ${need - Treats.balance()} vale(s) para este premio`); return; }
+        rec.treat = true; rec.meal = 'snack';
+      }
       const list = entriesOf(cursorIso);
       if (entry) {
         const i = list.findIndex((x) => x.id === entry.id);
         if (i >= 0) list[i] = rec;
       } else list.push(rec);
       saveEntries(cursorIso, list);
+      if (opts.treat && !entry) { Treats.spend(rec.id, rec.foodName, rec.kcal); Utils.toast(`🎁 Premio registrado: +${r0(rec.kcal)} kcal en tu meta de hoy`); }
       Utils.vibrate(20);
       if (!entry && opts.after === 'list' && opts.onBack) {
         Utils.toast(`✓ ${sp.name} agregado`);
@@ -647,6 +656,7 @@ const CaloriesView = (() => {
     if (entry) {
       const del = Utils.el('button', { class: 'btn-secondary btn-block', style: 'color:var(--red);', text: '🗑️ Quitar este alimento' });
       del.addEventListener('click', () => {
+        if (entry.treat) Treats.refund(entry.id);
         saveEntries(cursorIso, entriesOf(cursorIso).filter((x) => x.id !== entry.id));
         Modal.close();
         refresh();
@@ -678,7 +688,7 @@ const CaloriesView = (() => {
   }
 
   // ---------------------------------------------------------------- solo calorías
-  function openQuickAdd(mealKey, entry) {
+  function openQuickAdd(mealKey, entry, qopts = {}) {
     const body = Utils.el('div');
     let meal = mealKey;
     body.appendChild(Utils.el('p', { class: 'small', text: 'Para cuando no encuentras el alimento: anota lo que dice la etiqueta o tu mejor estimado.' }));
@@ -715,19 +725,26 @@ const CaloriesView = (() => {
         kcal: r1(kcal), protein: r1(p), carbs: r1(c), fat: r1(f), meal, time: entry ? entry.time : new Date().toISOString(),
       };
       if (entry && entry.foodId) rec.foodId = entry.foodId;
+      if (entry && entry.treat) rec.treat = true;
+      if (qopts.treat && !entry) {
+        const need = Treats.costOf(rec.kcal);
+        if (Treats.balance() < need) { Utils.toast(`Te faltan ${need - Treats.balance()} vale(s) para este premio`); return; }
+        rec.treat = true; rec.meal = 'snack';
+      }
       const list = entriesOf(cursorIso);
       if (entry) { const i = list.findIndex((x) => x.id === entry.id); if (i >= 0) list[i] = rec; } else list.push(rec);
       saveEntries(cursorIso, list);
+      if (qopts.treat && !entry) { Treats.spend(rec.id, rec.foodName, rec.kcal); Utils.toast(`🎁 Premio registrado: +${r0(rec.kcal)} kcal en tu meta de hoy`); }
       Modal.close();
       refresh();
     });
     body.appendChild(save);
     if (entry) {
       const del = Utils.el('button', { class: 'btn-secondary btn-block', style: 'color:var(--red);', text: '🗑️ Quitar' });
-      del.addEventListener('click', () => { saveEntries(cursorIso, entriesOf(cursorIso).filter((x) => x.id !== entry.id)); Modal.close(); refresh(); });
+      del.addEventListener('click', () => { if (entry.treat) Treats.refund(entry.id); saveEntries(cursorIso, entriesOf(cursorIso).filter((x) => x.id !== entry.id)); Modal.close(); refresh(); });
       body.appendChild(del);
     }
-    Modal.open(entry ? 'Editar' : '⚡ Calorías rápidas', body, { onClose: refresh });
+    Modal.open(entry ? 'Editar' : (qopts.treat ? '🎁 Premio: calorías' : '⚡ Calorías rápidas'), body, { onClose: refresh });
   }
 
   // ---------------------------------------------------------------- copiar de otro día
@@ -1145,5 +1162,14 @@ const CaloriesView = (() => {
     openAddFood(defaultMeal());
   }
 
-  return { render, addNow };
+  // premio con foto de la tabla, código de barras o calorías a mano (siempre en HOY)
+  function addTreat(kind) {
+    cursorIso = Utils.todayISO();
+    if (rootRef) render(rootRef);
+    if (kind === 'label') scanLabel('snack', { treat: true });
+    else if (kind === 'barcode') scanBarcode('snack', { treat: true });
+    else openQuickAdd('snack', null, { treat: true });
+  }
+
+  return { render, addNow, addTreat };
 })();
