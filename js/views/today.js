@@ -447,6 +447,38 @@ const TodayView = (() => {
     const settings = DB.getSettings();
     const rerender = () => render(root);
 
+    // avisos: se juntan y solo se muestra el más importante; el resto queda plegado
+    const notices = [];   // [{ key, node }] en orden de importancia
+
+    const deload = renderDeload(rerender);
+    const comeback = renderComeback();
+    const wkCard = WeeklyReview.card(rerender);
+    if (deload && Progression.deloadActive()) notices.push({ key: 'descarga', node: deload });
+    if (comeback) notices.push({ key: 'regreso', node: comeback });
+    if (deload && !Progression.deloadActive()) notices.push({ key: 'descarga', node: deload });
+    if (wkCard) notices.push({ key: 'semana', node: wkCard });
+
+    const backupNudge = renderBackupNudge(rerender);
+    if (backupNudge) notices.push({ key: 'respaldo', node: backupNudge });
+
+    // recordatorio semanal de peso (se puede ocultar por hoy)
+    const sinceW = MeasurementsView.daysSinceWeight();
+    let nudgeHidden = false;
+    try { nudgeHidden = localStorage.getItem('gt_weight_nudge') === todayIso; } catch (e) { /* sin almacenamiento */ }
+    if ((sinceW === null || sinceW >= 7) && !nudgeHidden && !backupNudge) {
+      const reg = Utils.el('button', { class: 'btn-small', text: 'Pesarme' });
+      reg.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
+      const later = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Recordármelo mañana' });
+      later.addEventListener('click', () => {
+        try { localStorage.setItem('gt_weight_nudge', todayIso); } catch (e) { /* sin almacenamiento */ }
+        rerender();
+      });
+      notices.push({ key: 'peso', node: Utils.el('div', { class: 'banner' }, [
+        Utils.el('span', { text: sinceW === null ? '⚖️ Aún no registras tu peso. Es la base para ver tu progreso.' : `⚖️ Hace ${sinceW} días que no registras tu peso.` }),
+        Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;flex:none;' }, [reg, later]),
+      ]) });
+    }
+
     // en Safari (iPhone/iPad) sin instalar: una pista de cómo añadirla a la pantalla de inicio
     let hintDismissed = false;
     try { hintDismissed = localStorage.getItem('gt_hint_ios') === '1'; } catch (e) { /* sin almacenamiento */ }
@@ -456,40 +488,26 @@ const TodayView = (() => {
         try { localStorage.setItem('gt_hint_ios', '1'); } catch (e) { /* sin almacenamiento */ }
         rerender();
       });
-      view.appendChild(Utils.el('div', { class: 'banner' }, [
+      notices.push({ key: 'ios', node: Utils.el('div', { class: 'banner' }, [
         Utils.el('span', { text: '📲 Para usarla como app: toca Compartir ⬆️ y elige «Añadir a pantalla de inicio».' }),
         gotIt,
-      ]));
+      ]) });
     }
-
-    // recordatorio semanal de peso (se puede ocultar por hoy)
-    const sinceW = MeasurementsView.daysSinceWeight();
-    let nudgeHidden = false;
-    try { nudgeHidden = localStorage.getItem('gt_weight_nudge') === todayIso; } catch (e) { /* sin almacenamiento */ }
-    const backupNudge = renderBackupNudge(rerender);
-    if ((sinceW === null || sinceW >= 7) && !nudgeHidden && !backupNudge) {
-      const reg = Utils.el('button', { class: 'btn-small', text: 'Pesarme' });
-      reg.addEventListener('click', () => MeasurementsView.openQuickWeight(rerender));
-      const later = Utils.el('button', { class: 'icon-btn', text: '✕', title: 'Recordármelo mañana' });
-      later.addEventListener('click', () => {
-        try { localStorage.setItem('gt_weight_nudge', todayIso); } catch (e) { /* sin almacenamiento */ }
-        rerender();
-      });
-      view.appendChild(Utils.el('div', { class: 'banner' }, [
-        Utils.el('span', { text: sinceW === null ? '⚖️ Aún no registras tu peso. Es la base para ver tu progreso.' : `⚖️ Hace ${sinceW} días que no registras tu peso.` }),
-        Utils.el('div', { style: 'display:flex;align-items:center;gap:4px;flex:none;' }, [reg, later]),
-      ]));
-    }
-
-    if (backupNudge) view.appendChild(backupNudge);
 
     view.appendChild(renderPlayer());
-    const wkCard = WeeklyReview.card(rerender);
-    if (wkCard) view.appendChild(wkCard);
-    const comeback = renderComeback();
-    if (comeback) view.appendChild(comeback);
-    const deload = renderDeload(rerender);
-    if (deload) view.appendChild(deload);
+    if (notices.length) view.appendChild(notices[0].node);
+    if (notices.length > 1) {
+      const rest = notices.slice(1);
+      const det = Utils.el('details', { class: 'fold notice-fold' });
+      det.appendChild(Utils.el('summary', { class: 'fold-sum' }, [
+        Utils.el('span', { class: 'fold-t', text: `🔔 ${rest.length} aviso${rest.length === 1 ? '' : 's'} más` }),
+        Utils.el('i', { class: 'fold-chev' }),
+      ]));
+      const box = Utils.el('div', { class: 'notice-box' });
+      rest.forEach((n) => box.appendChild(n.node));
+      det.appendChild(box);
+      view.appendChild(det);
+    }
 
     view.appendChild(renderHero(todayIso, routine, log, rerender));
     if (routine && routine.exercises.length > 0) view.appendChild(renderExerciseList(todayIso, routine, log));

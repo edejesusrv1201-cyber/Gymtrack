@@ -1784,3 +1784,9 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .share-frame { width: fit-content; max-width: 100%; margin: 0 auto 12px; border-radius: 18px; overflow: hidden; line-height: 0; }
 .share-frame .share-img { margin: 0; width: auto; max-width: 100%; max-height: 52vh; border-radius: 18px; }
 .share-frame.checker { background: repeating-conic-gradient(#3a3d46 0 25%, #2a2d35 0 50%) 0 / 22px 22px; }
+
+/* ===== v51: avisos de Hoy agrupados ===== */
+.notice-fold { margin-bottom: 12px; }
+.notice-fold .notice-box { padding-top: 8px; }
+.notice-fold .notice-box > * { margin-bottom: 8px; }
+.notice-fold .notice-box > *:last-child { margin-bottom: 0; }
