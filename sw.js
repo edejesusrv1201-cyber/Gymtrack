@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v49';
+const CACHE_NAME = 'migymtrack-v50';
 const ASSETS = [
   './',
   './index.html',
