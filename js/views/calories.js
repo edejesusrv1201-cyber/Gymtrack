@@ -89,6 +89,9 @@ const CaloriesView = (() => {
     view.appendChild(renderWeekStrip(settings));
     view.appendChild(renderAutoCard());
 
+    const menuBtn = Utils.el('button', { class: 'btn-primary btn-block', text: '✨ Menús listos según tus calorías' });
+    menuBtn.addEventListener('click', () => Menus.open());
+    view.appendChild(menuBtn);
     const planBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🗓️ Plan de comidas semanal y lista de compras' });
     planBtn.addEventListener('click', () => App.navigate('plancomidas'));
     view.appendChild(planBtn);

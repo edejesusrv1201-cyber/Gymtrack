@@ -108,6 +108,9 @@ const MealPlanView = (() => {
     row.appendChild(copy); row.appendChild(clear);
     view.appendChild(row);
 
+    const gen = Utils.el('button', { class: 'btn-secondary btn-block', style: 'margin-top:8px;', text: '✨ Generar un menú según mis calorías' });
+    gen.addEventListener('click', () => Menus.open());
+    view.appendChild(gen);
     const totalItems = DAYS.reduce((n, d) => n + dayItems(plan, d.dow).length, 0);
     const shop = Utils.el('button', { class: 'btn-secondary btn-block', style: 'margin-top:8px;', text: '🛒 Lista de compras de la semana' });
     shop.disabled = !totalItems;

@@ -1648,3 +1648,9 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .sl-bar i.good { background: linear-gradient(180deg, #3cd68f, #1f9f6b); }
 .sl-h { font-size: 0.72rem; font-weight: 800; }
 .sl-d { font-size: 0.66rem; color: var(--text-dim); }
+
+/* ===== v45: menús listos ===== */
+.mn-total { text-align: center; font-size: 1.15rem; margin: 6px 0 10px; }
+.mn-meal { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.07); margin-bottom: 8px; }
+.mn-item { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 0.86rem; }
+.mn-item span:first-child { min-width: 0; }
