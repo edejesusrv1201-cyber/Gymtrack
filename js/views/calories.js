@@ -69,10 +69,9 @@ const CaloriesView = (() => {
     view.appendChild(dayNav);
 
     view.appendChild(renderSummary(settings, entries));
-    try { view.appendChild(Treats.card(refresh)); } catch (e) { /* premios no disponibles */ }
 
     // ---- acciones principales ----
-    const addMain = Utils.el('button', { class: 'btn-primary', text: '➕ Agregar alimento' });
+    const addMain = Utils.el('button', { class: 'btn-primary', text: '➕ Agregar', title: 'Agregar alimento' });
     addMain.addEventListener('click', () => openAddFood(isToday ? defaultMeal() : 'almuerzo'));
     const addQuick = Utils.el('button', { class: 'btn-secondary', text: '⚡ Rápido', title: 'Solo calorías y macros' });
     addQuick.addEventListener('click', () => openQuickAdd(isToday ? defaultMeal() : 'almuerzo'));
@@ -85,24 +84,52 @@ const CaloriesView = (() => {
     // ---- comidas ----
     MEALS.forEach((meal) => view.appendChild(renderMeal(meal, entries)));
 
-    view.appendChild(renderWaterCard(cursorIso, settings));
-    view.appendChild(renderWeekStrip(settings));
-    view.appendChild(renderAutoCard());
+    // ---- secciones plegables (se recuerda cuáles dejaste abiertas) ----
+    try {
+      const bal = Treats.balance();
+      view.appendChild(fold('premios', '🎁 Tus premios', `🎟️ ${bal} vale${bal === 1 ? '' : 's'}`, Treats.card(refresh), false));
+    } catch (e) { /* premios no disponibles */ }
+    const wl = DB.getWaterLog()[cursorIso] || [];
+    const wMl = wl.reduce((s, e) => s + e.ml, 0);
+    view.appendChild(fold('agua', '💧 Agua', `${Utils.round1(wMl / 1000)} / ${Utils.round1((settings.waterGoalMl || 2500) / 1000)} L`, renderWaterCard(cursorIso, settings), true));
+    view.appendChild(fold('semana', '📊 Últimos 7 días', 'toca un día', renderWeekStrip(settings), false));
+    const am = Nutrition.AUTO_MODES[Nutrition.autoConfig().mode];
+    view.appendChild(fold('auto', '🎯 Ajuste automático', am ? am.label : '', renderAutoCard(), false));
 
-    const menuBtn = Utils.el('button', { class: 'btn-primary btn-block', text: '✨ Menús listos según tus calorías' });
-    menuBtn.addEventListener('click', () => Menus.open());
-    view.appendChild(menuBtn);
-    const planBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🗓️ Plan de comidas semanal y lista de compras' });
-    planBtn.addEventListener('click', () => App.navigate('plancomidas'));
-    view.appendChild(planBtn);
-    const manageBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🍎 Mis alimentos y plantillas' });
-    manageBtn.addEventListener('click', () => openFoodManager());
-    view.appendChild(manageBtn);
-    const calcBtn = Utils.el('button', { class: 'btn-secondary btn-block', text: '🧮 Calculadora de mantenimiento / déficit / superávit' });
-    calcBtn.addEventListener('click', () => App.navigate('calculadora'));
-    view.appendChild(calcBtn);
+    // ---- herramientas ----
+    view.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:16px 2px 8px;', text: 'Herramientas' }));
+    const tools = Utils.el('div', { class: 'cal-tools' });
+    [['✨', 'Menús listos', 'según tus calorías', () => Menus.open()],
+      ['🗓️', 'Plan semanal', 'y lista de compras', () => App.navigate('plancomidas')],
+      ['🍎', 'Mis alimentos', 'y plantillas', () => openFoodManager()],
+      ['🧮', 'Calculadora', 'mantener, bajar o subir', () => App.navigate('calculadora')]].forEach(([ico, t, s, fn]) => {
+      const b = Utils.el('button', { type: 'button', class: 'cal-tool' }, [
+        Utils.el('span', { class: 'ct-ico', text: ico }),
+        Utils.el('b', { text: t }),
+        Utils.el('span', { class: 'small text-dim', text: s }),
+      ]);
+      b.addEventListener('click', fn);
+      tools.appendChild(b);
+    });
+    view.appendChild(tools);
 
     root.appendChild(view);
+  }
+
+  // sección plegable; el estado abierto/cerrado se guarda en el celular
+  function foldState() { try { return JSON.parse(localStorage.getItem('gt_ui_folds') || '{}'); } catch (e) { return {}; } }
+  function fold(key, title, sub, content, defOpen) {
+    const st = foldState();
+    const d = Utils.el('details', { class: 'fold fold-flat' });
+    d.open = st[key] !== undefined ? !!st[key] : !!defOpen;
+    d.appendChild(Utils.el('summary', { class: 'fold-sum' }, [
+      Utils.el('span', { class: 'fold-t', text: title }),
+      Utils.el('span', { class: 'fold-sub', text: sub || '' }),
+      Utils.el('i', { class: 'fold-chev' }),
+    ]));
+    d.appendChild(content);
+    d.addEventListener('toggle', () => { try { const s = foldState(); s[key] = d.open; localStorage.setItem('gt_ui_folds', JSON.stringify(s)); } catch (e) { /* sin guardado */ } });
+    return d;
   }
 
   function shiftDay(delta) {

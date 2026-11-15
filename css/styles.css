@@ -1759,3 +1759,21 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .wz-kcal { font-size: 1.3rem; margin-bottom: 4px; }
 .wz-kcal b { font-size: 2rem; letter-spacing: -0.02em; }
 .wz-prog { margin-top: 12px; padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.08); display: grid; gap: 3px; }
+
+/* ===== v49: Calorías más corta (secciones plegables + herramientas) ===== */
+.fold-flat > .card { margin-top: 8px; }
+.fold-flat > .card > h3:first-child,
+.fold-flat > .card > .card-title-row:first-child,
+.fold-flat > .card > .flex-between:first-child { display: none; }
+.fold-flat > .card > .card-title-row:first-child + p { margin-top: 0 !important; }
+.fold-flat > .card > .flex-between:first-child + .macro-bar { margin-top: 0; }
+.nut-actions > button { min-height: 50px; display: flex; align-items: center; justify-content: center; }
+.nut-actions.act-2 > button { min-height: 46px; }
+.cal-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.cal-tool { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 14px; min-height: 96px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid var(--border-strong); }
+.cal-tool .ct-ico { font-size: 1.5rem; line-height: 1; margin-bottom: 6px; }
+.cal-tool b { font-size: 0.95rem; }
+.cal-tool .small { line-height: 1.25; }
+.fold-flat .grid-3 .btn-secondary { padding: 12px 4px; font-size: 0.88rem; white-space: nowrap; }
+.nut-actions.act-4 { grid-template-columns: 1.3fr 1fr 52px 52px; }
+.nut-actions.act-4 > button { padding: 0 6px; white-space: nowrap; font-size: 0.95rem; }
