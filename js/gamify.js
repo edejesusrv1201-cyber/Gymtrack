@@ -263,9 +263,11 @@ const Gamify = (() => {
   }
 
   // ---------------------------------------------------------------- visual
-  function badgeEl(a, big) {
+  // medalla metálica; las bloqueadas muestran un anillo con tu progreso
+  function badgeEl(a, big, size) {
     const tier = a.tier === 3 ? 'gold' : a.tier === 2 ? 'silver' : 'bronze';
-    return Utils.el('div', { class: `badge ${tier}${a.done ? '' : ' locked'}${big ? ' big' : ''}` }, [Utils.el('span', { text: a.icon })]);
+    const pct = a.done ? 100 : Math.max(0, Math.min(100, Math.round(((a.curCapped || 0) / (a.target || 1)) * 100)));
+    return Utils.el('div', { class: `badge ${tier}${a.done ? '' : ' locked'}${big ? ' big' : ''}${size ? ` ${size}` : ''}`, style: `--p:${pct}` }, [Utils.el('span', { text: a.icon })]);
   }
 
   function motionOk() {
@@ -283,9 +285,18 @@ const Gamify = (() => {
         Utils.el('div', {}, [Utils.el('div', { class: 'eyebrow', text: '¡Subiste de nivel!' }), Utils.el('div', { class: 'lu-title', text: `Nivel ${res.up.to} · ${res.ev.lvl.title}` })]),
       ]));
     }
-    res.fresh.forEach((a) => {
+    const TIER = { 1: 'Bronce', 2: 'Plata', 3: 'Oro' };
+    res.fresh.forEach((a, i) => {
+      const full = Object.assign({}, a, { done: true });
+      if (i === 0) {
+        body.appendChild(Utils.el('div', { class: 'unlock-hero' }, [Utils.el('div', { class: `rays t${a.tier}` }), badgeEl(full, true)]));
+        body.appendChild(Utils.el('div', { class: 'ur-name', style: 'text-align:center;font-size:1.25rem;', text: a.name }));
+        body.appendChild(Utils.el('div', { style: 'text-align:center;' }, [Utils.el('span', { class: `tier-pill t${a.tier}`, text: `${TIER[a.tier]} · ${a.cat}` })]));
+        body.appendChild(Utils.el('div', { class: 'meta', style: 'text-align:center;margin:6px 0 10px;', text: a.desc }));
+        return;
+      }
       body.appendChild(Utils.el('div', { class: 'unlock-row' }, [
-        badgeEl(Object.assign({}, a, { done: true }), true),
+        badgeEl(full),
         Utils.el('div', { style: 'min-width:0;' }, [Utils.el('div', { class: 'ur-name', text: a.name }), Utils.el('div', { class: 'meta', text: a.desc })]),
       ]));
     });
