@@ -391,6 +391,17 @@ const MoreView = (() => {
     view.appendChild(backupCard);
 
     // ---- acerca de ----
+    const fbCard = Utils.el('div', { class: 'card' });
+    fbCard.appendChild(Utils.el('h3', { text: '💬 Tu opinión importa' }));
+    fbCard.appendChild(Utils.el('p', { class: 'small', text: 'MyGymTrack se está construyendo con feedback de gente que entrena. Si algo falla, no se entiende o se te ocurre una mejora, cuéntamelo.' }));
+    const fbBtn = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', text: '💬 Enviar feedback' });
+    fbBtn.addEventListener('click', () => Feedback.open());
+    fbCard.appendChild(fbBtn);
+    const wzBtn = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:8px;', text: '👋 Ver la bienvenida otra vez' });
+    wzBtn.addEventListener('click', () => Welcome.open());
+    fbCard.appendChild(wzBtn);
+    view.appendChild(fbCard);
+
     const aboutCard = Utils.el('div', { class: 'card' });
     aboutCard.appendChild(Utils.el('h3', { text: 'ℹ️ Acerca de MyGymTrack' }));
     aboutCard.appendChild(Utils.el('p', { text: 'App personal para llevar tu progreso de gym: rutinas mensuales, series normales, aproximaciones y dropsets, cardio, calentamiento, cronómetro de descanso, calorías, agua y medidas, con métricas y gráficas de progreso por semana, grupo muscular y ejercicio. Todo se guarda localmente en tu celular.' }));

@@ -130,6 +130,7 @@ const App = (() => {
     RestTimer.init();
     AutoBackup.init();
     navigate('hoy');
+    try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
     registerServiceWorker();
     setTimeout(checkForUpdate, 3500);
   }

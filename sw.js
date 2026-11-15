@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v47';
+const CACHE_NAME = 'migymtrack-v48';
 const ASSETS = [
   './',
   './index.html',
@@ -49,6 +49,8 @@ const ASSETS = [
   './js/views/calories.js',
   './js/views/mealplan.js',
   './js/leaderboard.js',
+  './js/welcome.js',
+  './js/feedback.js',
   './js/views/measurements.js',
   './js/views/stats.js',
   './js/views/rewards.js',

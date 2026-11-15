@@ -1742,3 +1742,20 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .badge-tile.t2 .bt-tier { color: #cfd8e8; } .badge-tile.t3 .bt-tier { color: #ffd24a; }
 .badge-tile .bt-prog { font-size: 0.68rem; font-weight: 800; color: var(--text-dim); }
 .badge-tile:not(.done) .bt-name { color: var(--text-dim); }
+
+/* ===== v48: bienvenida ===== */
+.wz-dots { display: flex; justify-content: center; gap: 8px; margin: 0 0 14px; }
+.wz-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); transition: all .25s ease; }
+.wz-dots i.on { width: 24px; border-radius: 6px; background: var(--accent-grad); }
+.wz-dots i.done { background: rgba(var(--accent-rgb), 0.6); }
+.wz-hero { font-size: 3rem; text-align: center; margin: 4px 0; }
+.wz-body h3 { margin: 4px 0 8px; }
+.wz-list { display: grid; gap: 8px; margin-bottom: 10px; }
+.wz-choice { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+.wz-choice.on { background: var(--accent-soft); border-color: rgba(var(--accent-rgb), 0.7); }
+.wz-ico { font-size: 1.6rem; flex: none; }
+.wz-txt { display: grid; gap: 1px; }
+.wz-calc { margin-top: 6px; padding: 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.08); text-align: center; }
+.wz-kcal { font-size: 1.3rem; margin-bottom: 4px; }
+.wz-kcal b { font-size: 2rem; letter-spacing: -0.02em; }
+.wz-prog { margin-top: 12px; padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.08); display: grid; gap: 3px; }
