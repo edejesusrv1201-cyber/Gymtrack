@@ -67,14 +67,27 @@ const Records = (() => {
     return `${Utils.round1(r.value)} km · antes ${Utils.round1(r.prev)} km`;
   }
 
+  // valor principal y cuánto subió respecto al récord anterior
+  function headline(r) {
+    if (r.kind === 'peso') return { big: `${Units.label(r.value)} × ${r.reps}${r.uni ? ' /lado' : ''}`, up: `+${Units.label(Math.max(0, r.value - r.prev))}`, prev: Units.label(r.prev) };
+    if (r.kind === 'reps') return { big: `${r.reps} reps · ${Units.label(r.value)}`, up: `+${Math.max(0, r.reps - r.prev)} rep${r.reps - r.prev === 1 ? '' : 's'}`, prev: `${r.prev} reps` };
+    if (r.kind === 'tiempo') return { big: `${Math.round(r.value)} min`, up: `+${Math.max(0, Math.round(r.value - r.prev))} min`, prev: `${Math.round(r.prev)} min` };
+    return { big: `${Utils.round1(r.value)} km`, up: `+${Utils.round1(Math.max(0, r.value - r.prev))} km`, prev: `${Utils.round1(r.prev)} km` };
+  }
+
   function row(r) {
-    return Utils.el('div', { class: 'rec-row' }, [
+    const h = headline(r);
+    return Utils.el('div', { class: `rec-row k-${r.kind}` }, [
       Utils.el('div', { class: 'rec-ico', text: KIND_ICON[r.kind] || '🏆' }),
       Utils.el('div', { class: 'rec-main' }, [
         Utils.el('div', { class: 'rec-name', text: r.name }),
-        Utils.el('div', { class: 'meta', text: describe(r) }),
+        Utils.el('div', { class: 'rec-big', text: h.big }),
+        Utils.el('div', { class: 'meta', text: `antes ${h.prev}` }),
       ]),
-      Utils.el('div', { class: 'rec-date', text: Utils.shortDate(r.date) }),
+      Utils.el('div', { class: 'rec-side' }, [
+        Utils.el('span', { class: 'rec-up', text: `▲ ${h.up}` }),
+        Utils.el('div', { class: 'rec-date', text: Utils.shortDate(r.date) }),
+      ]),
     ]);
   }
 

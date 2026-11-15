@@ -14,12 +14,12 @@ const Leaderboard = (() => {
 
   // ejercicios básicos: clave del servidor, nombre y cómo reconocerlos en tu catálogo
   const BASICS = [
-    { key: 'banca', name: 'Press de banca', re: /press (de )?banca|banca plano|bench/, not: /mancuerna|inclinado|declinado|maquina|smith|agarre cerrado|cerrado/ },
-    { key: 'sentadilla', name: 'Sentadilla', re: /sentadilla/, not: /bulgara|hack|goblet|sissy|maquina|smith|salto|pistol|bandas?/ },
-    { key: 'peso_muerto', name: 'Peso muerto', re: /peso muerto/, not: /rumano|stiff|mancuerna|piernas rigidas|unilateral|una pierna/ },
+    { key: 'banca', name: 'Press de banca', re: /press (de )?banca|banca plano|bench/, not: /mancuerna|inclinado|declinado|maquina|smith|agarre cerrado|cerrado|floor|svend/ },
+    { key: 'sentadilla', name: 'Sentadilla', re: /sentadilla/, not: /bulgara|hack|goblet|sissy|maquina|smith|salto|pistol|bandas?|frontal|mancuerna|cinturon|belt|zercher|una pierna|pendular/ },
+    { key: 'peso_muerto', name: 'Peso muerto', re: /peso muerto/, not: /rumano|stiff|mancuerna|piernas rigidas|unilateral|una pierna|hexagonal|kettlebell/ },
     { key: 'press_militar', name: 'Press militar', re: /press militar/, not: /mancuerna|maquina|smith|arnold/ },
-    { key: 'remo_barra', name: 'Remo con barra', re: /remo (con )?barra|pendlay/, not: /mancuerna|maquina|polea|t-?bar/ },
-    { key: 'hip_thrust', name: 'Hip thrust', re: /hip thrust|empuje de cadera/, not: /maquina|mancuerna/ },
+    { key: 'remo_barra', name: 'Remo con barra', re: /remo (con )?barra|pendlay/, not: /mancuerna|maquina|polea|t-?bar|meadows|smith|invertido/ },
+    { key: 'hip_thrust', name: 'Hip thrust', re: /hip thrust|empuje de cadera/, not: /maquina|mancuerna|una pierna/ },
   ];
   const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const slug = (t) => norm(t).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
@@ -94,8 +94,106 @@ const Leaderboard = (() => {
   const bestBasic = (b) => bestFor(basicMatch(b));
   const bestOfExercise = (id) => bestFor((e) => e.id === id);
 
+  // ---------------------------------------------------------------- ejercicios del ranking
+  // Básicos + todo lo de la biblioteca de la app con peso externo. Así tus marcas entran solas.
+  const LIFT_GROUPS = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo'];
+  const cleanName = (t) => String(t).replace(/[^\p{L}\p{N} ._()/+-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40) || 'Ejercicio';
+  let liftsCache = null;
+  function lifts() {
+    if (liftsCache) return liftsCache;
+    const seen = new Set(); const arr = [];
+    ((typeof ExerciseUI !== 'undefined' && ExerciseUI.LIB) || []).forEach(([name, group, eq, uni, bw]) => {
+      if (uni || bw || !LIFT_GROUPS.includes(group)) return;
+      const n = norm(name);
+      if (BASICS.some((b) => b.re.test(n) && !b.not.test(n))) return;     // ya es un básico
+      const key = `c:${slug(name)}`;
+      if (key.length < 4 || seen.has(key)) return;
+      seen.add(key);
+      arr.push({ key, name: cleanName(name), group, eq, libName: name });
+    });
+    liftsCache = arr;
+    return arr;
+  }
+  // a qué prueba del ranking corresponde uno de tus ejercicios (o null)
+  function liftOf(ex) {
+    if (!ex || ex.group === 'cardio' || ex.group === 'movilidad') return null;
+    const n = norm(ex.name);
+    const b = BASICS.find((x) => x.re.test(n) && !x.not.test(n));
+    if (b) return { key: b.key, name: b.name, group: 'básico' };
+    if (ex.bodyweight || ex.unilateral) return null;
+    const all = lifts();
+    const exact = all.find((x) => norm(x.libName) === n);
+    if (exact) return exact;
+    // nombre abreviado en tu catálogo (p. ej. «Jalón al pecho» ↔ «Jalón al pecho en polea»)
+    if (n.length >= 8) {
+      // solo si en TODA la biblioteca hay una única coincidencia (si no, es ambiguo y no se adivina)
+      const names = ((typeof ExerciseUI !== 'undefined' && ExerciseUI.LIB) || []).map((x) => x[0]);
+      const cand = names.filter((nm) => norm(nm).startsWith(`${n} `));
+      if (cand.length === 1) return all.find((x) => x.libName === cand[0]) || null;
+    }
+    return null;
+  }
+  const bestForLift = (key) => bestFor((e) => { const l = liftOf(e); return !!l && l.key === key; });
+
+  // ---- publicación automática
+  const PUB_KEY = 'gt_lbPub';          // lo último que sé que está publicado: { clave: e1rm }
+  const pubMap = () => { try { return JSON.parse(localStorage.getItem(PUB_KEY) || '{}') || {}; } catch (e) { return {}; } };
+  const savePub = (m) => { try { localStorage.setItem(PUB_KEY, JSON.stringify(m)); } catch (e) { /* sin almacenamiento */ } };
+  const autoOn = () => DB.getSettings().lbAuto !== false;
+  const setAuto = (v) => { const st = DB.getSettings(); st.lbAuto = !!v; DB.saveSettings(st); };
+  let pubLoaded = false;
+  function rememberMine(list) {
+    const m = pubMap();
+    (list || []).forEach((x) => { m[x.exercise_key] = Number(x.e1rm) || 0; });
+    savePub(m);
+  }
+  async function publishBest(u, lift, best) {
+    await rpc('gt_publish', { p_secret: u.secret, p_key: lift.key, p_name: lift.name, p_weight: Math.round(best.kg * 100) / 100, p_reps: best.reps });
+    const m = pubMap(); m[lift.key] = best.e1rm; savePub(m);
+  }
+  const timers = {};
+  // se llama cada vez que registras una serie: si mejora tu marca en un ejercicio del ranking, se publica sola
+  function onSet(exerciseId) {
+    const u = user();
+    if (!u || !configured() || !autoOn()) return;
+    clearTimeout(timers[exerciseId]);
+    timers[exerciseId] = setTimeout(async () => {
+      try {
+        const ex = DB.getExercises().find((e) => e.id === exerciseId);
+        const lift = liftOf(ex);
+        if (!lift) return;
+        const best = bestForLift(lift.key);
+        if (!best || best.kg > 700) return;
+        if (!pubLoaded) { rememberMine(await rpc('gt_my_scores', { p_secret: u.secret })); pubLoaded = true; }
+        const prev = pubMap()[lift.key];
+        if (prev && best.e1rm <= prev * 1.005) return;
+        await publishBest(u, lift, best);
+        Utils.toast(`🌍 Marca publicada en el ranking: ${lift.name} ${Units.label(best.kg)} × ${best.reps}`);
+        ui.mine = []; ui.list = null;
+      } catch (e) { /* sin conexión: se intentará con la próxima serie */ }
+    }, 1500);
+  }
+  // publica de una vez todas tus mejores marcas de ejercicios del ranking
+  async function syncAll(u) {
+    let n = 0;
+    try { rememberMine(await rpc('gt_my_scores', { p_secret: u.secret })); pubLoaded = true; } catch (e) { return -1; }
+    const seen = new Set();
+    for (const ex of DB.getExercises()) {
+      const lift = liftOf(ex);
+      if (!lift || seen.has(lift.key)) continue;
+      seen.add(lift.key);
+      const best = bestForLift(lift.key);
+      if (!best || best.kg > 700) continue;
+      const prev = pubMap()[lift.key];
+      if (prev && best.e1rm <= prev * 1.005) continue;
+      try { await publishBest(u, lift, best); n += 1; } catch (e) { if (/máximo de 40/.test(e.message)) break; if (/conectarme/.test(e.message)) return n || -1; }
+    }
+    ui.mine = []; ui.list = null;
+    return n;
+  }
+
   // ---------------------------------------------------------------- pantalla
-  let ui = { joining: false, sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
+  let ui = { joining: false, auto: true, sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
   let rootRef = null;
   const refresh = () => { if (rootRef) render(rootRef); };
 
@@ -165,6 +263,14 @@ const Leaderboard = (() => {
       }
       card.appendChild(Utils.el('div', { class: 'field', style: 'margin-top:10px;' }, [Utils.el('label', { text: mode === 'new' ? 'Contraseña (opcional)' : 'Contraseña' }), pass]));
       if (mode === 'new') card.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:-4px 0 10px;', text: 'Solo sirve para entrar desde otro celular. Si no pones, no podrás recuperar tu usuario en otro dispositivo.' }));
+      if (mode === 'new') {
+        const autoChip = Utils.el('button', { class: `uni-chip${ui.auto !== false ? ' on' : ''}`, type: 'button', style: 'margin:4px 0 4px;' });
+        const paintAuto = () => { autoChip.classList.toggle('on', ui.auto !== false); autoChip.textContent = ui.auto !== false ? '⚡ Publicar mis mejores marcas automáticamente' : '⚡ Publicar automáticamente (apagado: yo elijo)'; };
+        autoChip.addEventListener('click', () => { ui.auto = ui.auto === false; paintAuto(); });
+        paintAuto();
+        card.appendChild(autoChip);
+        card.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:0 0 10px;', text: 'Solo ejercicios de la biblioteca de la app (y los básicos). Puedes cambiarlo cuando quieras en «Mis marcas».' }));
+      }
       const go = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', text: mode === 'new' ? 'Crear mi usuario' : 'Entrar' });
       go.addEventListener('click', async () => {
         msg.classList.add('hidden');
@@ -174,6 +280,9 @@ const Leaderboard = (() => {
         try {
           const r = mode === 'new' ? await rpc('gt_register', { p_name: n, p_sex: sex, p_pass: pass.value || null }) : await rpc('gt_login', { p_name: n, p_pass: pass.value });
           setUser({ id: r.id, secret: r.secret, name: r.name, sex: r.sex || null });
+          if (mode === 'new') setAuto(ui.auto !== false);
+          pubLoaded = false;
+          if (autoOn()) syncAll(user()).then((n) => { if (n > 0) { Utils.toast(`🌍 ${n} marca${n === 1 ? '' : 's'} publicada${n === 1 ? '' : 's'} automáticamente`); refresh(); } });
           Utils.toast(mode === 'new' ? `¡Bienvenido, ${r.name}!` : `Hola de nuevo, ${r.name}`);
           ui.mine = []; ui.list = null; ui.joining = false;
           refresh();
@@ -220,12 +329,21 @@ const Leaderboard = (() => {
 
     const fillSelect = () => {
       exSel.innerHTML = '';
-      const og1 = Utils.el('optgroup', { label: 'Básicos' });
-      BASICS.forEach((b) => og1.appendChild(Utils.el('option', { value: b.key, text: b.name })));
+      const count = (k) => { const x = ui.exercises.find((e) => e.exercise_key === k); return x ? Number(x.athletes) : 0; };
+      const og1 = Utils.el('optgroup', { label: '⭐ Básicos' });
+      BASICS.forEach((b) => og1.appendChild(Utils.el('option', { value: b.key, text: `${b.name}${count(b.key) ? ` (${count(b.key)})` : ''}` })));
       exSel.appendChild(og1);
-      const com = ui.exercises.filter((x) => !BASICS.some((b) => b.key === x.exercise_key));
+      LIFT_GROUPS.forEach((g) => {
+        const items = lifts().filter((l) => l.group === g);
+        if (!items.length) return;
+        const og = Utils.el('optgroup', { label: g.charAt(0).toUpperCase() + g.slice(1) });
+        items.forEach((l) => og.appendChild(Utils.el('option', { value: l.key, text: `${l.name}${count(l.key) ? ` (${count(l.key)})` : ''}` })));
+        exSel.appendChild(og);
+      });
+      const known = new Set(BASICS.map((b) => b.key).concat(lifts().map((l) => l.key)));
+      const com = ui.exercises.filter((x) => !known.has(x.exercise_key));
       if (com.length) {
-        const og2 = Utils.el('optgroup', { label: 'Comunidad' });
+        const og2 = Utils.el('optgroup', { label: 'Otros de la comunidad' });
         com.forEach((x) => og2.appendChild(Utils.el('option', { value: x.exercise_key, text: `${x.exercise_name} (${x.athletes})` })));
         exSel.appendChild(og2);
       }
@@ -251,14 +369,35 @@ const Leaderboard = (() => {
     function paintRows(rows) {
       body.innerHTML = '';
       if (!rows.length) { body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'text-align:center;padding:14px 0;', text: 'Nadie ha publicado esta marca todavía. ¡Sé la primera persona!' })); return; }
-      rows.forEach((r) => {
-        const me = !!u && norm(r.name) === norm(u.name);
-        const medal = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : String(r.rank);
+      const top = Number(rows[0].e1rm) || 1;
+      const sexMark = (r) => (r.sex === 'M' ? ' ♂' : r.sex === 'F' ? ' ♀' : '');
+      const isMe = (r) => !!u && norm(r.name) === norm(u.name);
+      // podio con los 3 primeros (2.º · 1.º · 3.º)
+      const pod = Utils.el('div', { class: 'lb-podium' });
+      [1, 0, 2].forEach((i) => {
+        const r = rows[i];
+        if (!r) return;
+        const medal = ['🥇', '🥈', '🥉'][i];
+        pod.appendChild(Utils.el('div', { class: `lb-pod p${i + 1}${isMe(r) ? ' me' : ''}` }, [
+          Utils.el('div', { class: 'lb-medal', text: medal }),
+          Utils.el('div', { class: 'lb-av', text: (r.name || '?').trim().charAt(0).toUpperCase() }),
+          Utils.el('div', { class: 'lb-pod-name', text: `${r.name}${sexMark(r)}` }),
+          Utils.el('b', { class: 'lb-pod-e1', text: Units.label(Number(r.e1rm)) }),
+          Utils.el('div', { class: 'lb-pod-sub', text: `${Units.label(Number(r.weight_kg))} × ${r.reps}` }),
+          Utils.el('div', { class: 'lb-pod-bar' }),
+        ]));
+      });
+      body.appendChild(pod);
+      rows.slice(3).forEach((r) => {
+        const me = isMe(r);
+        const pct = Math.max(6, Math.round(((Number(r.e1rm) || 0) / top) * 100));
         body.appendChild(Utils.el('div', { class: `lb-row${me ? ' me' : ''}` }, [
-          Utils.el('div', { class: 'lb-rank', text: medal }),
+          Utils.el('div', { class: 'lb-rank', text: String(r.rank) }),
+          Utils.el('div', { class: 'lb-av sm', text: (r.name || '?').trim().charAt(0).toUpperCase() }),
           Utils.el('div', { class: 'lb-main' }, [
-            Utils.el('div', { class: 'lb-name', text: `${r.name}${r.sex === 'M' ? ' ♂' : r.sex === 'F' ? ' ♀' : ''}` }),
+            Utils.el('div', { class: 'lb-name', text: `${r.name}${sexMark(r)}` }),
             Utils.el('div', { class: 'meta', text: `${Units.label(Number(r.weight_kg))} × ${r.reps}` }),
+            Utils.el('div', { class: 'lb-bar' }, [Utils.el('i', { style: `width:${pct}%` })]),
           ]),
           Utils.el('div', { class: 'lb-e1' }, [Utils.el('b', { text: Units.label(Number(r.e1rm)) }), Utils.el('div', { class: 'small text-dim', text: '1RM est.' })]),
         ]));
@@ -278,7 +417,7 @@ const Leaderboard = (() => {
     try { ui.exercises = (await rpc('gt_exercises', {})) || []; } catch (e) { /* se queda con los básicos */ }
   }
   async function loadMine(u) {
-    try { ui.mine = (await rpc('gt_my_scores', { p_secret: u.secret })) || []; } catch (e) { /* sin conexión */ }
+    try { ui.mine = (await rpc('gt_my_scores', { p_secret: u.secret })) || []; rememberMine(ui.mine); pubLoaded = true; } catch (e) { /* sin conexión */ }
   }
 
   // ---- mis marcas
@@ -286,18 +425,50 @@ const Leaderboard = (() => {
     host.innerHTML = '';
     const card = Utils.el('div', { class: 'card' });
     card.appendChild(Utils.el('div', { class: 'card-title-row' }, [Utils.el('h3', { text: '📤 Mis marcas' })]));
-    card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:-6px 0 8px;', text: 'Tu mejor serie de cada básico, calculada de tu historial. Solo se publica lo que toques.' }));
-    BASICS.forEach((b) => {
-      const local = bestBasic(b);
-      const pub = ui.mine.find((m) => m.exercise_key === b.key);
-      card.appendChild(markRow(u, { key: b.key, name: b.name, local, pub }, host));
+
+    // interruptor de publicación automática
+    const auto = Utils.el('button', { class: `uni-chip${autoOn() ? ' on' : ''}`, type: 'button', style: 'margin:0 0 6px;', text: autoOn() ? '⚡ Publicación automática: activada' : '⚡ Publicación automática: apagada' });
+    auto.addEventListener('click', () => { setAuto(!autoOn()); if (autoOn()) syncAll(u).then((n) => { if (n > 0) Utils.toast(`🌍 ${n} marca${n === 1 ? '' : 's'} publicada${n === 1 ? '' : 's'}`); loadMine(u).then(() => paintMine(host, u)); }); paintMine(host, u); });
+    card.appendChild(auto);
+    card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:0 0 8px;', text: autoOn()
+      ? 'Cuando mejoras tu marca en un ejercicio de la biblioteca de la app, se publica sola con tu nombre. Aquí abajo puedes ajustar o quitar cada una.'
+      : 'Nada se envía solo. Publica tú las marcas que quieras con los botones.' }));
+
+    const keys = new Set();
+    const rowsData = [];
+    BASICS.forEach((b) => { keys.add(b.key); rowsData.push({ key: b.key, name: b.name, group: 'básico', local: bestForLift(b.key), pub: ui.mine.find((m) => m.exercise_key === b.key) }); });
+    const used = new Set();
+    DB.getExercises().forEach((e) => { const l = liftOf(e); if (l && !keys.has(l.key) && !used.has(l.key)) { used.add(l.key); } });
+    used.forEach((k) => {
+      const l = lifts().find((x) => x.key === k);
+      if (!l) return;
+      keys.add(k);
+      rowsData.push({ key: k, name: l.name, group: l.group, local: bestForLift(k), pub: ui.mine.find((m) => m.exercise_key === k) });
     });
-    // ejercicios de comunidad que ya publicaste
-    ui.mine.filter((m) => m.exercise_key.startsWith('c:')).forEach((m) => {
-      const id = (DB.getExercises().find((e) => 'c:' + slug(e.name) === m.exercise_key) || {}).id;
-      card.appendChild(markRow(u, { key: m.exercise_key, name: m.exercise_name, local: id ? bestOfExercise(id) : null, pub: m }, host));
+    // lo que ya publicaste y no está arriba (ejercicios propios)
+    ui.mine.filter((m) => !keys.has(m.exercise_key)).forEach((m) => {
+      const ex = DB.getExercises().find((e) => 'c:' + slug(e.name) === m.exercise_key);
+      rowsData.push({ key: m.exercise_key, name: m.exercise_name, group: 'propio', local: ex ? bestOfExercise(ex.id) : null, pub: m });
     });
-    const add = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:10px;', text: '➕ Publicar otro ejercicio (comunidad)' });
+    const withData = rowsData.filter((r) => r.local || r.pub);
+    const empty = rowsData.filter((r) => !r.local && !r.pub && r.group === 'básico');
+    if (!withData.length) card.appendChild(Utils.el('p', { class: 'small text-dim', text: 'Registra series de los básicos o de ejercicios de la biblioteca y aparecerán aquí.' }));
+    let lastG = '';
+    withData.forEach((r) => {
+      if (r.group !== lastG) { lastG = r.group; card.appendChild(Utils.el('div', { class: 'eyebrow mk-group', text: r.group === 'básico' ? '⭐ Básicos' : r.group })); }
+      card.appendChild(markRow(u, r, host));
+    });
+    if (empty.length) card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: `Aún sin registros: ${empty.map((r) => r.name).join(', ')}.` }));
+
+    const now = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:10px;', text: '⚡ Publicar ahora todas mis mejores marcas' });
+    now.addEventListener('click', async () => {
+      now.disabled = true; now.textContent = 'Publicando…';
+      const n = await syncAll(u);
+      Utils.toast(n < 0 ? 'No pude conectarme' : n ? `🌍 ${n} marca${n === 1 ? '' : 's'} publicada${n === 1 ? '' : 's'}` : 'Todo está al día ✓');
+      await loadMine(u); paintMine(host, u);
+    });
+    card.appendChild(now);
+    const add = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:8px;', text: '➕ Publicar un ejercicio propio' });
     add.addEventListener('click', () => openCommunityPicker(u, host));
     card.appendChild(add);
     host.appendChild(card);
@@ -306,10 +477,12 @@ const Leaderboard = (() => {
   function markRow(u, o, host) {
     const better = o.local && o.pub && o.local.e1rm > Number(o.pub.e1rm) * 1.005;
     const row = Utils.el('div', { class: 'mk-row' });
+    const status = o.pub ? (better ? 'Mejor marca sin publicar' : 'Publicada') : (o.local ? 'Sin publicar' : '');
     row.appendChild(Utils.el('div', { class: 'mk-main' }, [
       Utils.el('div', { class: 'mk-name', text: o.name }),
-      Utils.el('div', { class: 'meta', text: o.pub ? `Publicado: ${Units.label(Number(o.pub.weight_kg))} × ${o.pub.reps}${better ? ' · ¡tienes una marca mejor!' : ''}` : o.local ? `Tu mejor: ${Units.label(o.local.kg)} × ${o.local.reps}` : 'Aún sin registros de este ejercicio' }),
+      Utils.el('div', { class: 'meta', text: o.pub ? `${Units.label(Number(o.pub.weight_kg))} × ${o.pub.reps} · 1RM ${Units.label(Number(o.pub.e1rm))}${better ? ` · ahora ${Units.label(o.local.kg)} × ${o.local.reps}` : ''}` : o.local ? `Tu mejor: ${Units.label(o.local.kg)} × ${o.local.reps}` : 'Aún sin registros' }),
     ]));
+    row.appendChild(Utils.el('span', { class: `mk-chip ${o.pub ? (better ? 'warn' : 'ok') : 'off'}`, text: o.pub ? (better ? '↑' : '✓') : '·', title: status }));
     const btn = Utils.el('button', { class: `btn-small${o.pub && !better ? '' : ' btn-primary-s'}`, type: 'button', text: o.pub ? (better ? 'Actualizar' : 'Editar') : 'Publicar' });
     btn.disabled = !o.local && !o.pub;
     btn.addEventListener('click', () => openPublish(u, o, host));
@@ -400,5 +573,5 @@ const Leaderboard = (() => {
     Modal.open('👤 Mi cuenta', body);
   }
 
-  return { render, configured, rpc, BASICS };
+  return { render, configured, rpc, BASICS, onSet, syncAll, liftOf, lifts };
 })();

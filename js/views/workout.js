@@ -721,6 +721,7 @@ const WorkoutView = (() => {
       entry.sets.push(set);
       saveLog(iso, log);
       Utils.vibrate(40);
+      if (typeSelected === 'normal' && typeof Leaderboard !== 'undefined') Leaderboard.onSet(entry.exerciseId);
       if (typeSelected === 'normal' && withDrop) typeMemory[key] = 'drop';
       else delete typeMemory[key];
       // con drop set: primero el drop y el descanso llega al terminarlo; si no, descanso normal
