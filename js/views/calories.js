@@ -48,6 +48,44 @@ const CaloriesView = (() => {
 
   const refresh = () => { if (rootRef) render(rootRef); };
 
+  // ---------- hábitos: lo que más repites (últimos 60 días antes del día que estás viendo) ----------
+  const habitKey = (e) => e.foodId || e.foodName;
+  function habits(mealKey, skipKeys) {
+    const log = DB.getCalorieLog();
+    const d = Utils.parseISO(cursorIso);
+    const map = {};
+    for (let i = 0; i < 60; i += 1) {
+      d.setDate(d.getDate() - 1);
+      (log[Utils.toISODate(d)] || []).forEach((e) => {
+        if (e.treat || !e.foodName || !(e.kcal > 0)) return;
+        if (mealKey && e.meal !== mealKey) return;
+        const k = habitKey(e);
+        if (skipKeys && skipKeys.has(k)) return;
+        if (!map[k]) map[k] = { key: k, n: 0, last: e };
+        map[k].n += 1;
+      });
+    }
+    return Object.values(map).sort((a, b) => b.n - a.n);
+  }
+  function repeatEntry(e, mealKey) {
+    const list = entriesOf(cursorIso);
+    list.push(Object.assign({}, e, { id: DB.uid(), meal: mealKey || e.meal, time: new Date().toISOString() }));
+    saveEntries(cursorIso, list);
+    Utils.vibrate(15);
+    Utils.toast(`✓ ${e.foodName} agregado`);
+    refresh();
+  }
+
+  // reparto de las calorías del día entre comidas (se puede cambiar en Metas)
+  const DEFAULT_SPLIT = { desayuno: 25, almuerzo: 35, cena: 30, snack: 10 };
+  function mealSplit() {
+    const sp = Object.assign({}, DEFAULT_SPLIT, DB.getSettings().mealSplit || {});
+    const tot = MEALS.reduce((n, m) => n + (Number(sp[m.key]) || 0), 0) || 100;
+    const out = {};
+    MEALS.forEach((m) => { out[m.key] = (Number(sp[m.key]) || 0) / tot; });
+    return out;
+  }
+
   // ---------------------------------------------------------------- pantalla
   function render(root) {
     rootRef = root;
@@ -69,6 +107,8 @@ const CaloriesView = (() => {
     view.appendChild(dayNav);
 
     view.appendChild(renderSummary(settings, entries));
+    const fillCard = renderFill(settings, entries);
+    if (fillCard) view.appendChild(fillCard);
 
     // ---- acciones principales ----
     const addMain = Utils.el('button', { class: 'btn-primary', text: '➕ Agregar', title: 'Agregar alimento' });
@@ -197,15 +237,60 @@ const CaloriesView = (() => {
     return card;
   }
 
+  // ---------------------------------------------------------------- qué te falta
+  // sugiere, entre lo que ya sueles comer, lo que mejor encaja con las calorías y macros que te quedan
+  function renderFill(settings, entries) {
+    const t = sumOf(entries);
+    const bonus = entries.reduce((n, e) => n + (e.treat ? (Number(e.kcal) || 0) : 0), 0);
+    const goal = (settings.calorieGoal || 0) + bonus;
+    const remK = goal - t.kcal;
+    if (!goal || remK < 80 || !entries.length) return null;
+    const remP = Math.max(0, (settings.proteinGoal || 0) - t.protein);
+    const remC = Math.max(0, (settings.carbGoal || 0) - t.carbs);
+    const remF = Math.max(0, (settings.fatGoal || 0) - t.fat);
+    const have = new Set(entries.map(habitKey));
+    const fit = (a, rem) => (rem > 0 ? Math.min(a, rem) / rem : 0);
+    const cands = habits('', have).filter((h) => h.last.kcal <= remK + 40).map((h) => {
+      const e = h.last;
+      const score = fit(e.protein, remP) * 2 + fit(e.carbs, remC) + fit(e.fat, remF) + Math.min(h.n, 6) * 0.08 - (e.kcal > remK ? 0.5 : 0);
+      return { h, score };
+    }).sort((a, b) => b.score - a.score).slice(0, 3);
+    if (!cands.length) return null;
+    const card = Utils.el('div', { class: 'card fill-card' });
+    const bits = [`${r0(remK)} kcal`];
+    if (remP > 5) bits.push(`${r0(remP)} g proteína`);
+    card.appendChild(Utils.el('div', { class: 'fill-title' }, [Utils.el('b', { text: '🎯 Para completar tu día' }), Utils.el('span', { class: 'small text-dim', text: `Te faltan ${bits.join(' · ')}` })]));
+    const row = Utils.el('div', { class: 'habit-row' });
+    cands.forEach(({ h }) => {
+      const e = h.last;
+      const chip = Utils.el('button', { type: 'button', class: 'habit-chip' }, [
+        Utils.el('b', { text: `+ ${e.foodName}` }),
+        Utils.el('span', { text: `${qtyText(e)} · ${r0(e.kcal)} kcal · P ${r0(e.protein)}` }),
+      ]);
+      chip.addEventListener('click', () => repeatEntry(e, e.meal));
+      row.appendChild(chip);
+    });
+    card.appendChild(row);
+    return card;
+  }
+
   // ---------------------------------------------------------------- comidas
   function renderMeal(meal, entries) {
     const mealEntries = entries.filter((e) => e.meal === meal.key);
     const t = sumOf(mealEntries);
     const card = Utils.el('div', { class: 'card meal-group' });
+    const goalK = DB.getSettings().calorieGoal || 0;
+    const target = goalK ? r0(goalK * mealSplit()[meal.key]) : 0;
+    let targetLine = null;
+    if (target) {
+      const left = target - t.kcal;
+      targetLine = Utils.el('div', { class: `small meal-target${left < -target * 0.1 ? ' over' : ''}`, text: left >= 0 ? `Meta ~${target} kcal · faltan ${r0(left)}` : `Meta ~${target} kcal · +${r0(-left)} de más` });
+    }
     card.appendChild(Utils.el('div', { class: 'meal-head' }, [
       Utils.el('div', {}, [
         Utils.el('h4', { class: 'mb-0', text: `${meal.icon} ${meal.label}` }),
         mealEntries.length ? Utils.el('div', { class: 'small text-dim', text: `P ${r0(t.protein)} · C ${r0(t.carbs)} · G ${r0(t.fat)} g` }) : null,
+        targetLine,
       ]),
       Utils.el('div', { class: 'meal-kcal', text: mealEntries.length ? `${r0(t.kcal)} kcal` : '' }),
     ]));
@@ -229,6 +314,22 @@ const CaloriesView = (() => {
       card.appendChild(row);
     });
 
+    // lo que más repites en esta comida: un toque y se agrega con la cantidad de la última vez
+    const have = new Set(mealEntries.map(habitKey));
+    const usual = habits(meal.key, have).slice(0, 4);
+    if (usual.length) {
+      const row = Utils.el('div', { class: 'habit-row' });
+      usual.forEach((h) => {
+        const chip = Utils.el('button', { type: 'button', class: 'habit-chip', title: 'Agregar igual que la última vez' }, [
+          Utils.el('b', { text: `+ ${h.last.foodName}` }),
+          Utils.el('span', { text: `${qtyText(h.last)} · ${r0(h.last.kcal)} kcal` }),
+        ]);
+        chip.addEventListener('click', () => repeatEntry(h.last, meal.key));
+        row.appendChild(chip);
+      });
+      card.appendChild(row);
+    }
+
     const actions = Utils.el('div', { class: 'meal-actions' });
     const add = Utils.el('button', { class: 'btn-secondary', text: '➕ Agregar' });
     add.addEventListener('click', () => openAddFood(meal.key));
@@ -236,6 +337,21 @@ const CaloriesView = (() => {
     const copy = Utils.el('button', { class: 'btn-secondary', text: '📋 Copiar', title: 'Copiar de otro día' });
     copy.addEventListener('click', () => openCopy(meal.key));
     actions.appendChild(copy);
+    if (!mealEntries.length) {
+      const y = Utils.parseISO(cursorIso); y.setDate(y.getDate() - 1);
+      const ySrc = entriesOf(Utils.toISODate(y)).filter((e) => e.meal === meal.key && !e.treat);
+      if (ySrc.length) {
+        const yb = Utils.el('button', { class: 'btn-secondary', text: '↩︎ Ayer', title: `Copiar ${ySrc.length} alimento(s) de ayer` });
+        yb.addEventListener('click', () => {
+          const list = entriesOf(cursorIso);
+          ySrc.forEach((e) => list.push(Object.assign({}, e, { id: DB.uid(), time: new Date().toISOString() })));
+          saveEntries(cursorIso, list);
+          Utils.toast(`Copiado de ayer ✓ (${r0(sumOf(ySrc).kcal)} kcal)`);
+          refresh();
+        });
+        actions.appendChild(yb);
+      }
+    }
     if (mealEntries.length >= 2) {
       const tpl = Utils.el('button', { class: 'btn-secondary', text: '💾 Plantilla', title: 'Guardar esta comida para repetirla' });
       tpl.addEventListener('click', () => openSaveTemplate(meal, mealEntries));
@@ -879,6 +995,18 @@ const CaloriesView = (() => {
     updInfo();
     body.appendChild(info);
 
+    // reparto de las calorías entre comidas
+    body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:12px 0 6px;', text: 'Reparto por comida (%)' }));
+    const cur = Object.assign({}, DEFAULT_SPLIT, s.mealSplit || {});
+    const splitIn = {};
+    const splitRow = Utils.el('div', { class: 'field-row' });
+    MEALS.forEach((m) => {
+      splitIn[m.key] = Utils.el('input', { type: 'number', inputmode: 'numeric', value: String(cur[m.key]) });
+      splitRow.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: m.label }), splitIn[m.key]]));
+    });
+    body.appendChild(splitRow);
+    body.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:-2px 0 8px;', text: 'Solo sirve de guía: cada comida te muestra cuánto te toca. Si no suman 100, se ajustan solos.' }));
+
     const kg = s.calcWeightKg || (DB.getMeasurements().slice(-1)[0] || {}).weight || 0;
     const auto = Utils.el('button', { class: 'btn-secondary btn-block', text: '✨ Autocompletar macros desde las calorías' });
     auto.addEventListener('click', () => {
@@ -900,6 +1028,9 @@ const CaloriesView = (() => {
       st.proteinGoal = parseFloat(p.value) || 0;
       st.carbGoal = parseFloat(c.value) || 0;
       st.fatGoal = parseFloat(f.value) || 0;
+      const split = {};
+      MEALS.forEach((m) => { split[m.key] = Math.max(0, parseFloat(splitIn[m.key].value) || 0); });
+      st.mealSplit = MEALS.some((m) => split[m.key] > 0) ? split : DEFAULT_SPLIT;
       DB.saveSettings(st);
       Modal.close();
       Utils.toast('Metas actualizadas');

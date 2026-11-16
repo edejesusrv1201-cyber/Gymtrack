@@ -1874,3 +1874,15 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .cloud-row { display: flex; gap: 8px; margin-top: 4px; }
 .cloud-row > button { flex: 1; }
 .cloud-card .uni-chip { margin-bottom: 10px; }
+
+/* ===== v57: contar más rápido ===== */
+.meal-target { margin-top: 2px; color: var(--text-dim); }
+.meal-target.over { color: var(--red); }
+.habit-row { display: flex; gap: 8px; overflow-x: auto; margin: 8px -2px 4px; padding: 2px 2px 4px; scrollbar-width: none; }
+.habit-row::-webkit-scrollbar { display: none; }
+.habit-chip { flex: none; max-width: 200px; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; padding: 8px 12px; border-radius: 14px; background: var(--accent-soft); border: 1px solid rgba(var(--accent-rgb), 0.35); }
+.habit-chip b { font-size: 0.82rem; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.habit-chip span { font-size: 0.7rem; color: var(--text-dim); }
+.habit-chip:active { transform: scale(0.97); }
+.fill-card { padding-bottom: 10px; }
+.fill-title { display: flex; flex-direction: column; gap: 2px; }
