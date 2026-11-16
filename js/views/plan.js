@@ -338,7 +338,34 @@ const PlanView = (() => {
       });
     }
 
+    // superseries: ejercicios seguidos con el mismo `ss`; el resto se limpia
+    function normalizeSS() {
+      r.exercises.forEach((re, i) => {
+        if (!re.ss) return;
+        const prev = r.exercises[i - 1]; const next = r.exercises[i + 1];
+        if (!((prev && prev.ss === re.ss) || (next && next.ss === re.ss))) delete re.ss;
+      });
+    }
+    function toggleLink(i) {
+      const a = r.exercises[i]; const b = r.exercises[i + 1];
+      if (!a || !b) return;
+      if (a.ss && a.ss === b.ss) {
+        // separar: de b hacia abajo pasan a otro grupo (o quedan sueltos)
+        const old = b.ss; const fresh = `ss${Date.now().toString(36)}`;
+        for (let k = i + 1; k < r.exercises.length && r.exercises[k].ss === old; k += 1) r.exercises[k].ss = fresh;
+      } else {
+        const id = a.ss || b.ss || `ss${Date.now().toString(36)}`;
+        const old = b.ss;
+        if (old && old !== id) r.exercises.forEach((re) => { if (re.ss === old) re.ss = id; });
+        a.ss = id; b.ss = id;
+      }
+      normalizeSS();
+      save();
+      renderList();
+    }
+
     function renderList() {
+      normalizeSS();
       const exs = exById();
       exList.innerHTML = '';
       if (r.exercises.length === 0) {
@@ -367,17 +394,20 @@ const PlanView = (() => {
         const move = (to) => {
           const [item] = r.exercises.splice(idx, 1);
           r.exercises.splice(to, 0, item);
+          normalizeSS();
           save();
           renderList();
         };
         up.addEventListener('click', () => move(idx - 1));
         down.addEventListener('click', () => move(idx + 1));
-        del.addEventListener('click', () => { r.exercises.splice(idx, 1); save(); renderList(); fillExercises(); });
+        del.addEventListener('click', () => { r.exercises.splice(idx, 1); normalizeSS(); save(); renderList(); fillExercises(); });
 
         const color = Utils.GROUP_COLORS[group] || '#8d95a8';
-        exList.appendChild(Utils.el('div', { class: 'rt-row', style: `--gc:${color}` }, [
+        let letter = '';
+        if (re.ss) { let n = 0; for (let k = idx - 1; k >= 0 && r.exercises[k].ss === re.ss; k -= 1) n += 1; letter = String.fromCharCode(65 + n); }
+        exList.appendChild(Utils.el('div', { class: `rt-row${re.ss ? ' rt-ss' : ''}`, style: `--gc:${color}` }, [
           Utils.el('div', { class: 'rt-top' }, [
-            Utils.el('span', { class: 'rt-num', text: String(idx + 1) }),
+            Utils.el('span', { class: 'rt-num', text: `${idx + 1}${letter}` }),
             Utils.el('div', { class: 'rt-name' }, [
               Utils.el('div', { text: ex ? ex.name : '(eliminado)' }),
               Utils.el('div', { class: 'rt-group', text: group }),
@@ -389,6 +419,12 @@ const PlanView = (() => {
             Utils.el('label', { class: 'grow' }, [Utils.el('span', { text: isCardio ? 'Duración / distancia' : 'Reps' }), repsIn]),
           ]),
         ]));
+        if (idx < r.exercises.length - 1) {
+          const linked = !!re.ss && r.exercises[idx + 1].ss === re.ss;
+          const lk = Utils.el('button', { type: 'button', class: `rt-link${linked ? ' on' : ''}`, text: linked ? '🔗 Superserie · tocar para separar' : '🔗 Unir con el siguiente en superserie' });
+          lk.addEventListener('click', () => toggleLink(idx));
+          exList.appendChild(lk);
+        }
       });
       renderSummary();
     }
