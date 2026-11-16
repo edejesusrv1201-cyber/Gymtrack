@@ -22,7 +22,7 @@ const TodayView = (() => {
     if (!wl[iso]) {
       wl[iso] = {
         routineId: routine ? routine.id : null,
-        exercises: routine ? routine.exercises.map((re) => ({ exerciseId: re.exerciseId, sets: [], fromRoutine: true })) : [],
+        exercises: routine ? routine.exercises.map((re) => (re.ss ? { exerciseId: re.exerciseId, sets: [], fromRoutine: true, ss: re.ss } : { exerciseId: re.exerciseId, sets: [], fromRoutine: true })) : [],
         notes: '',
       };
       DB.saveWorkoutLog(wl);

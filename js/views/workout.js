@@ -77,7 +77,7 @@ const WorkoutView = (() => {
       const presentIds = new Set(log.exercises.map((e) => e.exerciseId));
       routine.exercises.forEach((re) => {
         if (!presentIds.has(re.exerciseId) && !removed.includes(re.exerciseId)) {
-          log.exercises.push({ exerciseId: re.exerciseId, sets: [], fromRoutine: true });
+          log.exercises.push(re.ss ? { exerciseId: re.exerciseId, sets: [], fromRoutine: true, ss: re.ss } : { exerciseId: re.exerciseId, sets: [], fromRoutine: true });
           presentIds.add(re.exerciseId);
           changed = true;
         }
@@ -87,6 +87,66 @@ const WorkoutView = (() => {
   }
 
   const workingCount = (entry) => entry.sets.filter(Metrics.isNormal).length;
+
+  // ---------- superseries: ejercicios seguidos con el mismo `ss` se hacen alternados ----------
+  // devuelve las posiciones (idx) del bloque de superserie que contiene a idx, o null
+  function ssRun(log, idx) {
+    const e = log.exercises[idx];
+    if (!e || !e.ss) return null;
+    let a = idx; let b = idx;
+    while (a > 0 && log.exercises[a - 1].ss === e.ss) a -= 1;
+    while (b < log.exercises.length - 1 && log.exercises[b + 1].ss === e.ss) b += 1;
+    if (a === b) return null;
+    const run = [];
+    for (let i = a; i <= b; i += 1) run.push(i);
+    return run;
+  }
+  const ssLetter = (n) => String.fromCharCode(65 + n);
+
+  // guarda las superseries también en la rutina (y deja juntos a sus ejercicios) para los próximos días
+  function persistSS(log) {
+    if (!log.routineId) return;
+    const routines = DB.getRoutines();
+    const r = routines.find((x) => x.id === log.routineId);
+    if (!r) return;
+    r.exercises.forEach((re) => {
+      const e = log.exercises.find((x) => x.exerciseId === re.exerciseId);
+      if (!e) return;
+      if (e.ss) re.ss = e.ss; else delete re.ss;
+    });
+    const ids = Array.from(new Set(r.exercises.map((re) => re.ss).filter(Boolean)));
+    ids.forEach((id) => {
+      const members = r.exercises.filter((re) => re.ss === id);
+      if (members.length < 2) { members.forEach((m) => { delete m.ss; }); return; }
+      const first = r.exercises.indexOf(members[0]);
+      const rest = r.exercises.filter((re) => re.ss !== id);
+      const before = r.exercises.slice(0, first).filter((re) => re.ss !== id).length;
+      r.exercises = rest.slice(0, before).concat(members, rest.slice(before));
+    });
+    DB.saveRoutines(routines);
+  }
+
+  // une el ejercicio i con el j (vecinos) en una superserie
+  function linkSS(iso, log, i, j) {
+    const a = log.exercises[i]; const b = log.exercises[j];
+    if (!a || !b) return;
+    const id = a.ss || b.ss || `ss${Date.now().toString(36)}`;
+    const old = b.ss;
+    if (old && old !== id) log.exercises.forEach((e) => { if (e.ss === old) e.ss = id; });
+    a.ss = id; b.ss = id;
+    saveLog(iso, log);
+    persistSS(log);
+  }
+  function unlinkSS(iso, log, i) {
+    const e = log.exercises[i];
+    if (!e || !e.ss) return;
+    const id = e.ss;
+    delete e.ss;
+    const left = log.exercises.filter((x) => x.ss === id);
+    if (left.length < 2) left.forEach((x) => { delete x.ss; });
+    saveLog(iso, log);
+    persistSS(log);
+  }
 
   function render(root, params) {
     const iso = (params && params.date) || Utils.todayISO();
@@ -157,13 +217,24 @@ const WorkoutView = (() => {
 
     const exList = Utils.el('div', { class: 'ex-flow' });
     if (activeEntry) exList.appendChild(renderNowBar(iso, log, routine, activeEntry, activeIdx));
+    let ssBox = null; let ssId = null;
     log.exercises.forEach((entry, idx) => {
       const key = `${iso}:${entry.exerciseId}`;
       const opts = { num: idx + 1, total: log.exercises.length, key, iso };
+      const run = ssRun(log, idx);
+      if (run) {
+        opts.ssLetter = ssLetter(run.indexOf(idx));
+        if (!ssBox || ssId !== entry.ss || run[0] === idx) {
+          ssId = entry.ss;
+          ssBox = Utils.el('div', { class: 'ss-group' }, [Utils.el('div', { class: 'ss-label', text: `🔗 Superserie · ${run.map((_, n) => ssLetter(n)).join(' + ')} (sin descanso entre ejercicios)` })]);
+          exList.appendChild(ssBox);
+        }
+      } else { ssBox = null; ssId = null; }
+      const target = ssBox || exList;
       if (idx === activeIdx) {
-        exList.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups, Object.assign({ current: true, incomplete }, opts)));
+        target.appendChild(renderExerciseCard(iso, log, entry, idx, rerender, weekGroups, Object.assign({ current: true, incomplete }, opts)));
       } else {
-        exList.appendChild(renderRow(iso, log, entry, idx, opts, rerender));
+        target.appendChild(renderRow(iso, log, entry, idx, opts, rerender));
       }
     });
     view.appendChild(exList);
@@ -396,6 +467,13 @@ const WorkoutView = (() => {
       add('📝  Nota y descanso de este ejercicio', () => { Modal.close(); openExerciseSettings(ex, rerender); });
       if (ex && !isCardio && !ex.bodyweight) add('🔥  Agregar calentamiento completo', () => { Modal.close(); startWarmup(); });
       if (!isCardio) add('🧮  Calcular discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w, { onUse: (kg) => { if (weightInput) weightInput.value = String(Units.num(kg, inputUnit)); } }); });
+      const nameOf = (en) => { const x = DB.getExercises().find((q) => q.id === en.exerciseId); return x ? x.name : 'ejercicio'; };
+      if (entry.ss) {
+        add('🔗  Quitar de la superserie', () => { Modal.close(); unlinkSS(iso, log, idx); rerender(); });
+      } else {
+        if (idx < log.exercises.length - 1) add(`🔗  Superserie con «${nameOf(log.exercises[idx + 1])}» (siguiente)`, () => { Modal.close(); linkSS(iso, log, idx, idx + 1); Utils.toast('🔗 Superserie creada: alternas un ejercicio y el otro'); rerender(); });
+        if (idx > 0) add(`🔗  Superserie con «${nameOf(log.exercises[idx - 1])}» (anterior)`, () => { Modal.close(); linkSS(iso, log, idx - 1, idx); Utils.toast('🔗 Superserie creada: alternas un ejercicio y el otro'); rerender(); });
+      }
       add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
       Modal.open(ex ? ex.name : 'Ejercicio', menu);
     };
@@ -406,7 +484,7 @@ const WorkoutView = (() => {
     ]);
     card.appendChild(Utils.el('div', { class: 'ex-header' }, [
       Utils.el('div', { style: 'min-width:0;' }, [
-        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: String(opts.num) }) : null, ex ? ex.name : '(ejercicio eliminado)']),
+        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: `${opts.num}${opts.ssLetter || ''}` }) : null, ex ? ex.name : '(ejercicio eliminado)']),
         ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: ex.group }) : null,
       ]),
       headerBtns,
@@ -553,7 +631,12 @@ const WorkoutView = (() => {
 
     const addSetBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8' });
     const BTN_TEXT = {
-      get normal() { return withDrop ? '✓ Registrar serie y seguir con el drop ↓' : '✓ Registrar serie e iniciar descanso'; },
+      get normal() {
+        if (withDrop) return '✓ Registrar serie y seguir con el drop ↓';
+        const run = ssRun(log, idx);
+        if (run) { const pos = run.indexOf(idx); return pos < run.length - 1 ? `✓ Registrar y pasar a ${ssLetter(pos + 1)} (sin descanso)` : '✓ Registrar serie e iniciar descanso'; }
+        return '✓ Registrar serie e iniciar descanso';
+      },
       warmup: '✓ Registrar aproximación',
       drop: '✓ Registrar dropset',
     };
@@ -727,11 +810,34 @@ const WorkoutView = (() => {
       else delete typeMemory[key];
       // con drop set: primero el drop y el descanso llega al terminarlo; si no, descanso normal
       if (typeSelected === 'normal' && withDrop) DropFlow.open(key);
-      else if (typeSelected === 'normal' && DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : '');
+      else if (typeSelected === 'normal') afterSet();
       rerender();
       Celebrate.record(prs, ex ? ex.name : '');
     });
     form.appendChild(addSetBtn);
+
+    // después de una serie: en superserie se pasa al otro ejercicio y el descanso llega al cerrar la vuelta
+    function afterSet() {
+      const run = ssRun(log, idx);
+      const restFor = (e2) => { const x = DB.getExercises().find((q) => q.id === e2.exerciseId); return (x && x.restSec) || DB.getSettings().restDefault; };
+      if (run) {
+        const pos = run.indexOf(idx);
+        if (pos < run.length - 1) {
+          const nx = log.exercises[run[pos + 1]];
+          const nxEx = DB.getExercises().find((q) => q.id === nx.exerciseId);
+          activeByDate[iso] = nx.exerciseId; scrollToKey = `${iso}:${nx.exerciseId}`;
+          Utils.toast(`🔗 Ahora ${ssLetter(pos + 1)}: ${nxEx ? nxEx.name : ''} (sin descanso)`);
+          return;
+        }
+        if (DB.getSettings().restAuto !== false) RestTimer.quickStart(Math.max(...run.map((i) => restFor(log.exercises[i]))), `Superserie ${run.map((_, n) => ssLetter(n)).join('+')}`);
+        const members = run.map((i) => log.exercises[i]);
+        const nxt = (opts.incomplete && members.find(opts.incomplete)) || members[0];
+        activeByDate[iso] = nxt.exerciseId; scrollToKey = `${iso}:${nxt.exerciseId}`;
+        Utils.toast(`🔗 Descansa y vuelve con ${ssLetter(members.indexOf(nxt))}`);
+        return;
+      }
+      if (DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : '');
+    }
 
     // peso sugerido para hoy: progresión de cargas o regreso tras semanas sin este ejercicio
     if (ex && !isCardio && workingN === 0 && weightInput) {
@@ -843,7 +949,7 @@ const WorkoutView = (() => {
           saveLog(iso, log);
           Utils.vibrate(30);
         },
-        onFinish: () => { if (DB.getSettings().restAuto !== false) RestTimer.quickStart((ex && ex.restSec) || DB.getSettings().restDefault, ex ? ex.name : ''); },
+        onFinish: () => afterSet(),
         rerender,
       }));
     }
@@ -1151,7 +1257,7 @@ const WorkoutView = (() => {
 
     const row = Utils.el('div', { class: 'card ex-pending' + (started ? ' ex-started' : '') + (complete ? ' done' : ''), 'data-key': opts.key }, [
       Utils.el('div', { class: 'ex-pending-body' }, [
-        Utils.el('span', { class: 'ex-num', text: complete ? '✓' : String(opts.num) }),
+        Utils.el('span', { class: 'ex-num', text: complete ? '✓' : `${opts.num}${opts.ssLetter || ''}` }),
         Utils.el('div', { style: 'min-width:0;flex:1;' }, [
           Utils.el('div', { style: 'font-weight:700;', text: ex ? ex.name : '(ejercicio eliminado)' }),
           Utils.el('div', { class: 'meta', text: meta }),
