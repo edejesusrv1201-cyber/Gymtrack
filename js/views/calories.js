@@ -139,7 +139,7 @@ const CaloriesView = (() => {
     // ---- herramientas ----
     view.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:16px 2px 8px;', text: 'Herramientas' }));
     const tools = Utils.el('div', { class: 'cal-tools' });
-    [['✨', 'Menús listos', 'según tus calorías', () => Menus.open()],
+    [['🥗', 'Armar dieta', 'a tus calorías y macros', () => Diet.open()],
       ['🗓️', 'Plan semanal', 'y lista de compras', () => App.navigate('plancomidas')],
       ['🍎', 'Mis alimentos', 'y plantillas', () => openFoodManager()],
       ['🧮', 'Calculadora', 'mantener, bajar o subir', () => App.navigate('calculadora')]].forEach(([ico, t, s, fn]) => {

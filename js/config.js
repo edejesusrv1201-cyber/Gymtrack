@@ -6,5 +6,6 @@
    ============================================================ */
 window.GT_CONFIG = {
   supabaseUrl: 'https://hbcruzvypyzuqyabjskx.supabase.co',
+  cloud: false,   // cuentas y respaldo en la nube: pasar a true cuando se ejecute supabase/cloud.sql
   supabaseKey: 'sb_publishable_UxH6DEYxMsSTdCOEcORyzg_LoXGDbrP',   // clave pública (publishable)
 };

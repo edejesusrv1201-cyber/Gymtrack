@@ -42,7 +42,8 @@ const Cloud = (() => {
     const o = (DB.getSettings().lbConfig) || {};
     return { url: String(o.url || c.supabaseUrl || '').replace(/\/+$/, ''), key: String(o.key || c.supabaseKey || '') };
   }
-  const configured = () => { const c = conf(); return !!(c.url && c.key); };
+  // la nube se muestra solo cuando GT_CONFIG.cloud es true (después de correr supabase/cloud.sql)
+  const configured = () => { const c = conf(); return !!(c.url && c.key && (window.GT_CONFIG || {}).cloud === true); };
 
   async function api(path, opts = {}) {
     const c = conf();

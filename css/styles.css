@@ -1886,3 +1886,12 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .habit-chip:active { transform: scale(0.97); }
 .fill-card { padding-bottom: 10px; }
 .fill-title { display: flex; flex-direction: column; gap: 2px; }
+
+/* ===== v58: armar dieta ===== */
+.diet-total { margin: 10px 0 6px; font-size: 1.05rem; }
+.diet-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.diet-chip { padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 800; background: rgba(255, 194, 71, 0.16); color: var(--yellow); }
+.diet-chip.ok { background: rgba(53, 212, 154, 0.16); color: var(--green); }
+.diet-item { align-items: center; gap: 8px; }
+.diet-item > span:first-child { flex: 1; }
+.diet-swap { flex: none; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; line-height: 1; border-radius: 10px; font-size: 0.85rem; background: rgba(var(--ov), 0.07); }
