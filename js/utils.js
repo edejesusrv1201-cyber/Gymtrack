@@ -82,6 +82,14 @@ const Utils = (() => {
     return { main: g('--accent', '#ff6a3d'), a: g('--acc-a', '#ff5a36'), c: g('--acc-c', '#ffb347'), light: g('--accent-light', '#ffb08a') };
   }
 
+  // colores de tinta para los gráficos de canvas (según tema claro/oscuro)
+  function ink() {
+    const light = document.documentElement.dataset.scheme === 'light';
+    return light
+      ? { grid: 'rgba(20,26,50,0.12)', dim: 'rgba(20,26,50,0.55)', strong: '#151a28', dot: '#ffffff', goal: 'rgba(20,26,50,0.5)', goalText: 'rgba(20,26,50,0.75)', tip: 'rgba(255,255,255,0.97)', tipText: '#151a28', track: 'rgba(20,26,50,0.1)' }
+      : { grid: 'rgba(255,255,255,0.07)', dim: 'rgba(255,255,255,0.4)', strong: '#f2f4f9', dot: '#0b0d13', goal: 'rgba(255,255,255,0.45)', goalText: 'rgba(255,255,255,0.7)', tip: 'rgba(14,17,24,0.94)', tipText: '#f2f4f9', track: 'rgba(255,255,255,0.08)' };
+  }
+
   // ---- plataforma ----
   function isIOS() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -172,7 +180,7 @@ const Utils = (() => {
       <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0%" stop-color="${opts.from || accent().a}"/><stop offset="100%" stop-color="${opts.to || accent().c}"/>
       </linearGradient></defs>
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="${stroke}"/>
+      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${ink().track}" stroke-width="${stroke}"/>
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${stroke}"
         stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - clamped)}"/>`;
     const wrap = el('div', { class: 'ring', style: `width:${size}px;height:${size}px;` }, [svg]);
@@ -226,7 +234,7 @@ const Utils = (() => {
     let x = cx - tw / 2;
     x = Math.max(4, Math.min(w - tw - 4, x));
     const y = cy - 11;
-    ctx.fillStyle = 'rgba(14,17,24,0.94)';
+    ctx.fillStyle = ink().tip;
     ctx.strokeStyle = rgba(color, 0.7);
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -238,7 +246,7 @@ const Utils = (() => {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#f2f4f9';
+    ctx.fillStyle = ink().tipText;
     ctx.textAlign = 'center';
     ctx.fillText(text, x + tw / 2, y + 15);
   }
@@ -327,8 +335,8 @@ const Utils = (() => {
       // rejilla
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 5]);
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.strokeStyle = ink().grid;
+      ctx.fillStyle = ink().dim;
       ctx.font = '600 10px system-ui, sans-serif';
       ctx.textAlign = 'right';
       for (let i = 0; i <= 3; i++) {
@@ -365,7 +373,7 @@ const Utils = (() => {
       ctx.restore();
 
       // etiquetas del eje X
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillStyle = ink().dim;
       ctx.font = '600 10px system-ui, sans-serif';
       const n = points.length;
       const idxs = n <= 4 ? points.map((_, i) => i) : [0, Math.round((n - 1) / 3), Math.round(((n - 1) * 2) / 3), n - 1];
@@ -391,7 +399,7 @@ const Utils = (() => {
         const isSel = i === selected;
         const isLast = i === pts.length - 1;
         ctx.beginPath();
-        ctx.fillStyle = '#0b0d13';
+        ctx.fillStyle = ink().dot;
         ctx.arc(p.x, p.y, isSel ? 6.5 : isLast ? 5.5 : 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
@@ -452,8 +460,8 @@ const Utils = (() => {
       ctx.clearRect(0, 0, w, h);
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 5]);
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.strokeStyle = ink().grid;
+      ctx.fillStyle = ink().dim;
       ctx.font = '600 10px system-ui, sans-serif';
       ctx.textAlign = 'right';
       for (let i = 0; i <= 3; i++) {
@@ -490,7 +498,7 @@ const Utils = (() => {
         const widest = Math.max(...bars.map((x) => ctx.measureText(x.label).width));
         const skip = Math.max(1, Math.ceil((widest + 8) / slot));
         if ((bars.length - 1 - i) % skip === 0) {
-          ctx.fillStyle = strong ? '#f2f4f9' : 'rgba(255,255,255,0.4)';
+          ctx.fillStyle = strong ? ink().strong : ink().dim;
           ctx.font = '600 10px system-ui, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(b.label, x + barW / 2, h - 8);
@@ -500,11 +508,11 @@ const Utils = (() => {
       if (opts.goal) {
         const gy = yFor(opts.goal);
         ctx.setLineDash([6, 5]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.strokeStyle = ink().goal;
         ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(w - padR, gy); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillStyle = ink().goalText;
         ctx.font = '700 10px system-ui, sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(opts.goalLabel || 'meta', w - padR, gy - 4);
@@ -542,7 +550,7 @@ const Utils = (() => {
 
   return {
     DIAS, DIAS_CORTOS, MESES, GROUP_COLORS, pad, toISODate, todayISO, monthKey, parseISO,
-    friendlyDate, shortDate, daysInMonth, el, round1, compact, accent, isIOS, isStandalone, saveFile, vibrate, toast, confirmDialog,
+    friendlyDate, shortDate, daysInMonth, el, round1, compact, accent, ink, isIOS, isStandalone, saveFile, vibrate, toast, confirmDialog,
     segmented, ring, drawLineChart, drawBarChart,
   };
 })();

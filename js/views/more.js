@@ -20,6 +20,13 @@ const MoreView = (() => {
     }
 
     card.appendChild(Utils.el('h3', { text: '🎨 Personalización' }));
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: 'Apariencia' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'oscuro', label: '🌙 Oscuro' }, { key: 'claro', label: '☀️ Claro' }, { key: 'auto', label: 'Automático' }],
+      cfg.scheme,
+      (k) => { save({ themeScheme: k }); App.navigate(App.currentView, App.currentParams); },
+      true,
+    ));
     card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin-bottom:8px;', text: 'Fondo' }));
     card.appendChild(Utils.segmented(
       [{ key: 'auto', label: 'Color del día' }, { key: 'fijo', label: 'Color fijo' }],

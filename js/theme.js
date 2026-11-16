@@ -124,8 +124,18 @@ const Theme = (() => {
       motion: s.themeMotion || (reducedMotion() ? 'quieto' : 'lava'),
       ui: s.uiAnim || (reducedMotion() ? 'off' : 'on'),
       accent: s.themeAccent === 'app' ? 'app' : 'tema',
+      scheme: ['claro', 'oscuro', 'auto'].includes(s.themeScheme) ? s.themeScheme : 'oscuro',
     };
   }
+
+  // 'oscuro' | 'claro' | 'auto' (según el teléfono) -> 'dark' | 'light'
+  function resolveScheme(pref) {
+    if (pref === 'claro') return 'light';
+    if (pref === 'auto') return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return 'dark';
+  }
+  const GROUPS_DARK = { pecho: '#ff6a3d', espalda: '#5b8cff', pierna: '#35d49a', hombro: '#ffc247', brazo: '#b08bff', core: '#e6e9f0', cardio: '#ff5d73', movilidad: '#3de0c2', otro: '#8d95a8' };
+  const GROUPS_LIGHT = { pecho: '#e0522a', espalda: '#3d6fe6', pierna: '#0e9e6b', hombro: '#b27300', brazo: '#7650e0', core: '#566078', cardio: '#e0344f', movilidad: '#0b9b84', otro: '#6b7488' };
 
   function resolve(iso) {
     const cfg = settings();
@@ -149,7 +159,22 @@ const Theme = (() => {
     root.style.setProperty('--glow-opacity', String(INTENSITIES[cfg.intensity].glow * damp));
     root.style.setProperty('--card-alpha', String(INTENSITIES[cfg.intensity].card));
 
-    const acc = cfg.accent === 'app' ? APP_ACCENT : accentFromColor(res.colors[0]);
+    const scheme = resolveScheme(cfg.scheme);
+    const light = scheme === 'light';
+    root.dataset.scheme = scheme;
+    root.style.colorScheme = scheme;
+    root.style.background = light ? '#eef0f6' : '#090b10';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', light ? '#eef0f6' : '#090b10');
+    // sobre fondo claro las manchas se atenúan y los textos de acento se oscurecen
+    if (light) root.style.setProperty('--glow-opacity', String(INTENSITIES[cfg.intensity].glow * damp * 0.62));
+    if (typeof Utils !== 'undefined' && Utils.GROUP_COLORS) Object.assign(Utils.GROUP_COLORS, light ? GROUPS_LIGHT : GROUPS_DARK);
+
+    let acc = cfg.accent === 'app' ? APP_ACCENT : accentFromColor(res.colors[0]);
+    if (light) {
+      const [h, s] = hexToHsl(acc.main);
+      acc = Object.assign({}, acc, { light: s < 0.18 ? '#5b6478' : hslToHex(h, Math.min(1, Math.max(0.6, s)), 0.4) });
+    }
     root.style.setProperty('--accent', acc.main);
     root.style.setProperty('--accent-rgb', hexToRgb(acc.main).join(', '));
     root.style.setProperty('--accent-light', acc.light);
@@ -186,7 +211,13 @@ const Theme = (() => {
     apply();
     // si cambia el día con la app abierta, el color del día se actualiza al volver
     document.addEventListener('visibilitychange', () => { if (!document.hidden) apply(); });
+    // modo automático: si el teléfono cambia de claro a oscuro, la app lo sigue
+    if (window.matchMedia) {
+      const mq = window.matchMedia('(prefers-color-scheme: light)');
+      const onChange = () => { if (settings().scheme === 'auto') { apply(); if (typeof App !== 'undefined') App.navigate(App.currentView, App.currentParams); } };
+      if (mq.addEventListener) mq.addEventListener('change', onChange); else if (mq.addListener) mq.addListener(onChange);
+    }
   }
 
-  return { PRESETS, INTENSITIES, init, apply, resolve, settings, reducedMotion };
+  return { PRESETS, INTENSITIES, init, apply, resolve, settings, reducedMotion, resolveScheme, isLight: () => document.documentElement.dataset.scheme === 'light' };
 })();
