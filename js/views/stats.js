@@ -42,8 +42,15 @@ const StatsView = (() => {
     return c;
   }
 
-  function emptyNote(text) {
-    return Utils.el('p', { class: 'mt-8', text });
+  // aviso de "aún no hay datos"; con `cta` agrega un botón que lleva a donde se registran
+  const CTA_TRAIN = { label: '🏋️ Empezar un entreno', view: 'hoy' };
+  const CTA_FOOD = { label: '🍽️ Registrar una comida', view: 'calorias' };
+  const CTA_WATER = { label: '💧 Registrar agua', view: 'calorias' };
+  function emptyNote(text, cta) {
+    if (!cta) return Utils.el('p', { class: 'mt-8', text });
+    const b = Utils.el('button', { type: 'button', class: 'btn-secondary empty-cta', text: cta.label });
+    b.addEventListener('click', () => App.navigate(cta.view));
+    return Utils.el('div', { class: 'empty-note' }, [Utils.el('p', { class: 'small text-dim', text }), b]);
   }
 
   // ---------- progreso de un ejercicio (reutilizado por el modal del entreno) ----------
@@ -188,7 +195,7 @@ const StatsView = (() => {
     const groups = GROUP_ORDER.filter((g) => t.byGroup[g] && t.byGroup[g].sets > 0)
       .sort((a, b) => t.byGroup[b].sets - t.byGroup[a].sets);
     if (groups.length === 0) {
-      groupCard.appendChild(emptyNote('No hay series registradas en este período.'));
+      groupCard.appendChild(emptyNote('No hay series registradas en este período.', CTA_TRAIN));
     } else {
       const maxSets = Math.max(...groups.map((g) => t.byGroup[g].sets));
       groups.forEach((g) => {
@@ -239,7 +246,7 @@ const StatsView = (() => {
     const weeks = Metrics.weeklySeries(8);
     const volCard = card('Volumen por semana', 'Últimas 8');
     if (weeks.every((w) => w.volume === 0)) {
-      volCard.appendChild(emptyNote('Aún no hay volumen registrado. Anota series con peso y repeticiones y aquí verás cómo crece.'));
+      volCard.appendChild(emptyNote('Aún no hay volumen registrado. Anota series con peso y repeticiones y aquí verás cómo crece.', CTA_TRAIN));
     } else {
       const wrap = Utils.el('div', { class: 'chart-wrap' });
       const canvas = Utils.el('canvas', { class: 'chart' });
@@ -322,7 +329,7 @@ const StatsView = (() => {
       .filter((r) => r.rec)
       .sort((a, b) => a.ex.name.localeCompare(b.ex.name));
     if (rows.length === 0) {
-      recCard.appendChild(emptyNote('Aún no tienes marcas. En cuanto anotes series de un ejercicio, tu récord aparecerá aquí y como guía al entrenarlo.'));
+      recCard.appendChild(emptyNote('Aún no tienes marcas. En cuanto anotes series de un ejercicio, tu récord aparecerá aquí y como guía al entrenarlo.', CTA_TRAIN));
     } else {
       rows.forEach(({ ex, rec }) => {
         const isCardio = ex.group === 'cardio';
@@ -420,7 +427,7 @@ const StatsView = (() => {
     // ---- calorías por día ----
     const calCard = card('Calorías por día', `Meta ${goal} kcal`);
     if (withData.length === 0) {
-      calCard.appendChild(emptyNote('Aún no hay comidas registradas en este período.'));
+      calCard.appendChild(emptyNote('Aún no hay comidas registradas en este período.', CTA_FOOD));
     } else {
       const wrap = Utils.el('div', { class: 'chart-wrap' });
       const canvas = Utils.el('canvas', { class: 'chart' });
@@ -472,7 +479,7 @@ const StatsView = (() => {
     // ---- agua por día ----
     const waterCard = card('Agua por día', `Meta ${Utils.round1(waterGoal / 1000)} L`);
     if (waterDays.length === 0) {
-      waterCard.appendChild(emptyNote('Aún no has registrado agua en este período.'));
+      waterCard.appendChild(emptyNote('Aún no has registrado agua en este período.', CTA_WATER));
     } else {
       const wrap = Utils.el('div', { class: 'chart-wrap' });
       const canvas = Utils.el('canvas', { class: 'chart' });

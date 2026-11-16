@@ -589,6 +589,7 @@ const TodayView = (() => {
       body.appendChild(Utils.el('div', { class: 'empty-state' }, [
         Utils.el('div', { class: 'icon', text: '🗒️' }),
         Utils.el('div', { text: 'Aún no has registrado entrenamientos.' }),
+        (() => { const b = Utils.el('button', { type: 'button', class: 'btn-primary', style: 'margin-top:14px;', text: '🏋️ Empezar mi primer entreno' }); b.addEventListener('click', () => { Modal.close(); const t = Utils.todayISO(); ensureLog(t, getRoutineForDate(t)); App.navigate('workout', { date: t }); }); return b; })(),
       ]));
     } else {
       dates.forEach((iso) => {

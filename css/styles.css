@@ -1797,3 +1797,8 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .ss-label { position: absolute; left: 14px; top: 2px; font-size: 0.74rem; font-weight: 800; letter-spacing: .02em; color: var(--accent-light); }
 .ss-group > .card { margin-bottom: 8px; }
 .ss-group > .card:last-child { margin-bottom: 0; }
+
+/* ===== v53: pantallas vacías con botón de arranque ===== */
+.empty-note { text-align: center; padding: 8px 4px 2px; }
+.empty-note p { margin: 4px 0 12px; }
+.empty-note .empty-cta { width: auto; padding: 12px 22px; font-weight: 700; }
