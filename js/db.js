@@ -49,6 +49,7 @@ const DB = (() => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
       if (key !== KEYS.settings && typeof AutoBackup !== 'undefined') AutoBackup.touch();
+      if (key !== KEYS.settings && typeof Cloud !== 'undefined') Cloud.touch();
       return true;
     } catch (e) {
       console.error('Error guardando', key, e);

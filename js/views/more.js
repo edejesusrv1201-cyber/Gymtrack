@@ -315,6 +315,9 @@ const MoreView = (() => {
     view.appendChild(exCard);
     refreshExList();
 
+    // ---- cuenta y nube ----
+    view.appendChild(Cloud.card());
+
     // ---- respaldo ----
     const backupCard = Utils.el('div', { class: 'card' });
     backupCard.appendChild(Utils.el('h3', { text: '💾 Copia de seguridad' }));

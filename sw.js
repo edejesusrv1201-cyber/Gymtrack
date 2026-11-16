@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v55';
+const CACHE_NAME = 'migymtrack-v56';
 const ASSETS = [
   './',
   './index.html',
@@ -20,6 +20,7 @@ const ASSETS = [
   './js/gamify.js',
   './js/backup.js',
   './js/autoBackup.js',
+  './js/cloud.js',
   './js/weekly.js',
   './js/muscles.js',
   './js/plates.js',

@@ -1869,3 +1869,8 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 :root[data-scheme="light"] .lb-pod.p2 .lb-av { box-shadow: 0 0 0 3px rgba(150, 160, 185, 0.9); }
 :root[data-scheme="light"] .plate-chip i, :root[data-scheme="light"] .plate-row i { box-shadow: inset 0 0 0 1px rgba(20, 26, 50, 0.3); }
 :root[data-scheme="light"] .badge.locked { background: conic-gradient(var(--accent-light) calc(var(--p, 0) * 1%), rgba(20, 26, 50, 0.12) 0); }
+
+/* ===== v56: cuenta y nube ===== */
+.cloud-row { display: flex; gap: 8px; margin-top: 4px; }
+.cloud-row > button { flex: 1; }
+.cloud-card .uni-chip { margin-bottom: 10px; }

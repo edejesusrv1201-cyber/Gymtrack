@@ -129,6 +129,7 @@ const App = (() => {
     }, { passive: true });
     RestTimer.init();
     AutoBackup.init();
+    try { Cloud.init(); } catch (e) { console.warn('nube', e); }
     navigate('hoy');
     try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
     registerServiceWorker();
