@@ -469,5 +469,5 @@ const MeasurementsView = (() => {
     return card;
   }
 
-  return { render, daysSinceWeight, openQuickWeight };
+  return { render, daysSinceWeight, openQuickWeight, weightTrend };
 })();

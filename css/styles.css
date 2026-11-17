@@ -1941,3 +1941,21 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .resp-body b { font-size: 0.98rem; }
 .resp-spark { flex: none; display: inline-flex; }
 .resp-val { flex: none; min-width: 56px; text-align: right; font-weight: 900; font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+
+/* ===== v60: constancia y tendencia de alimentación ===== */
+.adh-top { display: flex; align-items: center; gap: 16px; }
+.adh-top .ring { flex: none; }
+.adh-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.adh-label { font-size: 1.15rem; font-weight: 900; letter-spacing: -0.01em; }
+.adh-stat { display: flex; align-items: baseline; gap: 6px; font-size: 0.82rem; line-height: 1.3; }
+.adh-stat b { flex: none; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+.adh-stat span { color: var(--text-dim); }
+.adh-tip { margin-top: 10px; }
+.wk-table { display: grid; grid-template-columns: 1fr 1fr 1.4fr 1fr; gap: 2px 8px; }
+.wk-h { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); padding-bottom: 4px; }
+.wk-c { padding: 7px 0; border-top: 1px solid rgba(var(--ov), 0.06); font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wk-c.now { color: var(--accent-light); }
+.wk-d.up { color: var(--green); }
+.wk-d.down { color: var(--yellow); }
+.adh-adjust { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.09); }
+.adh-adjust .btn-primary { flex: none; width: auto; padding: 10px 18px; }

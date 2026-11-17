@@ -363,6 +363,174 @@ const StatsView = (() => {
     return out;
   }
 
+  // =========================================================
+  //  RESUMEN DE ALIMENTACIÓN: constancia, tendencia de peso y qué ajustar
+  // =========================================================
+  const sumDay = (entries, k) => entries.reduce((s, e) => s + (Number(e[k]) || 0), 0);
+
+  function adherenceCard(nDays, container) {
+    const st = DB.getSettings();
+    const log = DB.getCalorieLog();
+    const goalP = Number(st.proteinGoal) || 0;
+    const days = lastDays(nDays).map((iso) => {
+      const en = log[iso] || [];
+      return {
+        iso, dow: Utils.parseISO(iso).getDay(), logged: sumDay(en, 'kcal') >= 300,
+        kcal: sumDay(en, 'kcal'), protein: sumDay(en, 'protein'), goal: Treats.goalOf(iso) || Number(st.calorieGoal) || 0,
+      };
+    });
+    const logged = days.filter((d) => d.logged);
+    const c = card('📋 Tu constancia', `últimos ${nDays} días`);
+    if (!Number(st.calorieGoal)) {
+      c.appendChild(emptyNote('Define tu meta de calorías (Calorías → Metas) para medir qué tanto la cumples.', CTA_FOOD));
+      return c;
+    }
+    if (!logged.length) {
+      c.appendChild(emptyNote('Aún no hay comidas registradas en este período.', CTA_FOOD));
+      return c;
+    }
+    const inGoal = logged.filter((d) => d.kcal >= d.goal * 0.9 && d.kcal <= d.goal * 1.1).length;
+    const protOk = goalP ? logged.filter((d) => d.protein >= goalP * 0.9).length : 0;
+    const share = (a, b) => (b ? a / b : 0);
+    const score = Math.round(100 * (0.4 * share(logged.length, nDays) + 0.35 * share(inGoal, logged.length) + (goalP ? 0.25 * share(protOk, logged.length) : 0.25 * share(inGoal, logged.length))));
+    const label = score >= 80 ? 'Excelente' : score >= 60 ? 'Muy bien' : score >= 40 ? 'Vas mejorando' : 'Por mejorar';
+    const color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--accent-light)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+
+    const stat = (n, t) => Utils.el('div', { class: 'adh-stat' }, [Utils.el('b', { text: n }), Utils.el('span', { text: t })]);
+    c.appendChild(Utils.el('div', { class: 'adh-top' }, [
+      Utils.ring(score / 100, { size: 96, stroke: 10, label: String(score), sub: '/100' }),
+      Utils.el('div', { class: 'adh-side' }, [
+        Utils.el('div', { class: 'adh-label', style: `color:${color}`, text: label }),
+        stat(`${logged.length}/${nDays}`, 'días registrados'),
+        stat(`${inGoal}/${logged.length}`, 'días en tu meta de calorías (±10 %)'),
+        goalP ? stat(`${protOk}/${logged.length}`, 'días con tu proteína') : null,
+      ]),
+    ]));
+
+    // promedio contra meta por nutriente
+    const avg = (k) => logged.reduce((sum, d) => sum + d[k], 0) / logged.length;
+    const bars = [
+      ['Calorías', avg('kcal'), logged.reduce((sum, d) => sum + d.goal, 0) / logged.length, 'kcal', '#ff9f43'],
+      ['Proteína', avg('protein'), goalP, 'g', '#b08bff'],
+    ];
+    const gc = Number(st.carbGoal) || 0; const gf = Number(st.fatGoal) || 0;
+    const avgOf = (k) => logged.reduce((sum, d) => sum + sumDay(log[d.iso] || [], k), 0) / logged.length;
+    if (gc) bars.push(['Carbos', avgOf('carbs'), gc, 'g', '#5b8cff']);
+    if (gf) bars.push(['Grasas', avgOf('fat'), gf, 'g', '#ffc247']);
+    c.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:16px 0 8px;', text: 'Promedio diario vs tu meta' }));
+    bars.forEach(([name, v, g, u, col]) => {
+      if (!g) return;
+      const pct = v / g;
+      c.appendChild(Utils.el('div', { class: 'hbar' }, [
+        Utils.el('span', { class: 'hb-label', style: `color:${col}`, text: name }),
+        Utils.el('div', { class: 'hb-track' }, [Utils.el('div', { class: 'hb-fill', style: `width:${Math.max(3, Math.min(100, pct * 100))}%;background:${col}` })]),
+        Utils.el('span', { class: 'hb-val' }, [`${Math.round(v)} ${u}`, Utils.el('small', { text: `${Math.round(pct * 100)} % de ${Math.round(g)}` })]),
+      ]));
+    });
+
+    // consejos concretos (máximo 3)
+    const tips = [];
+    const avgK = avg('kcal'); const avgGoal = bars[0][2];
+    if (logged.length < Math.ceil(nDays * 0.6)) tips.push(`📝 Registraste ${logged.length} de ${nDays} días. Con más días puedo darte consejos más fiables.`);
+    if (goalP && avg('protein') < goalP * 0.9) tips.push(`🥩 Te faltan ~${Math.round(goalP - avg('protein'))} g de proteína al día. Una pechuga o 3 huevos y una lata de atún suman ~40 g.`);
+    if (avgK > avgGoal * 1.1) tips.push(`🍽️ Pasas tu meta por ~${Math.round(avgK - avgGoal)} kcal al día. Mira la comida donde más se te va en Calorías.`);
+    else if (avgK < avgGoal * 0.9) tips.push(`⚡ Te quedas ~${Math.round(avgGoal - avgK)} kcal por debajo de tu meta. Si estás entrenando, puede frenar tu progreso.`);
+    const wk = logged.filter((d) => d.dow === 0 || d.dow === 6); const wd = logged.filter((d) => d.dow > 0 && d.dow < 6);
+    if (wk.length >= 2 && wd.length >= 3) {
+      const a = wk.reduce((sum, d) => sum + d.kcal, 0) / wk.length; const b = wd.reduce((sum, d) => sum + d.kcal, 0) / wd.length;
+      if (a > b * 1.15) tips.push(`📅 Los fines de semana comes ~${Math.round(a - b)} kcal más que entre semana: ahí se te escapa buena parte del progreso.`);
+    }
+    if (!tips.length) tips.push('✅ Vas muy bien con tus números. Mantén el ritmo.');
+    tips.slice(0, 3).forEach((t) => c.appendChild(Utils.el('div', { class: 'nut-hint adh-tip', text: t })));
+    return c;
+  }
+
+  // tendencia de peso contra tu objetivo + ajuste sugerido de calorías
+  function trendCard(container) {
+    const c = card('⚖️ Tu peso y tus calorías', 'semana a semana');
+    const cfg = Nutrition.autoConfig();
+    const mUnit = Units.current();
+    const weeks = [];
+    for (let i = 5; i >= 0; i--) {
+      const r = Metrics.weekRange(-i);
+      const log = DB.getCalorieLog();
+      const ds = lastDaysBetween(r.start, r.end).map((iso) => ({ iso, en: log[iso] || [] })).filter((d) => sumDay(d.en, 'kcal') >= 300);
+      const ws = DB.getMeasurements().filter((m) => m.weight && m.date >= r.start && m.date <= r.end).map((m) => Number(m.weight));
+      weeks.push({
+        r, days: ds.length,
+        kcal: ds.length ? ds.reduce((sum, d) => sum + sumDay(d.en, 'kcal'), 0) / ds.length : null,
+        prot: ds.length ? ds.reduce((sum, d) => sum + sumDay(d.en, 'protein'), 0) / ds.length : null,
+        w: ws.length ? ws.reduce((a, b) => a + b, 0) / ws.length : null,
+      });
+    }
+    if (weeks.every((w) => w.w === null)) {
+      c.appendChild(emptyNote('Registra tu peso al menos una vez por semana (Progreso → Cuerpo) para ver cómo responde tu cuerpo a lo que comes.'));
+      return c;
+    }
+    // tabla
+    const head = ['Semana', 'kcal/día', 'Peso', 'Cambio'];
+    const grid = Utils.el('div', { class: 'wk-table' });
+    head.forEach((h) => grid.appendChild(Utils.el('span', { class: 'wk-h', text: h })));
+    let prevW = null;
+    weeks.forEach((w, i) => {
+      const d = Utils.parseISO(w.r.start);
+      const delta = w.w !== null && prevW !== null ? w.w - prevW : null;
+      if (w.w !== null) prevW = w.w;
+      const cls = i === weeks.length - 1 ? ' now' : '';
+      grid.appendChild(Utils.el('span', { class: `wk-c${cls}`, text: `${d.getDate()}/${d.getMonth() + 1}` }));
+      grid.appendChild(Utils.el('span', { class: `wk-c${cls}`, text: w.kcal !== null ? String(Math.round(w.kcal)) : '—' }));
+      grid.appendChild(Utils.el('span', { class: `wk-c${cls}`, text: w.w !== null ? `${Utils.round1(Units.fromKg(w.w))} ${mUnit}` : '—' }));
+      const good = delta === null ? '' : (cfg.mode === 'perder' ? (delta < -0.05 ? ' up' : delta > 0.15 ? ' down' : '') : cfg.mode === 'ganar' ? (delta > 0.05 ? ' up' : delta < -0.15 ? ' down' : '') : (Math.abs(delta) <= 0.4 ? ' up' : ' down'));
+      grid.appendChild(Utils.el('span', { class: `wk-c wk-d${good}${cls}`, text: delta === null ? '—' : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Utils.round1(Math.abs(Units.fromKg(delta)))}` }));
+    });
+    c.appendChild(grid);
+
+    // veredicto según tu objetivo
+    const slope = typeof MeasurementsView.weightTrend === 'function' ? MeasurementsView.weightTrend() : null;
+    const sg = Nutrition.suggestGoal();
+    const goalTxt = cfg.mode === 'perder' ? `perder ${Math.abs(cfg.rate)} kg/sem` : cfg.mode === 'ganar' ? `subir ${cfg.rate} kg/sem` : 'mantener tu peso';
+    c.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:10px;', text: `Objetivo actual: ${goalTxt}. Cámbialo en Calorías → Ajuste automático.` }));
+    if (slope === null) {
+      c.appendChild(Utils.el('div', { class: 'nut-hint', text: '⚖️ Necesito 2 pesajes con al menos 5 días de diferencia para calcular tu tendencia. Pésate en ayunas 2 veces por semana.' }));
+    } else {
+      const wkKg = slope * 7;
+      const diff = wkKg - cfg.rate;
+      const sl = `${wkKg > 0 ? '+' : wkKg < 0 ? '−' : ''}${Utils.round1(Math.abs(Units.fromKg(wkKg)))} ${mUnit}/semana`;
+      let msg; let col = 'var(--green)';
+      if (Math.abs(diff) <= 0.15) msg = `✓ Tu peso cambia ${sl}: justo lo que buscas. No cambies nada.`;
+      else if (cfg.mode === 'perder' && diff > 0) { msg = `🐌 Tu peso cambia ${sl}: bajas más lento de lo planeado.`; col = 'var(--yellow)'; }
+      else if (cfg.mode === 'perder') { msg = `⚠️ Tu peso cambia ${sl}: bajas más rápido de lo planeado. Cuida tu músculo y tu energía.`; col = 'var(--yellow)'; }
+      else if (cfg.mode === 'ganar' && diff < 0) { msg = `🐌 Tu peso cambia ${sl}: subes más lento de lo planeado.`; col = 'var(--yellow)'; }
+      else if (cfg.mode === 'ganar') { msg = `⚠️ Tu peso cambia ${sl}: subes más rápido de lo planeado y puede ser grasa.`; col = 'var(--yellow)'; }
+      else { msg = `⚠️ Tu peso cambia ${sl} y quieres mantenerlo.`; col = 'var(--yellow)'; }
+      c.appendChild(Utils.el('div', { class: 'nut-hint', style: `color:${col};`, text: msg }));
+    }
+    if (sg.ok && Math.abs(sg.diff) >= 100) {
+      const row = Utils.el('div', { class: 'adh-adjust' }, [
+        Utils.el('div', { style: 'flex:1;min-width:0;' }, [
+          Utils.el('b', { text: `Meta sugerida: ${sg.recommended} kcal` }),
+          Utils.el('div', { class: 'small text-dim', text: `${sg.diff > 0 ? '+' : ''}${sg.diff} vs tu meta de ${sg.current}${Math.abs(sg.slopeKgWeek - cfg.rate) <= 0.15 ? `. Comes ~${sg.avgKcal} y tu peso va bien: así tu meta refleja la realidad.` : ''}` }),
+        ]),
+      ]);
+      const ap = Utils.el('button', { type: 'button', class: 'btn-primary btn-small', text: 'Aplicar' });
+      ap.addEventListener('click', () => { Nutrition.applyGoal(sg.recommended); Utils.toast(`Meta actualizada: ${sg.recommended} kcal ✓`); renderNutrition(container); });
+      row.appendChild(ap);
+      c.appendChild(row);
+    } else if (sg.ok) {
+      c.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:8px;', text: `Tu gasto real estimado es ~${sg.tdee} kcal/día y tu meta ya encaja.` }));
+    } else {
+      c.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:8px;', text: `Para sugerirte un ajuste de calorías: ${sg.reason}` }));
+    }
+    return c;
+  }
+
+  function lastDaysBetween(a, b) {
+    const out = [];
+    const d = Utils.parseISO(a); const end = Utils.parseISO(b);
+    while (d <= end) { out.push(Utils.toISODate(d)); d.setDate(d.getDate() + 1); }
+    return out;
+  }
+
   function renderNutrition(container) {
     container.innerHTML = '';
     const view = Utils.el('div', { class: 'view' });
@@ -418,6 +586,9 @@ const StatsView = (() => {
         Utils.el('div', { class: 'kpi-delta', text: `meta ${Utils.round1(waterGoal / 1000)} L` }),
       ]),
     ]));
+
+    view.appendChild(adherenceCard(nutriPeriod, container));
+    view.appendChild(trendCard(container));
 
     const labelFor = (iso) => {
       const d = Utils.parseISO(iso);
