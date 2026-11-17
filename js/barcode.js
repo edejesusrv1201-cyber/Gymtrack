@@ -22,36 +22,51 @@ const Barcode = (() => {
     return DB.getFoods().find((f) => f.barcode && clean(f.barcode) === code) || null;
   }
 
-  // busca en Open Food Facts → { found, name, brand, kcal, protein, carbs, fat, servingG, servingLabel }
-  async function lookup(code) {
+  // convierte un producto de Open Food Facts → { name, brand, kcal, protein, carbs, fat, fiber, sugar, sodium, servingG, servingLabel } (por 100 g)
+  function parse(p) {
+    const n = p.nutriments || {};
+    let kcal = num(n['energy-kcal_100g']);
+    if (kcal === null && num(n.energy_100g) !== null) kcal = num(n.energy_100g) / 4.184;
+    const protein = num(n.proteins_100g); const carbs = num(n.carbohydrates_100g); const fat = num(n.fat_100g);
+    const name = String(p.product_name_es || p.product_name || '').trim();
+    const brand = String(p.brands || '').split(',')[0].trim();
+    if (kcal === null && protein === null && carbs === null && fat === null) return { empty: true, name, brand };
+    if (kcal === null) kcal = (protein || 0) * 4 + (carbs || 0) * 4 + (fat || 0) * 9;
+    const fiber = num(n.fiber_100g); const sugar = num(n.sugars_100g);
+    let sodium = num(n.sodium_100g);                       // en gramos
+    if (sodium === null && num(n.salt_100g) !== null) sodium = num(n.salt_100g) / 2.5;
+    const servingG = num(p.serving_quantity);
+    return {
+      name, brand,
+      kcal: r1(kcal), protein: r1(protein || 0), carbs: r1(carbs || 0), fat: r1(fat || 0),
+      fiber: fiber === null ? null : r1(fiber), sugar: sugar === null ? null : r1(sugar), sodium: sodium === null ? null : Math.round(sodium * 1000),
+      servingG: servingG > 0 ? servingG : null,
+      servingLabel: p.serving_size ? String(p.serving_size).trim() : '',
+    };
+  }
+
+  async function getJson(url) {
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 9000);
+    const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 12000);
     try {
-      const res = await fetch(`${API}${code}.json?fields=${FIELDS}`, ctl ? { signal: ctl.signal } : undefined);
-      if (!res.ok) return { found: false };
-      const j = await res.json();
-      if (!j || j.status !== 1 || !j.product) return { found: false };
-      const p = j.product;
-      const n = p.nutriments || {};
-      let kcal = num(n['energy-kcal_100g']);
-      if (kcal === null && num(n.energy_100g) !== null) kcal = num(n.energy_100g) / 4.184;
-      const protein = num(n.proteins_100g); const carbs = num(n.carbohydrates_100g); const fat = num(n.fat_100g);
-      if (kcal === null && protein === null && carbs === null && fat === null) return { found: true, empty: true, name: p.product_name_es || p.product_name || '', brand: p.brands || '' };
-      if (kcal === null) kcal = (protein || 0) * 4 + (carbs || 0) * 4 + (fat || 0) * 9;
-      const servingG = num(p.serving_quantity);
-      return {
-        found: true,
-        name: (p.product_name_es || p.product_name || '').trim(),
-        brand: String(p.brands || '').split(',')[0].trim(),
-        kcal: r1(kcal), protein: r1(protein || 0), carbs: r1(carbs || 0), fat: r1(fat || 0),
-        servingG: servingG > 0 ? servingG : null,
-        servingLabel: p.serving_size ? String(p.serving_size).trim() : '',
-      };
+      const res = await fetch(url, ctl ? { signal: ctl.signal } : undefined);
+      if (!res.ok) return { error: true };
+      return { json: await res.json() };
     } catch (e) {
-      return { found: false, error: true };
+      return { error: true };
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // busca en Open Food Facts por código → { found, ...parse }
+  async function lookup(code) {
+    const r = await getJson(`${API}${code}.json?fields=${FIELDS}`);
+    if (r.error) return { found: false, error: true };
+    const j = r.json;
+    if (!j || j.status !== 1 || !j.product) return { found: false };
+    const info = parse(j.product);
+    return Object.assign({ found: true }, info);
   }
 
   // opts: { onFound(code, food) , onNew(code, info|null) }

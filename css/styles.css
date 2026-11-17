@@ -1959,3 +1959,15 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .wk-d.down { color: var(--yellow); }
 .adh-adjust { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.09); }
 .adh-adjust .btn-primary { flex: none; width: auto; padding: 10px 18px; }
+
+/* ===== v61: más alimentos, búsqueda en internet, fibra/azúcar/sodio ===== */
+.micro-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.micro-chip { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border-radius: 12px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.08); }
+.micro-chip b { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.micro-chip span { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.micro-chip.warn { border-color: rgba(255, 194, 71, 0.5); }
+.micro-chip.warn b { color: var(--yellow); }
+.micro-note { margin-top: 6px; font-size: 0.7rem; color: var(--text-dim); text-align: center; line-height: 1.35; }
+.micro-fold { margin: 0 0 10px; }
+.micro-fold > .fold-sum { padding: 10px 14px; border-radius: 14px; font-size: 0.86rem; background: rgba(var(--ov), 0.04); }
+.micro-form { padding: 10px 2px 0; }

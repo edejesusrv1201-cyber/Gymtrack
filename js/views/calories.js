@@ -36,9 +36,11 @@ const CaloriesView = (() => {
     if (list.length) log[iso] = list; else delete log[iso];
     DB.saveCalorieLog(log);
   }
+  const hasMicro = (e) => typeof e.fiber === 'number' || typeof e.sugar === 'number' || typeof e.sodium === 'number';
   const sumOf = (list) => list.reduce((a, e) => ({
     kcal: a.kcal + (e.kcal || 0), protein: a.protein + (e.protein || 0), carbs: a.carbs + (e.carbs || 0), fat: a.fat + (e.fat || 0),
-  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+    fiber: a.fiber + (e.fiber || 0), sugar: a.sugar + (e.sugar || 0), sodium: a.sodium + (e.sodium || 0), micro: a.micro + (hasMicro(e) ? 1 : 0), n: a.n + 1,
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0, micro: 0, n: 0 });
 
   function qtyText(e) {
     if (e.grams) return `${r1(e.grams)} g`;
@@ -233,6 +235,15 @@ const CaloriesView = (() => {
         ]),
         Utils.el('div', { class: 'small text-dim', text: `Proteína ${r0((kP / kT) * 100)}% · Carbos ${r0((kC / kT) * 100)}% · Grasas ${r0((kF / kT) * 100)}%` }),
       ]));
+    }
+    if (t.micro > 0) {
+      const chip = (icon, label, val, unit, warn) => Utils.el('div', { class: `micro-chip${warn ? ' warn' : ''}` }, [Utils.el('b', { text: `${icon} ${val}${unit}` }), Utils.el('span', { text: label })]);
+      card.appendChild(Utils.el('div', { class: 'micro-row' }, [
+        chip('🌾', 'Fibra', r0(t.fiber), ' g', false),
+        chip('🍬', 'Azúcar', r0(t.sugar), ' g', t.sugar > 50),
+        chip('🧂', 'Sodio', r0(t.sodium), ' mg', t.sodium > 2300),
+      ]));
+      card.appendChild(Utils.el('div', { class: 'micro-note', text: `Suma de ${t.micro} de ${t.n} alimentos que traen el dato (meta orientativa: fibra ≥ 25 g, azúcar < 50 g, sodio < 2300 mg).` }));
     }
     return card;
   }
@@ -648,7 +659,7 @@ const CaloriesView = (() => {
         extra.appendChild(Utils.el('div', { class: 'sm-ok', text: `✓ Encontré el producto${info.brand ? ` (${info.brand})` : ''}. Los valores son por 100 g: compáralos con tu empaque antes de guardar.` }));
         openFoodForm(null, afterSave, '', {
           basis: 'g', name: [info.name, info.brand && !String(info.name).toLowerCase().includes(info.brand.toLowerCase()) ? `(${info.brand})` : ''].filter(Boolean).join(' '),
-          kcal: info.kcal, protein: info.protein, carbs: info.carbs, fat: info.fat,
+          kcal: info.kcal, protein: info.protein, carbs: info.carbs, fat: info.fat, fiber: info.fiber, sugar: info.sugar, sodium: info.sodium,
           servingLabel: info.servingG ? (info.servingLabel || `1 porción (${info.servingG} g)`) : '', portionG: info.servingG || null,
           barcode: code, extra,
         });
@@ -776,6 +787,7 @@ const CaloriesView = (() => {
         meal, time: entry ? entry.time : new Date().toISOString(),
       };
       if (isG) rec.grams = r1(q); else rec.servings = r1(q);
+      ['fiber', 'sugar', 'sodium'].forEach((k) => { if (typeof m[k] === 'number') rec[k] = r1(m[k]); });
       if (opts.treat && !entry) {
         const need = Treats.costOf(rec.kcal);
         if (Treats.balance() < need) { Utils.toast(`Te faltan ${need - Treats.balance()} vale(s) para este premio`); return; }
@@ -1096,6 +1108,23 @@ const CaloriesView = (() => {
     ]));
     body.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:-4px 0 10px;', text: 'Si dejas las calorías vacías, se calculan con los macros (4 · P + 4 · C + 9 · G).' }));
 
+    const microVal = (k) => (src && typeof src[k] === 'number' ? String(src[k]) : '');
+    const fiberIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: microVal('fiber'), placeholder: '—' });
+    const sugarIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: microVal('sugar'), placeholder: '—' });
+    const sodiumIn = Utils.el('input', { type: 'number', inputmode: 'decimal', step: 'any', value: microVal('sodium'), placeholder: '—' });
+    const microBox = Utils.el('details', { class: 'fold fold-flat micro-fold' });
+    microBox.open = !!(microVal('fiber') || microVal('sugar') || microVal('sodium'));
+    microBox.appendChild(Utils.el('summary', { class: 'fold-sum' }, [Utils.el('span', { class: 'fold-t', text: 'Más datos (opcional)' }), Utils.el('span', { class: 'fold-sub', text: 'fibra · azúcar · sodio' }), Utils.el('i', { class: 'fold-chev' })]));
+    microBox.appendChild(Utils.el('div', { class: 'micro-form' }, [
+      Utils.el('div', { class: 'field-row' }, [
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Fibra (g)' }), fiberIn]),
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Azúcar (g)' }), sugarIn]),
+        Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Sodio (mg)' }), sodiumIn]),
+      ]),
+      Utils.el('div', { class: 'small text-dim', text: 'Con los mismos valores que los macros (por 100 g o por porción).' }),
+    ]));
+    body.appendChild(microBox);
+
     const saveBtn = Utils.el('button', { class: 'btn-primary btn-block', text: 'Guardar en mis alimentos' });
     saveBtn.addEventListener('click', () => {
       const name = nameIn.value.trim();
@@ -1109,6 +1138,10 @@ const CaloriesView = (() => {
       else { food = { id: DB.uid() }; foods.push(food); }
       Object.assign(food, { name, basis, kcal: r1(kcal), protein: r1(p), carbs: r1(c), fat: r1(f) });
       if (prefill && prefill.barcode) food.barcode = prefill.barcode;
+      [['fiber', fiberIn], ['sugar', sugarIn], ['sodium', sodiumIn]].forEach(([k, inp]) => {
+        const v = parseFloat(inp.value);
+        if (!isNaN(v) && v >= 0) food[k] = r1(v); else delete food[k];
+      });
       if (basis === 'g') {
         const g = parseFloat(portionG.value);
         if (g > 0) { food.portionG = g; food.servingLabel = labelIn.value.trim() || `1 porción (${r0(g)} g)`; } else { delete food.portionG; food.servingLabel = labelIn.value.trim() || '100 g'; }

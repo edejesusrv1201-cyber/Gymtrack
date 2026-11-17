@@ -18,6 +18,7 @@ const FoodDB = (() => {
     { key: 'grasa', label: 'Grasas y frutos secos', icon: '🥑' },
     { key: 'bebida', label: 'Bebidas', icon: '🥤' },
     { key: 'dulce', label: 'Dulces y snacks', icon: '🍫' },
+    { key: 'salsa', label: 'Salsas y aderezos', icon: '🥫' },
     { key: 'preparado', label: 'Comidas preparadas', icon: '🍕' },
   ];
 
@@ -187,7 +188,10 @@ const FoodDB = (() => {
   const slug = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-  const BUILTIN = RAW.map(([name, cat, kcal, protein, carbs, fat, ports]) => ({
+  const MORE = typeof FoodMore !== 'undefined' ? FoodMore : { ROWS: [], MICRO: {} };
+  const BUILTIN = RAW.concat(MORE.ROWS).map(([name, cat, kcal, protein, carbs, fat, ports, fb, sg, na]) => {
+    const mi = MORE.MICRO[name] || (fb !== undefined ? [fb, sg, na] : null);
+    return Object.assign({
     id: `b_${slug(name)}`,
     builtin: true,
     name,
@@ -197,7 +201,8 @@ const FoodDB = (() => {
       const [label, g] = p.split('|');
       return { label, g: Number(g) };
     }),
-  }));
+    }, mi ? { fiber: mi[0], sugar: mi[1], sodium: mi[2] } : {});
+  });
   const BUILTIN_BY_ID = {};
   BUILTIN.forEach((f) => { BUILTIN_BY_ID[f.id] = f; });
 
@@ -209,12 +214,12 @@ const FoodDB = (() => {
   function spec(food) {
     if (!food) return null;
     if (food.builtin) {
-      return { id: food.id, name: food.name, basis: 'g', kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat, portions: food.portions, builtin: true, cat: food.cat };
+      return { id: food.id, name: food.name, basis: 'g', kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat, portions: food.portions, builtin: true, cat: food.cat, fiber: food.fiber, sugar: food.sugar, sodium: food.sodium };
     }
     // alimento tuyo escrito "por 100 g" (nuevo formato)
     if (food.basis === 'g') {
       const portions = food.portionG > 0 ? [{ label: food.servingLabel || `1 porción (${food.portionG} g)`, g: Number(food.portionG) }] : [];
-      return { id: food.id, name: food.name, basis: 'g', kcal: food.kcal, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, portions, mine: true, combo: !!food.combo, recipe: !!food.recipe };
+      return { id: food.id, name: food.name, basis: 'g', kcal: food.kcal, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, portions, mine: true, combo: !!food.combo, recipe: !!food.recipe, fiber: food.fiber, sugar: food.sugar, sodium: food.sodium };
     }
     // formato antiguo con porción "100g" / "150 g": se convierte a por 100 g para poder anotar en gramos
     const m = GRAM_LABEL.exec(food.servingLabel || '');
@@ -229,13 +234,15 @@ const FoodDB = (() => {
         };
       }
     }
-    return { id: food.id, name: food.name, basis: 's', kcal: food.kcal || 0, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, servingLabel: food.servingLabel || '1 porción', portions: [], mine: true, combo: !!food.combo, recipe: !!food.recipe };
+    return { id: food.id, name: food.name, basis: 's', kcal: food.kcal || 0, protein: food.protein || 0, carbs: food.carbs || 0, fat: food.fat || 0, servingLabel: food.servingLabel || '1 porción', portions: [], mine: true, combo: !!food.combo, recipe: !!food.recipe, fiber: food.fiber, sugar: food.sugar, sodium: food.sodium };
   }
 
   // macros de una cantidad (gramos para basis 'g', porciones para basis 's')
   function macros(sp, qty) {
     const k = sp.basis === 'g' ? qty / 100 : qty;
-    return { kcal: sp.kcal * k, protein: sp.protein * k, carbs: sp.carbs * k, fat: sp.fat * k };
+    const out = { kcal: sp.kcal * k, protein: sp.protein * k, carbs: sp.carbs * k, fat: sp.fat * k };
+    ['fiber', 'sugar', 'sodium'].forEach((key) => { if (typeof sp[key] === 'number') out[key] = sp[key] * k; });
+    return out;
   }
 
   function allFoods() {
