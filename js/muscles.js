@@ -324,9 +324,49 @@ const Muscles = (() => {
     return wrap;
   }
 
+  // ---------------------------------------------------------------- mejores músculos
+  // Cuánto subió tu fuerza (1RM estimado) en los ejercicios que trabajan cada músculo
+  // durante los últimos 4 meses: compara la primera mitad de tus sesiones con la segunda.
+  function ranking() {
+    const since = Utils.toISODate(new Date(Date.now() - 120 * 86400000));
+    const perEx = [];
+    DB.getExercises().forEach((ex) => {
+      if (ex.group === 'cardio' || !mapOf(ex).p.length) return;
+      const ss = Metrics.exerciseSessions(ex.id, false).filter((x) => x.date >= since && x.e1rm > 0);
+      if (ss.length < 2) return;
+      const span = (Utils.parseISO(ss[ss.length - 1].date) - Utils.parseISO(ss[0].date)) / 86400000;
+      if (span < 10) return;
+      const half = Math.ceil(ss.length / 2);
+      const a = Math.max(...ss.slice(0, half).map((x) => x.e1rm));
+      const b = Math.max(...ss.slice(half).map((x) => x.e1rm));
+      if (!(a > 0)) return;
+      perEx.push({ name: ex.name, gain: Math.max(-0.5, Math.min(1, b / a - 1)), n: ss.length });
+    });
+    const out = {};
+    LIST.forEach((m) => {
+      const cands = perEx.filter((r) => mapOf(DB.getExercises().find((e) => e.name === r.name)).p.includes(m.id)).sort((x, y) => y.gain - x.gain);
+      if (!cands.length) return;
+      out[m.id] = { id: m.id, gain: cands.reduce((s, r) => s + r.gain, 0) / cands.length, cands };
+    });
+    const list = Object.keys(out).map((k) => out[k]).sort((x, y) => y.gain - x.gain);
+    list.forEach((r, i) => { r.rank = i; });
+    return { by: out, list };
+  }
+  const pctText = (g) => `${g >= 0 ? '+' : '−'}${Math.abs(Math.round(g * 100))}%`;
+  const MEDAL = ['🥇', '🥈', '🥉'];
+  const PODIUM_COLOR = ['#ffd23f', '#d5dbe8', '#e0904f'];
+  function gainColor(g) { return g >= 0.1 ? '#35d49a' : g >= 0.03 ? '#7be0b0' : g > -0.03 ? '#ffc247' : '#ff5c6c'; }
+  function bestFills(rk) {
+    const fills = {};
+    rk.list.forEach((r) => {
+      fills[r.id] = { color: r.rank < 3 && r.gain > 0.005 ? PODIUM_COLOR[r.rank] : gainColor(r.gain), opacity: 0.92 };
+    });
+    return fills;
+  }
+
   // ---------------------------------------------------------------- tarjeta interactiva
   // opts: { compact } — compact oculta el selector de período
-  let mode = 'series';   // 'series' | 'recuperacion'
+  let mode = null;       // 'mejores' | 'series' | 'recuperacion' (la primera vez: mejores si ya hay datos)
   let period = 'semana'; // 'semana' | '4sem'
   let selected = null;
 
@@ -377,11 +417,13 @@ const Muscles = (() => {
       const cur = setsBetween(wk.start, wk.end);
       const four = setsBetween(from4, wk.end);
       const rec = setsBetween(Utils.toISODate(new Date(Date.now() - 20 * 86400000)), Utils.todayISO());
+      const rk = ranking();
+      if (!mode) mode = rk.list.length ? 'mejores' : 'series';
 
       // controles
       controls.innerHTML = '';
       controls.appendChild(Utils.segmented(
-        [{ key: 'series', label: 'Series' }, { key: 'recuperacion', label: 'Recuperación' }],
+        [{ key: 'mejores', label: '🏆 Mejores' }, { key: 'series', label: 'Series' }, { key: 'recuperacion', label: 'Recuperación' }],
         mode, (k) => { mode = k; firstDraw = true; draw(); }, true,
       ));
       if (mode === 'series') {
@@ -392,9 +434,9 @@ const Muscles = (() => {
         ));
       }
 
-      const data = mode === 'recuperacion' ? rec : (period === 'semana' ? cur : four);
-      const days = mode === 'series' && period === '4sem' ? 4 : 1;
-      const fills = mode === 'recuperacion' ? recoveryFills(rec) : seriesFills(data, g, days);
+      const data = mode === 'recuperacion' ? rec : (mode === 'mejores' ? four : (period === 'semana' ? cur : four));
+      const days = (mode === 'series' && period === '4sem') || mode === 'mejores' ? 4 : 1;
+      const fills = mode === 'recuperacion' ? recoveryFills(rec) : mode === 'mejores' ? bestFills(rk) : seriesFills(data, g, days);
       mapHost.classList.toggle('fresh', firstDraw);
       firstDraw = false;
       mapHost.innerHTML = bodySvg(fills);
@@ -408,6 +450,8 @@ const Muscles = (() => {
       const item = (color, text) => Utils.el('span', {}, [Utils.el('i', { style: `background:${color}` }), text]);
       if (mode === 'recuperacion') {
         [[REC_COLOR[0], 'hoy'], [REC_COLOR[1], 'ayer'], [REC_COLOR[2], 'hace 2 días'], [REC_COLOR[3], '3+ días: listo']].forEach(([c, t]) => legend.appendChild(item(c, t)));
+      } else if (mode === 'mejores') {
+        [[PODIUM_COLOR[0], '🥇🥈🥉 podio'], ['#35d49a', 'mejora'], ['#ffc247', 'estancado'], ['#ff5c6c', 'baja']].forEach(([c, t]) => legend.appendChild(item(c, t)));
       } else {
         legend.appendChild(item(STATUS_COLOR.low, `menos de ${g.min}`));
         legend.appendChild(item(STATUS_COLOR.ok, `${g.min}–${g.max} (meta)`));
@@ -416,7 +460,24 @@ const Muscles = (() => {
 
       // detalle del músculo tocado
       detail.innerHTML = '';
-      if (selected && BY_ID[selected]) {
+      if (selected && BY_ID[selected] && mode === 'mejores') {
+        const m = BY_ID[selected];
+        const r = rk.by[selected];
+        const box = Utils.el('div', { class: 'bm-card-sel' });
+        if (r) {
+          const col = r.rank < 3 && r.gain > 0.005 ? PODIUM_COLOR[r.rank] : gainColor(r.gain);
+          box.appendChild(Utils.el('div', { class: 'flex-between' }, [
+            Utils.el('b', { text: `${r.rank < 3 && r.gain > 0.005 ? `${MEDAL[r.rank]} ` : ''}${m.name}` }),
+            Utils.el('span', { class: 'bm-badge', style: `background:${col}33;color:${col}`, text: `${pctText(r.gain)} de fuerza` }),
+          ]));
+          box.appendChild(Utils.el('div', { class: 'small', style: 'margin-top:6px;', text: `Con: ${r.cands.slice(0, 4).map((c) => `${c.name} ${pctText(c.gain)}`).join(' · ')}` }));
+          box.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:4px;', text: `Lugar ${r.rank + 1} de ${rk.list.length} · ${fmtN(Math.round((data[selected].sets / 4) * 2) / 2)} series por semana en promedio` }));
+        } else {
+          box.appendChild(Utils.el('b', { text: m.name }));
+          box.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:4px;', text: 'Aún no hay datos para medirlo: repite un ejercicio que lo trabaje en 2 días distintos y anota el peso.' }));
+        }
+        detail.appendChild(box);
+      } else if (selected && BY_ID[selected]) {
         const m = BY_ID[selected];
         const nShown = data[selected].sets / days;
         const st = status(nShown, g);
@@ -443,7 +504,42 @@ const Muscles = (() => {
 
       // lo más descuidado
       lacking.innerHTML = '';
-      if (mode === 'series') {
+      if (mode === 'mejores') {
+        if (!rk.list.length) {
+          lacking.appendChild(Utils.el('div', { class: 'nut-hint', style: 'margin-top:12px;', text: 'Aún no hay con qué comparar. Repite un ejercicio en 2 días distintos (con al menos 10 días de diferencia) y aquí verás qué músculos están mejorando más.' }));
+        } else {
+          const top = rk.list.filter((r) => r.gain > 0.005).slice(0, 3);
+          lacking.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:14px 0 6px;', text: '🏆 Tus mejores músculos' }));
+          if (!top.length) lacking.appendChild(Utils.el('p', { class: 'small', text: 'Por ahora ninguno subió de fuerza. Intenta añadir un poco de peso o una repetición más en tus ejercicios base.' }));
+          const maxG = Math.max(0.05, ...top.map((r) => r.gain));
+          top.forEach((r, i) => {
+            const row = Utils.el('button', { type: 'button', class: 'best-row' }, [
+              Utils.el('span', { class: 'best-medal', text: MEDAL[i] }),
+              Utils.el('span', { class: 'best-body' }, [
+                Utils.el('b', { text: BY_ID[r.id].name.replace(/ \(.*\)/, '') }),
+                Utils.el('span', { class: 'small text-dim', text: `con ${r.cands[0].name} ${pctText(r.cands[0].gain)}` }),
+                Utils.el('span', { class: 'best-bar' }, [Utils.el('i', { style: `width:${Math.max(8, Math.round((r.gain / maxG) * 100))}%;background:${PODIUM_COLOR[i]}` })]),
+              ]),
+              Utils.el('span', { class: 'best-pct', style: `color:${PODIUM_COLOR[i]}`, text: pctText(r.gain) }),
+            ]);
+            row.addEventListener('click', () => { selected = r.id; draw(); });
+            lacking.appendChild(row);
+          });
+          const weak = rk.list.filter((r) => r.rank >= 3 && r.gain <= 0.03).slice(-2).reverse();
+          if (weak.length) {
+            lacking.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:14px 0 6px;', text: '🐢 Los que menos avanzan' }));
+            const chips = Utils.el('div', { class: 'rt-chips' });
+            weak.forEach((r) => {
+              const c = Utils.el('button', { type: 'button', class: 'rt-chip', style: `--gc:${gainColor(r.gain)}`, text: `${BY_ID[r.id].name.replace(/ \(.*\)/, '')} ${pctText(r.gain)}` });
+              c.addEventListener('click', () => { selected = r.id; draw(); });
+              chips.appendChild(c);
+            });
+            lacking.appendChild(chips);
+            lacking.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:6px;', text: 'Tip: dales una serie más por semana o sube un poco el peso.' }));
+          }
+          lacking.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:10px;', text: 'Se mide con tu 1RM estimado en los últimos 4 meses. Cuantas más veces repitas el mismo ejercicio, más preciso.' }));
+        }
+      } else if (mode === 'series') {
         const low = LIST.map((m) => ({ m, n: data[m.id].sets / days })).filter((x) => x.n < g.min).sort((a, b) => a.n - b.n).slice(0, 5);
         const total = Object.keys(data).reduce((s, k) => s + data[k].sets, 0);
         if (total > 0 && low.length) {
@@ -492,5 +588,5 @@ const Muscles = (() => {
     return c;
   }
 
-  return { LIST, mapOf, setsBetween, goal, card, homeCard, dayMini, bodySvg };
+  return { LIST, mapOf, setsBetween, goal, card, homeCard, dayMini, bodySvg, ranking };
 })();

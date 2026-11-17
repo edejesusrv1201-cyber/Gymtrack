@@ -27,6 +27,7 @@ const MeasurementsView = (() => {
   const ALL_FIELDS = [...FIELDS, ...LEGACY_FIELDS];
 
   let chartField = 'weight';
+  let respPeriod = 90; // días para comparar (0 = todo el historial)
 
   function render(root) {
     root.innerHTML = '';
@@ -40,6 +41,7 @@ const MeasurementsView = (() => {
     view.appendChild(addBtn);
 
     view.appendChild(goalCard(measurements, () => render(root)));
+    if (measurements.length >= 2) view.appendChild(responseCard(measurements, root));
     view.appendChild(Photos.card());
 
     // ---- gráfico de progreso ----
@@ -114,6 +116,99 @@ const MeasurementsView = (() => {
     view.appendChild(histCard);
 
     root.appendChild(view);
+  }
+
+  // ---------- qué medidas responden mejor con el tiempo ----------
+  const DOWN_KEYS = ['waist', 'hips']; // aquí lo ideal es que baje (salvo que busques subir de peso)
+  const PAIRS = [['armL', 'armR', 'brazo'], ['thighL', 'thighR', 'muslo'], ['calfL', 'calfR', 'pantorrilla']];
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  const signed = (v, u) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Utils.round1(Math.abs(v))}${u}`;
+
+  function spark(pts, color) {
+    const w = 64; const h = 26;
+    const ys = pts.map((p) => p.y);
+    const mn = Math.min(...ys); const rng = (Math.max(...ys) - mn) || 1;
+    const t0 = Utils.parseISO(pts[0].x).getTime();
+    const span = (Utils.parseISO(pts[pts.length - 1].x).getTime() - t0) || 1;
+    const d = pts.map((p, i) => {
+      const x = ((Utils.parseISO(p.x).getTime() - t0) / span) * (w - 6) + 3;
+      const y = h - 3 - ((p.y - mn) / rng) * (h - 6);
+      return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+    const holder = Utils.el('span', { class: 'resp-spark' });
+    holder.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" style="stroke:${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    return holder;
+  }
+
+  function responseCard(measurements, root) {
+    const st = DB.getSettings();
+    const gStart = st.goalStartKg || 0;
+    const bulk = !!(st.goalWeightKg && gStart && st.goalWeightKg > gStart + 0.5);
+    const cutoff = respPeriod ? Utils.toISODate(new Date(Date.now() - respPeriod * 86400000)) : '0000-00-00';
+    const rows = [];
+    ALL_FIELDS.forEach((f) => {
+      if (f.key === 'weight') return;
+      const pts = fieldPoints(measurements, f.key).filter((p) => p.x >= cutoff);
+      if (pts.length < 2) return;
+      const first = pts[0]; const last = pts[pts.length - 1];
+      const days = (Utils.parseISO(last.x) - Utils.parseISO(first.x)) / 86400000;
+      if (days < 7 || !(first.y > 0)) return;
+      const diff = last.y - first.y;
+      const down = DOWN_KEYS.includes(f.key);
+      const judged = !(down && bulk);                       // si buscas subir de peso, la cintura no se juzga
+      const good = judged ? (down ? -diff : diff) : 0;
+      const monthPct = (good / first.y) * 100 * (30 / days); // % al mes en la dirección buena
+      rows.push({ f, pts, first, last, diff, days, down, judged, monthPct });
+    });
+    rows.sort((a, b) => (a.judged === b.judged ? b.monthPct - a.monthPct : a.judged ? -1 : 1));
+
+    const c = Utils.el('div', { class: 'card' });
+    c.appendChild(Utils.el('div', { class: 'card-title-row' }, [
+      Utils.el('h3', { text: '📊 Qué responde mejor' }),
+      Utils.el('span', { class: 'eyebrow', text: respPeriod ? `últimos ${respPeriod} días` : 'todo el historial' }),
+    ]));
+    c.appendChild(Utils.segmented(
+      [{ key: '30', label: '30 días' }, { key: '90', label: '90 días' }, { key: '0', label: 'Todo' }],
+      String(respPeriod), (k) => { respPeriod = Number(k); render(root); }, true,
+    ));
+    if (!rows.length) {
+      c.appendChild(Utils.el('p', { class: 'small mt-8', text: 'Para comparar necesito al menos 2 registros de una misma medida (pecho, brazo, cintura…) con 7 días o más de diferencia. Prueba con «Todo» o registra tus medidas cada 2–4 semanas.' }));
+      return c;
+    }
+    c.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:8px 0 6px;', text: bulk ? 'Ordenado por cuánto crece cada medida. La cintura no se juzga porque estás subiendo de peso.' : 'Ordenado por cuánto mejora cada medida: músculo que crece y cintura o cadera que bajan.' }));
+    rows.forEach((r, i) => {
+      const unit = r.f.unit();
+      let verdict; let color;
+      if (!r.judged) { verdict = 'sin juicio'; color = 'var(--text-dim)'; }
+      else if (r.monthPct >= 0.8) { verdict = 'responde muy bien'; color = 'var(--green)'; }
+      else if (r.monthPct >= 0.25) { verdict = 'va bien'; color = 'var(--green)'; }
+      else if (r.monthPct > -0.25) { verdict = 'estable'; color = 'var(--yellow)'; }
+      else { verdict = r.down ? 'está subiendo' : 'está bajando'; color = 'var(--red)'; }
+      const perMonth = (r.diff / r.days) * 30;
+      const row = Utils.el('button', { type: 'button', class: 'resp-row', title: 'Ver gráfico' }, [
+        Utils.el('span', { class: 'resp-rank', text: r.judged && i < 3 && r.monthPct >= 0.25 ? MEDALS[i] : '·' }),
+        Utils.el('span', { class: 'resp-body' }, [
+          Utils.el('b', { text: r.f.label }),
+          Utils.el('span', { class: 'small', style: `color:${color};font-weight:700;`, text: verdict }),
+          Utils.el('span', { class: 'small text-dim', text: `${Utils.round1(r.first.y)} → ${Utils.round1(r.last.y)}${unit} · ${signed(perMonth, unit)}/mes` }),
+        ]),
+        spark(r.pts, color),
+        Utils.el('span', { class: 'resp-val', style: `color:${color}`, text: signed(r.diff, unit) }),
+      ]);
+      row.addEventListener('click', () => { chartField = r.f.key; render(root); Utils.toast(`Gráfico: ${r.f.label}`); });
+      c.appendChild(row);
+    });
+
+    // simetría izquierda / derecha
+    const sym = [];
+    const lastOf = (k) => { const p = fieldPoints(measurements, k); return p.length ? p[p.length - 1].y : null; };
+    PAIRS.forEach(([l, rgt, name]) => {
+      const a = lastOf(l); const b = lastOf(rgt);
+      if (a !== null && b !== null && Math.abs(a - b) >= 1) sym.push(`${name} ${a < b ? 'izquierdo' : 'derecho'} ${Utils.round1(Math.abs(a - b))} cm más chico`);
+    });
+    if (sym.length) c.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: `⚖️ Simetría: ${sym.join(' · ')}. Dale una serie extra a ese lado.` }));
+    c.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:6px;', text: 'Cambios menores de 1 cm pueden ser error al medir: mídete a la misma hora y en el mismo punto.' }));
+    return c;
   }
 
   function buildForm(existing, onSaved) {

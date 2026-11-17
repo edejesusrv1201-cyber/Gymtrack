@@ -258,5 +258,6 @@ const Warmup = (() => {
     return host;
   }
 
-  return { open, build, usesBar, flow };
+  const isOpen = (key) => !!flows[key] && flows[key].phase !== 'idle';
+  return { open, build, usesBar, flow, isOpen };
 })();

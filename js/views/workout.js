@@ -453,28 +453,32 @@ const WorkoutView = (() => {
       rerender();
     };
     const openMenu = () => {
-      const menu = Utils.el('div', { class: 'action-menu' });
-      const add = (label, fn, danger) => {
-        const b = Utils.el('button', { class: 'am-item' + (danger ? ' danger' : ''), type: 'button', text: label });
+      // menú compacto: mosaicos de dos columnas para que quepa siempre en pantalla
+      const menu = Utils.el('div', { class: 'action-menu am-grid' });
+      const add = (label, fn, o = {}) => {
+        const b = Utils.el('button', { class: 'am-item' + (o.danger ? ' danger' : '') + (o.wide ? ' wide' : ''), type: 'button' }, [
+          Utils.el('span', { class: 'am-t', text: label }),
+          o.sub ? Utils.el('span', { class: 'am-sub', text: o.sub }) : null,
+        ]);
         b.addEventListener('click', fn);
         menu.appendChild(b);
         return b;
       };
-      const up = add('▲  Subir en el orden', () => { Modal.close(); moveEntry(iso, log, idx, -1, rerender); });
-      const down = add('▼  Bajar en el orden', () => { Modal.close(); moveEntry(iso, log, idx, 1, rerender); });
+      const up = add('▲ Subir', () => { Modal.close(); moveEntry(iso, log, idx, -1, rerender); });
+      const down = add('▼ Bajar', () => { Modal.close(); moveEntry(iso, log, idx, 1, rerender); });
       up.disabled = idx === 0;
       down.disabled = idx === log.exercises.length - 1;
-      add('📝  Nota y descanso de este ejercicio', () => { Modal.close(); openExerciseSettings(ex, rerender); });
-      if (ex && !isCardio && !ex.bodyweight) add('🔥  Agregar calentamiento completo', () => { Modal.close(); startWarmup(); });
-      if (!isCardio) add('🧮  Calcular discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w, { onUse: (kg) => { if (weightInput) weightInput.value = String(Units.num(kg, inputUnit)); } }); });
+      add('📝 Nota y descanso', () => { Modal.close(); openExerciseSettings(ex, rerender); });
+      if (!isCardio) add('🧮 Discos', () => { Modal.close(); const w = lastWork && !lastWork.bw ? Number(lastWork.weight) || 0 : 0; Plates.open(w, { onUse: (kg) => { if (weightInput) weightInput.value = String(Units.num(kg, inputUnit)); } }); });
+      if (ex && !isCardio && !ex.bodyweight && workingN === 0) add('🔥 Calentamiento', () => { Modal.close(); startWarmup(); }, { wide: true, sub: 'Series de aproximación hasta tu peso de hoy' });
       const nameOf = (en) => { const x = DB.getExercises().find((q) => q.id === en.exerciseId); return x ? x.name : 'ejercicio'; };
       if (entry.ss) {
-        add('🔗  Quitar de la superserie', () => { Modal.close(); unlinkSS(iso, log, idx); rerender(); });
+        add('🔗 Quitar de la superserie', () => { Modal.close(); unlinkSS(iso, log, idx); rerender(); }, { wide: true });
       } else {
-        if (idx < log.exercises.length - 1) add(`🔗  Superserie con «${nameOf(log.exercises[idx + 1])}» (siguiente)`, () => { Modal.close(); linkSS(iso, log, idx, idx + 1); Utils.toast('🔗 Superserie creada: alternas un ejercicio y el otro'); rerender(); });
-        if (idx > 0) add(`🔗  Superserie con «${nameOf(log.exercises[idx - 1])}» (anterior)`, () => { Modal.close(); linkSS(iso, log, idx - 1, idx); Utils.toast('🔗 Superserie creada: alternas un ejercicio y el otro'); rerender(); });
+        if (idx < log.exercises.length - 1) add('🔗 Superserie con el siguiente', () => { Modal.close(); linkSS(iso, log, idx, idx + 1); Utils.toast('🔗 Superserie creada: alternas un ejercicio y el otro'); rerender(); }, { wide: true, sub: nameOf(log.exercises[idx + 1]) });
+        if (idx > 0) add('🔗 Superserie con el anterior', () => { Modal.close(); linkSS(iso, log, idx - 1, idx); Utils.toast('🔗 Superserie creada: alternas un ejercicio y el otro'); rerender(); }, { wide: true, sub: nameOf(log.exercises[idx - 1]) });
       }
-      add('🗑️  Quitar del entrenamiento de hoy', removeEntry, true);
+      add('🗑️ Quitar de hoy', removeEntry, { danger: true, wide: true });
       Modal.open(ex ? ex.name : 'Ejercicio', menu);
     };
     const headerBtns = Utils.el('div', { class: 'ex-actions' }, [
@@ -498,12 +502,16 @@ const WorkoutView = (() => {
       if (typeof Guide !== 'undefined' && !isCardio) card.appendChild(Guide.inline(ex));
     }
 
+    // lo avanzado (tipo de serie, esfuerzo, herramientas, datos) va en un solo plegable
+    // «Más opciones»: así lo básico —peso, repeticiones y registrar— queda limpio para quien empieza
+    const adv = { type: Utils.el('div'), feel: Utils.el('div'), tools: Utils.el('div'), stats: Utils.el('div', { class: 'adv-stats' }) };
+
     // --- series de este grupo muscular en la semana ---
     if (ex && Metrics.STRENGTH_GROUPS.includes(ex.group)) {
       const goal = Metrics.weeklyGoal();
       const n = weekGroups && weekGroups[ex.group] ? weekGroups[ex.group].sets : 0;
       const st = n < goal.min ? 'low' : n > goal.max ? 'high' : 'ok';
-      card.appendChild(Utils.el('div', {
+      adv.stats.appendChild(Utils.el('div', {
         class: 'wk-line',
         style: `color:${{ low: 'var(--yellow)', ok: 'var(--green)', high: 'var(--accent-2)' }[st]}`,
         text: `Esta semana en ${ex.group}: ${n} serie${n === 1 ? '' : 's'} · meta ${goal.min}–${goal.max}`,
@@ -529,21 +537,21 @@ const WorkoutView = (() => {
     const records = ex ? Metrics.exerciseRecords(ex.id, isCardio) : null;
     const prev = ex ? Metrics.previousBest(ex.id, iso, isCardio) : null;
     if (records || prev) {
+      // a la vista solo lo útil para decidir el peso: la última vez y tu récord
+      const fmt = (set) => Metrics.formatSet(set, isCardio);
       const guide = Utils.el('div', { class: 'guide' });
+      if (prev) {
+        guide.appendChild(Utils.el('div', { text: `Última vez (${Utils.shortDate(prev.date)}): ${fmt(prev.best)}` }));
+      }
       if (records) {
+        guide.appendChild(Utils.el('div', { class: 'guide-rec', text: `🏆 Récord: ${fmt(records.max.set)}` }));
+        // el detalle completo queda dentro de «Más opciones»
         const sameSet = records.max.date === records.min.date && records.max.set === records.min.set;
-        const fmt = (set) => Metrics.formatSet(set, isCardio);
-        let text = sameSet
+        let full = sameSet
           ? `🏆 Récord: ${fmt(records.max.set)} (${Utils.shortDate(records.max.date)})`
           : `🏆 Máx: ${fmt(records.max.set)} (${Utils.shortDate(records.max.date)}) · Mín: ${fmt(records.min.set)} (${Utils.shortDate(records.min.date)})`;
-        if (!isCardio && records.e1rm > 0) text += ` · 1RM est. ${Units.label(records.e1rm)}`;
-        guide.appendChild(Utils.el('div', { text }));
-      }
-      if (prev) {
-        guide.appendChild(Utils.el('div', {
-          style: 'color:var(--text-dim);font-weight:600;margin-top:3px;',
-          text: `Última vez (${Utils.shortDate(prev.date)}): ${Metrics.formatSet(prev.best, isCardio)}`,
-        }));
+        if (!isCardio && records.e1rm > 0) full += ` · 1RM est. ${Units.label(records.e1rm)}`;
+        adv.stats.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:4px;', text: full }));
       }
       card.appendChild(guide);
     }
@@ -569,12 +577,20 @@ const WorkoutView = (() => {
       if (Metrics.isWarmup(set)) badge = Utils.el('span', { class: 'set-badge warm', title: 'Aproximación', text: 'A' });
       else if (Metrics.isDrop(set)) badge = Utils.el('span', { class: 'set-badge drop', title: 'Drop set', text: '↓' });
       else { normalIdx += 1; badge = Utils.el('span', { class: 'set-badge work', text: `${normalIdx}` }); }
+      // una línea clara: «60kg × 10 🏆»; el esfuerzo y la sensación van en una segunda línea
+      // pequeña solo si existen, y así la fila nunca se sale de la pantalla
+      const metaBits = [];
+      if (Metrics.isWarmup(set)) metaBits.push(Utils.el('span', { class: 'set-felt', text: 'aproximación' }));
+      else {
+        if (set.rpe) metaBits.push(Utils.el('span', { class: `set-rpe r${set.rpe}`, title: rpeText(set.rpe), text: `RPE ${set.rpe}` }));
+        if (set.felt && set.felt !== 'normal') metaBits.push(Utils.el('span', { class: 'set-felt', text: `${feltOpt.icon} ${feltOpt.label}` }));
+      }
       const row = Utils.el('div', { class: 'set-line' }, [
         badge,
-        Utils.el('span', { class: 'set-main', text: mainLabel }),
-        set.pr ? Utils.el('span', { title: `Récord de ${set.pr.replace(',', ' y ')}`, text: '🏆' }) : null,
-        set.rpe ? Utils.el('span', { class: `set-rpe r${set.rpe}`, title: rpeText(set.rpe), text: `RPE ${set.rpe}` }) : null,
-        Metrics.isWarmup(set) ? Utils.el('span', { class: 'set-felt', text: 'aprox.' }) : Utils.el('span', { class: 'set-felt', text: `${feltOpt.icon} ${feltOpt.label}` }),
+        Utils.el('div', { class: 'set-body' }, [
+          Utils.el('div', { class: 'set-main' }, [mainLabel, set.pr ? Utils.el('span', { class: 'set-pr', title: `Récord de ${set.pr.replace(',', ' y ')}`, text: ' 🏆' }) : null]),
+          metaBits.length ? Utils.el('div', { class: 'set-meta' }, metaBits) : null,
+        ]),
         Utils.el('button', { class: 'icon-btn', text: '✏️', title: 'Editar esta serie', onclick: () => openEditSet(iso, log, entry, sIdx, ex, isCardio, rerender) }),
         Utils.el('button', { class: 'icon-btn', text: '✕', title: Metrics.isDrop(set) ? 'Quitar este drop' : 'Quitar la serie (y sus drops)', onclick: () => removeSet(sIdx) }),
       ]);
@@ -589,7 +605,7 @@ const WorkoutView = (() => {
     });
     card.appendChild(setsWrap);
     const dropSlot = Utils.el('div');
-    card.appendChild(dropSlot);
+    adv.tools.appendChild(dropSlot);
 
     // --- formulario para nueva serie / sesión ---
     const form = Utils.el('div', { class: 'mt-8' });
@@ -634,8 +650,8 @@ const WorkoutView = (() => {
       get normal() {
         if (withDrop) return '✓ Registrar serie y seguir con el drop ↓';
         const run = ssRun(log, idx);
-        if (run) { const pos = run.indexOf(idx); return pos < run.length - 1 ? `✓ Registrar y pasar a ${ssLetter(pos + 1)} (sin descanso)` : '✓ Registrar serie e iniciar descanso'; }
-        return '✓ Registrar serie e iniciar descanso';
+        if (run) { const pos = run.indexOf(idx); return pos < run.length - 1 ? `✓ Registrar y pasar a ${ssLetter(pos + 1)} (sin descanso)` : '✓ Registrar y descansar'; }
+        return DB.getSettings().restAuto !== false ? '✓ Registrar serie y descansar' : '✓ Registrar serie';
       },
       warmup: '✓ Registrar aproximación',
       drop: '✓ Registrar dropset',
@@ -685,7 +701,8 @@ const WorkoutView = (() => {
         pillBtns[k] = b;
         pillRow.appendChild(b);
       });
-      form.appendChild(pillRow);
+      adv.type.appendChild(Utils.el('div', { class: 'adv-label', text: 'Tipo de serie' }));
+      adv.type.appendChild(pillRow);
 
       // bilateral / unilateral (peso por lado): una pastilla que se enciende o apaga
       const uniChip = Utils.el('button', { class: 'uni-chip', type: 'button' });
@@ -737,7 +754,8 @@ const WorkoutView = (() => {
         Utils.el('div', { class: 'sf-col' }, [Utils.el('div', { class: 'sf-label' }, [Utils.el('span', { text: 'Peso' }), unitBtn]), stepBtns(weightInput, () => Units.step(inputUnit, true), -9999)]),
         Utils.el('div', { class: 'sf-col' }, [Utils.el('div', { class: 'sf-label' }, [Utils.el('span', { text: 'Repeticiones' })]), stepBtns(repsInput, () => 1, 0)]),
       ]));
-      form.appendChild(Utils.el('div', { class: 'chip-pair' }, [uniChip, bwChip]));
+      adv.type.appendChild(Utils.el('div', { class: 'adv-label', text: 'Cómo se carga' }));
+      adv.type.appendChild(Utils.el('div', { class: 'chip-pair' }, [uniChip, bwChip]));
       addSetBtn.textContent = BTN_TEXT[typeSelected];
       form.refreshType = refreshType;
     }
@@ -758,7 +776,8 @@ const WorkoutView = (() => {
     feltWrap.appendChild(feltRow);
     let rpeSelected = !isCardio ? (rpeMemory[key] || 0) : 0;
     if (!isCardio) feltWrap.appendChild(rpeControl(() => rpeSelected, (v) => { rpeSelected = v; }));
-    form.appendChild(feltWrap);
+    adv.feel.appendChild(Utils.el('div', { class: 'adv-label', text: '¿Cómo se sintió?' }));
+    adv.feel.appendChild(feltWrap);
     if (form.refreshType) form.refreshType();
     if (form.paintUni) form.paintUni();
 
@@ -815,6 +834,29 @@ const WorkoutView = (() => {
       Celebrate.record(prs, ex ? ex.name : '');
     });
     form.appendChild(addSetBtn);
+
+    // «Más opciones»: recuerda si lo dejaste abierto; se abre solo si hay un drop o calentamiento en curso
+    {
+      const KEY = 'adv';
+      let saved = false;
+      try { saved = !!JSON.parse(localStorage.getItem('gt_ui_folds') || '{}')[KEY]; } catch (e) { /* sin almacenamiento */ }
+      const busy = withDrop || DropFlow.isOpen(key) || (typeof Warmup.isOpen === 'function' && Warmup.isOpen(key));
+      const det = Utils.el('details', { class: 'fold fold-flat adv-fold' });
+      det.open = saved || busy;
+      det.appendChild(Utils.el('summary', { class: 'fold-sum' }, [
+        Utils.el('span', { class: 'fold-t', text: '⚙️ Más opciones' }),
+        Utils.el('span', { class: 'fold-sub', text: isCardio ? 'sensación' : 'aprox. · drop set · RPE' }),
+        Utils.el('i', { class: 'fold-chev' }),
+      ]));
+      const body = Utils.el('div', { class: 'adv-body' });
+      [adv.type, adv.feel, adv.tools, adv.stats].forEach((n) => { if (n.childNodes.length) body.appendChild(n); });
+      det.appendChild(body);
+      det.addEventListener('toggle', () => {
+        if (busy) return;
+        try { const s = JSON.parse(localStorage.getItem('gt_ui_folds') || '{}'); s[KEY] = det.open; localStorage.setItem('gt_ui_folds', JSON.stringify(s)); } catch (e) { /* sin almacenamiento */ }
+      });
+      form.appendChild(det);
+    }
 
     // después de una serie: en superserie se pasa al otro ejercicio y el descanso llega al cerrar la vuelta
     function afterSet() {
@@ -933,7 +975,7 @@ const WorkoutView = (() => {
         });
       });
       tools.appendChild(prBtn);
-      card.appendChild(tools);
+      adv.tools.appendChild(tools);
     }
     // drop set: dentro de la misma serie, con el mismo flujo que las aproximaciones
     const lastAny = entry.sets[entry.sets.length - 1];
