@@ -14,6 +14,7 @@
    - gt_workoutLog     -> { 'YYYY-MM-DD': { routineId, exercises:[...], notes } }
    - gt_waterLog       -> { 'YYYY-MM-DD': [{id, ml, time}] }
    - gt_sleepLog       -> { 'YYYY-MM-DD': { h: horas dormidas } }
+   - gt_activities     -> [ { id, date, type, min, km, elev, effort, note } ] deporte fuera del gym
    - gt_rewards        -> { since, awarded: { semana: [retos] }, spent: [canjes] }
    - gt_mealPlan       -> { '0'..'6' (día de la semana, 0 = domingo): { desayuno: [...], almuerzo, cena, snack } }
    ============================================================ */
@@ -32,6 +33,7 @@ const DB = (() => {
     mealPlan: 'gt_mealPlan',
     sleepLog: 'gt_sleepLog',
     rewards: 'gt_rewards',
+    activities: 'gt_activities',
   };
 
   function read(key, fallback) {

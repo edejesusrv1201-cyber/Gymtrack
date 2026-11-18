@@ -151,6 +151,7 @@ const App = (() => {
     try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
     registerServiceWorker();
     setTimeout(checkForUpdate, 3500);
+    try { Perf.measure(); } catch (e) { /* sin medición */ }
   }
 
   return { navigate, init, get currentView() { return currentView; }, get currentParams() { return currentParams; } };

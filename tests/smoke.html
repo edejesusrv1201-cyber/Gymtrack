@@ -46,7 +46,7 @@
   const w = frame.contentWindow; const d = frame.contentDocument;
   // los módulos son «const» globales: no cuelgan de window, se leen con eval
   const A = {};
-  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
   bind();
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
@@ -94,8 +94,10 @@
       if (overflow() > 1) throw new Error(`se sale de la pantalla (${overflow()} px)`);
     });
   }
+  // deporte de ejemplo (para ver Hoy y Progreso → Deporte con datos)
+  [['correr', 5, 28, 0], ['trail', 12, 95, 640], ['bici', 30, 85, 220], ['futbol', 0, 60, 0], ['yoga', 0, 40, 0]].forEach(([type, km, min, elev], i) => A.Activity.add({ date: iso(i * 2), type, km, min, elev }));
   await view('hoy'); await view('plan'); await view('calorias');
-  for (const s of ['entreno', 'cuerpo', 'nutricion', 'logros', 'ranking']) await view('progreso', { section: s }, `progreso → ${s}`);
+  for (const s of ['entreno', 'cuerpo', 'deporte', 'nutricion', 'logros', 'ranking']) await view('progreso', { section: s }, `progreso → ${s}`);
   await view('mas'); await view('calculadora'); await view('plancomidas');
 
   // ---- accesibilidad básica: botones y campos con nombre
@@ -174,6 +176,43 @@
   await modal('Armar dieta', () => A.Diet.open());
 
   await modal('Enviar feedback', () => A.Feedback.open());
+  await modal('Registrar actividad', () => A.Activity.openForm({}, () => {}));
+
+  // ---- deporte: cálculos, GPS, cronómetro en vivo y logros
+  await test('Deporte: calorías, ritmo y marcas razonables', async () => {
+    const a = { date: today, type: 'correr', min: 30, km: 5, effort: 2 };
+    const k = A.Activity.kcalOf(a); if (k < 200 || k > 600) throw new Error(`calorías raras para 5 km en 30 min: ${k}`);
+    if (A.Activity.paceText(a) !== '6:00 /km') throw new Error(`ritmo: ${A.Activity.paceText(a)}`);
+    if (A.Activity.xpOf(a) < 40) throw new Error('XP muy bajo');
+    const r = A.Activity.records(); if (!r.some((x) => /larga/.test(x.title))) throw new Error('faltan marcas');
+    const s = A.Activity.stats(); if (s.acts < 5 || s.actTypes < 4 || s.trailElev < 600) throw new Error('estadísticas raras');
+  });
+  await test('Deporte: el GPS descarta ruido y saltos', async () => {
+    const t = A.Activity.typeOf('correr'); let s = { km: 0, elev: 0, last: null, refAlt: null };
+    const P = (lat, t0, acc) => ({ lat, lon: -99, alt: 2240, acc: acc || 5, t: t0 });
+    s = A.Activity.gpsStep(s, P(19.4300, 0), t);
+    s = A.Activity.gpsStep(s, P(19.43001, 5000), t);          // ~1 m: ruido
+    s = A.Activity.gpsStep(s, P(19.4310, 40000), t);          // ~111 m en 35 s: correr
+    s = A.Activity.gpsStep(s, P(19.4410, 41000), t);          // ~1 km en 1 s: salto imposible
+    s = A.Activity.gpsStep(s, P(19.4320, 80000, 80), t);      // señal mala
+    if (s.km < 0.10 || s.km > 0.13) throw new Error(`distancia GPS rara: ${s.km}`);
+  });
+  await test('Deporte: cronómetro en vivo abre y termina en el formulario', async () => {
+    A.Activity.openLive('futbol', () => {}); await wait(400);
+    if (!D.querySelector('.act-live') || !/\d\d:\d\d/.test(D.querySelector('.al-time').textContent)) throw new Error('no se ve el cronómetro');
+    if (overflow() > 1) throw new Error('se sale de la pantalla');
+    [...D.querySelectorAll('.al-ctrl button')].find((b) => /Terminar/.test(b.textContent)).click(); await wait(700);
+    if (D.querySelector('.act-live')) throw new Error('el cronómetro sigue abierto');
+    if (!D.querySelector('.modal-sheet')) throw new Error('no abrió el formulario al terminar');
+    A.Modal.close(); await wait(350);
+    if (W.localStorage.getItem('gt_act_live')) throw new Error('quedó una actividad en curso guardada');
+  });
+  await test('Logros: aparecen los de deporte y suman XP', async () => {
+    const ev = A.Gamify.evaluate();
+    const dep = ev.list.filter((x) => x.cat === 'Deporte'); if (dep.length < 10) throw new Error('faltan logros de deporte');
+    if (!dep.find((x) => x.id === 'ac1').done) throw new Error('«Primer movimiento» debería estar ganado');
+    if (!(ev.st.actXp > 0)) throw new Error('el deporte no suma XP');
+  });
 
   // ---- registro de errores internos
   await test('Registro de errores: guarda y resume', async () => {

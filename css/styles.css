@@ -2021,3 +2021,56 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 @keyframes setpop { 0% { opacity: 0; transform: translateX(-16px) scale(.96); background-color: var(--accent-soft); } 55% { opacity: 1; transform: translateX(3px) scale(1.01); } 100% { transform: none; } }
 :root[data-ui="on"] .set-line.set-new { animation: setpop .5s cubic-bezier(.2, .9, .3, 1) both; border-radius: 12px; }
 :root[data-ui="on"] .counter-chip.bump { animation: pop .45s cubic-bezier(.2, .9, .3, 1) both; }
+
+/* ============================================================
+   v71 — modo ahorro (lo activa js/perf.js solo, o la persona en Más → Rendimiento)
+   Sin movimiento en el fondo, sin partículas y entradas de pantalla más cortas.
+   ============================================================ */
+:root[data-perf="low"] .bg-glow i,
+:root[data-perf="low"] .bg-glow::before { animation: none !important; }
+:root[data-perf="low"] .bg-glow b { display: none !important; }
+:root[data-perf="low"] #viewRoot.anim-in .view > * { animation-duration: .22s !important; animation-delay: 0s !important; }
+:root[data-perf="low"] .card { box-shadow: none; }
+:root[data-perf="low"] .modal-sheet { animation-duration: .18s !important; }
+
+/* ============================================================
+   v71 — deporte (activity.js)
+   ============================================================ */
+.act-card h3 { margin: 0 0 2px; }
+.act-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.act-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; padding: 9px 12px; margin-top: 8px; border-radius: 12px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.08); min-width: 0; }
+.act-row .ar-t { font-weight: 800; font-size: 0.9rem; }
+.act-row .ar-d { font-size: 0.78rem; color: var(--text-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.act-type { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px; min-height: 66px; border-radius: 14px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.09); transition: transform .15s ease, background .15s ease, border-color .15s ease; }
+.act-type .ai { font-size: 1.5rem; line-height: 1; }
+.act-type .an { font-size: 0.7rem; font-weight: 700; text-align: center; line-height: 1.15; }
+.act-type.on { background: rgba(var(--ov), 0.12); border-color: var(--accent-light); transform: scale(1.03); }
+.act-type:active { transform: scale(.95); }
+.act-preview { margin-top: 10px; text-align: center; font-weight: 800; color: var(--accent-light); font-size: 0.92rem; }
+.act-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+.act-tile { padding: 12px; border-radius: 14px; background: rgba(var(--sf2), 0.86); border: 1px solid rgba(var(--ov), 0.07); display: flex; flex-direction: column; }
+.act-tile b { font-size: 1.15rem; }
+.act-tile span { font-size: 0.74rem; color: var(--text-dim); }
+.act-sport { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(var(--ov), 0.06); font-size: 0.9rem; }
+.act-sport:first-of-type { border-top: 0; }
+.act-sport > span:last-child { text-align: right; min-width: 0; }
+.act-live { position: fixed; inset: 0; z-index: 400; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px 20px calc(24px + env(safe-area-inset-bottom)); background: radial-gradient(120% 80% at 50% 0%, rgba(var(--sf3), 0.98), rgba(var(--sf1), 0.99)); text-align: center; }
+.al-head { font-size: 1.2rem; font-weight: 800; letter-spacing: .02em; }
+.al-time { font-size: 4.2rem; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; background: linear-gradient(180deg, var(--accent-light), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.al-stats { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.al-stat { display: flex; flex-direction: column; min-width: 78px; padding: 10px 12px; border-radius: 16px; background: rgba(var(--ov), 0.06); }
+.al-stat b { font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.al-stat span { font-size: 0.72rem; color: var(--text-dim); }
+.al-gps { color: var(--text-dim); min-height: 1.2em; max-width: 30ch; }
+.al-ctrl { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(320px, 100%); }
+.al-btn { width: 100%; padding: 16px; font-size: 1.05rem; border-radius: 18px; }
+:root[data-ui="on"] .act-live { animation: fadein .25s ease both; }
+:root[data-ui="on"] .al-time { animation: none; }
+/* 6 pestañas en Progreso: se desplazan de lado en pantallas angostas */
+.seg.small:has(.seg-btn:nth-child(6)) { overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.seg.small:has(.seg-btn:nth-child(6))::-webkit-scrollbar { display: none; }
+.seg.small:has(.seg-btn:nth-child(6)) .seg-btn { flex: 0 0 auto; font-size: 0.78rem; padding: 7px 12px; }
+.act-grid.strip { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 6px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.act-grid.strip::-webkit-scrollbar { display: none; }
+.act-grid.strip .act-type { flex: 0 0 76px; scroll-snap-align: start; }

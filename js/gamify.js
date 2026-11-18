@@ -36,8 +36,11 @@ const Gamify = (() => {
     });
 
     // racha semanal: semanas seguidas con al menos MIN_WEEKLY entrenos
+    // el deporte (20+ min) cuenta como día de entrenamiento para la racha
+    const act = typeof Activity !== 'undefined' ? Activity.stats() : { acts: 0, actMin: 0, actKm: 0, runKm: 0, longestRun: 0, trailElev: 0, actTypes: 0, actDays: new Set(), actXp: 0 };
+    const streakDays = Array.from(new Set(dates.concat(Array.from(act.actDays))));
     const perWeek = {};
-    dates.forEach((d) => { const w = weekStart(d); perWeek[w] = (perWeek[w] || 0) + 1; });
+    streakDays.forEach((d) => { const w = weekStart(d); perWeek[w] = (perWeek[w] || 0) + 1; });
     const thisWeek = weekStart(Utils.todayISO());
     const step = (iso, n) => { const d = Utils.parseISO(iso); d.setDate(d.getDate() + n * 7); return Utils.toISODate(d); };
     let cursor = (perWeek[thisWeek] || 0) >= MIN_WEEKLY ? thisWeek : step(thisWeek, -1); // la semana en curso no rompe la racha
@@ -94,13 +97,13 @@ const Gamify = (() => {
     }
     const tr = typeof Treats !== 'undefined' ? Treats.stats() : { vales: 0, redeemed: 0, goodNights: 0, perfectTreatWeeks: 0 };
 
-    return { lifts, basicPrs, bw, vales: tr.vales, redeemed: tr.redeemed, goodNights: tr.goodNights, perfectTreatWeeks: tr.perfectTreatWeeks, sessions: dates.length, sets, volume, prs, exercises: exerciseIds.size, streak, bestStreak, comebacks, perfectWeeks, foodDays, waterDays, weighIns, lastDate: dates[dates.length - 1] || null };
+    return { acts: act.acts, actMin: act.actMin, actKm: act.actKm, runKm: act.runKm, longestRun: act.longestRun, trailElev: act.trailElev, actTypes: act.actTypes, actXp: act.actXp, lifts, basicPrs, bw, vales: tr.vales, redeemed: tr.redeemed, goodNights: tr.goodNights, perfectTreatWeeks: tr.perfectTreatWeeks, sessions: dates.length, sets, volume, prs, exercises: exerciseIds.size, streak, bestStreak, comebacks, perfectWeeks, foodDays, waterDays, weighIns, lastDate: dates[dates.length - 1] || null };
   }
 
   // ---------------------------------------------------------------- nivel
   const TITLES = [[1, 'Novato'], [3, 'Aprendiz'], [5, 'Constante'], [8, 'Atleta'], [12, 'Fuerte'], [16, 'Élite'], [20, 'Leyenda']];
   const addDays = (iso, n) => { const d = Utils.parseISO(iso); d.setDate(d.getDate() + n); return Utils.toISODate(d); };
-  const baseXp = (st) => st.sessions * 100 + st.sets * 4 + st.prs * 60 + st.foodDays * 15 + st.waterDays * 10 + st.weighIns * 20 + st.streak * 50;
+  const baseXp = (st) => (st.actXp || 0) + st.sessions * 100 + st.sets * 4 + st.prs * 60 + st.foodDays * 15 + st.waterDays * 10 + st.weighIns * 20 + st.streak * 50;
   function levelInfo(xp) {
     const level = 1 + Math.floor(Math.sqrt(xp / 120));
     const base = 120 * (level - 1) ** 2;
@@ -142,6 +145,23 @@ const Gamify = (() => {
     { id: 'b4', cat: 'Cuerpo', icon: '📏', name: 'Seguimiento', desc: '4 pesajes registrados', tier: 1, target: 4, cur: (s) => s.weighIns },
     { id: 'b12', cat: 'Cuerpo', icon: '📈', name: 'Tendencia clara', desc: '12 pesajes registrados', tier: 2, target: 12, cur: (s) => s.weighIns },
   ];
+  // ---- deporte fuera del gym
+  ACH.push(
+    { id: 'ac1', cat: 'Deporte', icon: '👟', name: 'Primer movimiento', desc: 'Registra tu primera actividad deportiva', tier: 1, target: 1, cur: (s) => s.acts },
+    { id: 'ac10', cat: 'Deporte', icon: '🏅', name: 'Deportista', desc: '10 actividades registradas', tier: 2, target: 10, cur: (s) => s.acts },
+    { id: 'ac30', cat: 'Deporte', icon: '🎖️', name: 'Siempre en movimiento', desc: '30 actividades registradas', tier: 3, target: 30, cur: (s) => s.acts },
+    { id: 'am10', cat: 'Deporte', icon: '⏱️', name: 'Diez horas', desc: '10 horas de deporte en total', tier: 1, target: 600, cur: (s) => Math.round(s.actMin), fmt: (v) => `${Math.round(v / 60)} h` },
+    { id: 'am50', cat: 'Deporte', icon: '⌛', name: 'Cincuenta horas', desc: '50 horas de deporte en total', tier: 3, target: 3000, cur: (s) => Math.round(s.actMin), fmt: (v) => `${Math.round(v / 60)} h` },
+    { id: 'rk25', cat: 'Deporte', icon: '🛣️', name: 'Primeros 25 km', desc: '25 km corriendo (calle o trail)', tier: 1, target: 25, cur: (s) => Math.round(s.runKm), fmt: (v) => `${v} km` },
+    { id: 'rk100', cat: 'Deporte', icon: '🌄', name: 'Cien kilómetros', desc: '100 km corriendo en total', tier: 2, target: 100, cur: (s) => Math.round(s.runKm), fmt: (v) => `${v} km` },
+    { id: 'rk250', cat: 'Deporte', icon: '🌍', name: 'Vuelta larga', desc: '250 km corriendo en total', tier: 3, target: 250, cur: (s) => Math.round(s.runKm), fmt: (v) => `${v} km` },
+    { id: 'r5', cat: 'Deporte', icon: '5️⃣', name: 'Corredor de 5K', desc: 'Corre 5 km seguidos', tier: 1, target: 5, cur: (s) => Math.floor(s.longestRun), fmt: (v) => `${v} km` },
+    { id: 'r10', cat: 'Deporte', icon: '🔟', name: 'Corredor de 10K', desc: 'Corre 10 km seguidos', tier: 2, target: 10, cur: (s) => Math.floor(s.longestRun), fmt: (v) => `${v} km` },
+    { id: 'r21', cat: 'Deporte', icon: '🏁', name: 'Media maratón', desc: 'Corre 21 km seguidos', tier: 3, target: 21, cur: (s) => Math.floor(s.longestRun), fmt: (v) => `${v} km` },
+    { id: 'el500', cat: 'Deporte', icon: '⛰️', name: 'Montañista', desc: 'Sube 500 m de desnivel acumulado', tier: 1, target: 500, cur: (s) => Math.round(s.trailElev), fmt: (v) => `${v} m` },
+    { id: 'el3000', cat: 'Deporte', icon: '🏔️', name: 'Cumbre tras cumbre', desc: 'Sube 3 000 m de desnivel acumulado', tier: 3, target: 3000, cur: (s) => Math.round(s.trailElev), fmt: (v) => `${v} m` },
+    { id: 'mt3', cat: 'Deporte', icon: '🎯', name: 'Todoterreno', desc: 'Practica 3 deportes distintos', tier: 2, target: 3, cur: (s) => s.actTypes },
+  );
   // ---- básicos: fuerza relativa a tu peso corporal (1RM estimado ÷ peso)
   const ratio = (id, icon, name, key, mult, tier, label) => ({
     id, cat: 'Básicos', icon, name, tier, target: Math.round(mult * 100),
@@ -177,7 +197,7 @@ const Gamify = (() => {
     { id: 'sl7', cat: 'Premios', icon: '😴', name: 'Buen dormir', desc: '7 noches de 7 h o más', tier: 1, target: 7, cur: (s) => s.goodNights },
     { id: 'sl30', cat: 'Premios', icon: '🌙', name: 'Sueño reparador', desc: '30 noches de 7 h o más', tier: 2, target: 30, cur: (s) => s.goodNights },
   );
-  const CATS = ['Constancia', 'Fuerza', 'Básicos', 'Volumen', 'Nutrición', 'Premios', 'Cuerpo'];
+  const CATS = ['Constancia', 'Fuerza', 'Básicos', 'Volumen', 'Deporte', 'Nutrición', 'Premios', 'Cuerpo'];
 
   function evaluate() {
     const st = computeStats();
@@ -218,6 +238,7 @@ const Gamify = (() => {
     if (rot === 0) list.push({ id: 'pr', icon: '🏆', title: 'Rompe 1 récord', target: 1, cur: prs });
     else if (rot === 1) list.push({ id: 'food', icon: '🍽️', title: 'Registra tus comidas 3 días', target: 3, cur: inWeek(DB.getCalorieLog(), (l) => (l || []).length > 0) });
     else if (rot === 2) { const g = DB.getSettings().waterGoalMl || 2500; list.push({ id: 'water', icon: '💧', title: 'Cumple tu meta de agua 3 días', target: 3, cur: inWeek(DB.getWaterLog(), (l) => (l || []).reduce((n, e) => n + e.ml, 0) >= g) }); }
+    else if (typeof Activity !== 'undefined' && Activity.recentCount(28) > 0) list.push({ id: 'move', icon: '🏃', title: 'Muévete 90 min fuera del gym', target: 90, cur: Math.round(Activity.weekSum(start).min) });
     else list.push({ id: 'weigh', icon: '⚖️', title: 'Pésate esta semana', target: 1, cur: DB.getMeasurements().filter((m) => m.weight && m.date >= start && m.date <= end).length });
     const saved = (DB.getSettings().challengeDone || {})[start] || [];
     return list.map((c) => Object.assign(c, { curCapped: Math.min(c.cur, c.target), done: c.cur >= c.target || saved.includes(c.id), xp: 60 }));

@@ -87,6 +87,15 @@ const MoreView = (() => {
       card.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:-4px;', text: 'Tu teléfono pide reducir animaciones, por eso viene quieto. Toca "Activado" para ver la lava.' }));
     }
 
+    card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Rendimiento' }));
+    card.appendChild(Utils.segmented(
+      [{ key: 'auto', label: 'Automático' }, { key: 'max', label: 'Máximo' }, { key: 'ahorro', label: 'Ahorro' }],
+      DB.getSettings().perfMode || 'auto',
+      (k) => { const st = DB.getSettings(); st.perfMode = k; DB.saveSettings(st); Perf.reset(); card.replaceWith(buildThemeCard()); },
+      true,
+    ));
+    card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:-4px;', text: Perf.isLow() ? 'Ahora mismo: modo ligero (fondo quieto) para que todo vaya fluido.' : 'Automático aligera los efectos solo si tu teléfono va a tirones.' }));
+
     card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Botones y detalles' }));
     card.appendChild(Utils.segmented(
       [{ key: 'tema', label: 'Color del fondo' }, { key: 'app', label: 'Naranja' }],
