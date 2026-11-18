@@ -103,7 +103,7 @@ const Gamify = (() => {
   // ---------------------------------------------------------------- nivel
   const TITLES = [[1, 'Novato'], [3, 'Aprendiz'], [5, 'Constante'], [8, 'Atleta'], [12, 'Fuerte'], [16, 'Élite'], [20, 'Leyenda']];
   const addDays = (iso, n) => { const d = Utils.parseISO(iso); d.setDate(d.getDate() + n); return Utils.toISODate(d); };
-  const baseXp = (st) => (st.actXp || 0) + st.sessions * 100 + st.sets * 4 + st.prs * 60 + st.foodDays * 15 + st.waterDays * 10 + st.weighIns * 20 + st.streak * 50;
+  const baseXp = (st) => (st.actXp || 0) + (st.goodNights || 0) * 10 + st.sessions * 100 + st.sets * 4 + st.prs * 60 + st.foodDays * 15 + st.waterDays * 10 + st.weighIns * 20 + st.streak * 50;
   function levelInfo(xp) {
     const level = 1 + Math.floor(Math.sqrt(xp / 120));
     const base = 120 * (level - 1) ** 2;

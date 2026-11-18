@@ -838,6 +838,7 @@ const WorkoutView = (() => {
       else if (typeSelected === 'normal') afterSet();
       rerender();
       Celebrate.record(prs, ex ? ex.name : '');
+      if (typeof Fx !== 'undefined' && typeSelected !== 'warmup') Fx.xp(4 + (prs.length ? 60 : 0), prs.length ? '🏆' : '');
     });
     form.appendChild(addSetBtn);
 

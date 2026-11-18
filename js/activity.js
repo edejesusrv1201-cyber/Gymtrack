@@ -192,7 +192,7 @@ const Activity = (() => {
       Modal.close();
       Utils.toast(`${typeOf(rec.type).i} Guardado · +${xpOf(rec)} XP`);
       if (onDone) onDone();
-      if (!editing) celebrate();
+      if (!editing) { try { Fx.xp(xpOf(rec), typeOf(rec.type).i); } catch (e) { /* sin efecto */ } celebrate(); }
     });
     body.appendChild(saveBtn);
     if (editing) {

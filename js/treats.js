@@ -30,9 +30,10 @@ const Treats = (() => {
   const addDays = (iso, n) => { const d = Utils.parseISO(iso); d.setDate(d.getDate() + n); return Utils.toISODate(d); };
 
   function sleepOf(iso) { const s = sleepLog()[iso]; return s && Number(s.h) > 0 ? Number(s.h) : null; }
-  function saveSleep(iso, h) {
+  function qualityOf(iso) { const s = sleepLog()[iso]; return s && s.q >= 1 && s.q <= 5 ? s.q : 0; }
+  function saveSleep(iso, h, q) {
     const all = sleepLog();
-    if (h > 0) all[iso] = { h: Math.round(h * 2) / 2 }; else delete all[iso];
+    if (h > 0) { all[iso] = { h: Math.round(h * 2) / 2 }; if (q >= 1 && q <= 5) all[iso].q = q; } else delete all[iso];
     DB.write(DB.KEYS.sleepLog, all);
   }
 
@@ -254,17 +255,19 @@ const Treats = (() => {
     const body = Utils.el('div');
     let day = iso;
     let hours = sleepOf(day) || 7.5;
+    let quality = qualityOf(day);
     const head = Utils.el('div', { class: 'day-nav' });
     const big = Utils.el('div', { class: 'sl-big' });
     const chips = Utils.el('div', { class: 'rt-chips' });
     const avg = Utils.el('div', { class: 'small text-dim', style: 'margin-top:10px;text-align:center;' });
     const hist = Utils.el('div', { class: 'sl-hist' });
+    const qrow = Utils.el('div');
     function paint() {
       head.innerHTML = '';
       const prev = Utils.el('button', { class: 'btn-small', type: 'button', text: '←' });
       const next = Utils.el('button', { class: 'btn-small', type: 'button', text: '→' });
-      prev.addEventListener('click', () => { day = addDays(day, -1); hours = sleepOf(day) || hours; paint(); });
-      next.addEventListener('click', () => { if (day < Utils.todayISO()) { day = addDays(day, 1); hours = sleepOf(day) || hours; paint(); } });
+      prev.addEventListener('click', () => { day = addDays(day, -1); hours = sleepOf(day) || hours; quality = qualityOf(day); paint(); });
+      next.addEventListener('click', () => { if (day < Utils.todayISO()) { day = addDays(day, 1); hours = sleepOf(day) || hours; quality = qualityOf(day); paint(); } });
       next.disabled = day >= Utils.todayISO();
       head.appendChild(prev);
       head.appendChild(Utils.el('div', { class: 'day-title' }, [Utils.el('div', { class: 'h', text: day === Utils.todayISO() ? 'Anoche (para hoy)' : `Noche antes del ${Utils.friendlyDate(day)}` })]));
@@ -283,6 +286,15 @@ const Treats = (() => {
         c.addEventListener('click', () => { hours = h; paint(); });
         chips.appendChild(c);
       });
+      qrow.innerHTML = '';
+      qrow.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:10px 0 6px;text-align:center;', text: '¿Cómo te sentiste al despertar? (opcional)' }));
+      const qb = Utils.el('div', { class: 'sl-q' });
+      [[1, '😫', 'Fatal'], [2, '😕', 'Mal'], [3, '😐', 'Normal'], [4, '🙂', 'Bien'], [5, '😄', 'Genial']].forEach(([v, ic, nm]) => {
+        const b = Utils.el('button', { type: 'button', class: `sl-qb${quality === v ? ' on' : ''}`, 'aria-label': nm, text: ic });
+        b.addEventListener('click', () => { quality = quality === v ? 0 : v; paint(); });
+        qb.appendChild(b);
+      });
+      qrow.appendChild(qb);
       hist.innerHTML = '';
       for (let i = 6; i >= 0; i -= 1) {
         const d = addDays(Utils.todayISO(), -i); const h = sleepOf(d);
@@ -296,10 +308,10 @@ const Treats = (() => {
       const last7 = []; for (let i = 0; i < 7; i += 1) { const h = sleepOf(addDays(Utils.todayISO(), -i)); if (h) last7.push(h); }
       avg.textContent = last7.length ? `Promedio de los últimos 7 días: ${(last7.reduce((a, b) => a + b, 0) / last7.length).toFixed(1)} h · meta ${SLEEP_GOAL_H} h` : `Meta: ${SLEEP_GOAL_H} h o más por noche.`;
     }
-    body.appendChild(head); body.appendChild(big); body.appendChild(chips); body.appendChild(hist); body.appendChild(avg);
+    body.appendChild(head); body.appendChild(big); body.appendChild(chips); body.appendChild(qrow); body.appendChild(hist); body.appendChild(avg);
     const save = Utils.el('button', { class: 'btn-primary btn-block', style: 'margin-top:12px;', type: 'button', text: '✓ Guardar' });
     save.addEventListener('click', () => {
-      saveSleep(day, hours);
+      saveSleep(day, hours, quality);
       Modal.close();
       Utils.toast(`😴 ${hours} h guardadas`);
       check();
@@ -315,5 +327,5 @@ const Treats = (() => {
     Modal.open('😴 Sueño', body);
   }
 
-  return { card, check, balance, bonusOf, goalOf, costOf, spend, refund, stats, openSleep, openRedeem, sleepOf, weekStart };
+  return { card, check, balance, bonusOf, goalOf, costOf, spend, refund, stats, openSleep, openRedeem, sleepOf, qualityOf, weekStart };
 })();

@@ -46,7 +46,7 @@
   const w = frame.contentWindow; const d = frame.contentDocument;
   // los módulos son «const» globales: no cuelgan de window, se leen con eval
   const A = {};
-  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
   bind();
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
@@ -206,6 +206,21 @@
     if (!D.querySelector('.modal-sheet')) throw new Error('no abrió el formulario al terminar');
     A.Modal.close(); await wait(350);
     if (W.localStorage.getItem('gt_act_live')) throw new Error('quedó una actividad en curso guardada');
+  });
+  await test('Energía y sueño: valor razonable, XP flotante y calidad', async () => {
+    const e0 = A.Energy.today(); if (!(e0.value >= 12 && e0.value <= 100) || !e0.tier) throw new Error(`energía rara: ${e0.value}`);
+    A.Treats.sleepOf; const st = W.localStorage;
+    const log = JSON.parse(st.getItem('gt_sleepLog') || '{}'); log[today] = { h: 9, q: 5 }; st.setItem('gt_sleepLog', JSON.stringify(log));
+    const e1 = A.Energy.today(); if (e1.value <= e0.value && e0.sleepH == null) throw new Error('dormir 9 h no sube la energía');
+    log[today] = { h: 4.5, q: 1 }; st.setItem('gt_sleepLog', JSON.stringify(log));
+    const e2 = A.Energy.today(); if (!(e2.value < e1.value)) throw new Error('dormir 4,5 h no baja la energía');
+    if (A.Treats.qualityOf(today) !== 1) throw new Error('no lee la calidad del sueño');
+    A.App.navigate('hoy'); await wait(700);
+    if (!D.querySelector('.energy-card')) throw new Error('no aparece la tarjeta de energía en Hoy');
+    D.documentElement.dataset.ui = 'on'; A.Fx.xp(10, '🏆'); await wait(150);
+    if (!D.querySelector('.fx-xp')) throw new Error('no apareció el XP flotante');
+    await wait(1400); if (D.querySelector('.fx-xp')) throw new Error('el XP flotante no se quitó');
+    await modal('Sueño', () => A.Treats.openSleep(today, () => {}));
   });
   await test('Logros: aparecen los de deporte y suman XP', async () => {
     const ev = A.Gamify.evaluate();

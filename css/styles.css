@@ -2074,3 +2074,24 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .act-grid.strip { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 6px; scrollbar-width: none; scroll-snap-type: x proximity; }
 .act-grid.strip::-webkit-scrollbar { display: none; }
 .act-grid.strip .act-type { flex: 0 0 76px; scroll-snap-align: start; }
+
+/* ============================================================
+   v72 — sensación de videojuego: XP flotante, energía, toque con respuesta
+   ============================================================ */
+.fx-xp { position: fixed; left: 50%; z-index: 500; pointer-events: none; transform: translateX(-50%); padding: 7px 16px; border-radius: 999px; font-weight: 900; font-size: 1.05rem; letter-spacing: .02em; color: var(--on-accent, #fff); background: linear-gradient(135deg, var(--accent-light), var(--accent)); box-shadow: 0 8px 24px rgba(0, 0, 0, .35), 0 0 22px rgba(var(--ov), .18); animation: fxxp 1.25s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes fxxp { 0% { opacity: 0; transform: translate(-50%, 14px) scale(.7); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.12); } 32% { transform: translate(-50%, -4px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -64px) scale(.96); } }
+.energy-card { padding-bottom: 12px; }
+.en-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.en-title { display: flex; align-items: baseline; gap: 6px; font-size: 1rem; }
+.en-ico { font-size: 1.2rem; }
+.en-tier { color: var(--text-dim); font-weight: 700; font-size: .9rem; }
+.en-bar { height: 10px; border-radius: 999px; background: rgba(var(--ov), 0.08); overflow: hidden; }
+.en-bar i { display: block; height: 100%; border-radius: 999px; box-shadow: 0 0 12px rgba(var(--ov), .25); }
+:root[data-ui="on"] .en-bar i { transform-origin: left center; animation: growx 1s cubic-bezier(.2, .85, .25, 1) .15s both; }
+.en-det { margin-top: 2px; }
+.sl-q { display: flex; justify-content: center; gap: 8px; }
+.sl-qb { width: 46px; height: 46px; border-radius: 14px; font-size: 1.5rem; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.09); transition: transform .15s ease, background .15s ease; }
+.sl-qb.on { background: rgba(var(--ov), 0.14); border-color: var(--accent-light); transform: scale(1.12); }
+/* respuesta al tocar: todo lo que se pulsa se hunde un poquito */
+:root[data-ui="on"] button:not(:disabled):active, :root[data-ui="on"] .tile:active, :root[data-ui="on"] .week-day:active, :root[data-ui="on"] .badge-tile:active { transform: scale(.965); transition: transform .08s ease; }
+:root[data-ui="on"] .btn-primary:not(:disabled):active { filter: brightness(1.08); }

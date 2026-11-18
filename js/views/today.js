@@ -558,6 +558,7 @@ const TodayView = (() => {
     [qFood, qWater, qWeight, qSleep].forEach((b) => quick.appendChild(b));
     view.appendChild(quick);
 
+    try { view.appendChild(Energy.card(rerender)); } catch (e) { console.warn('energia', e); }
     try { view.appendChild(Activity.card(rerender)); } catch (e) { console.warn('deporte', e); }
 
     const gapCard = renderGaps(rerender);
