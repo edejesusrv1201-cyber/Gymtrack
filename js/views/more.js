@@ -317,6 +317,7 @@ const MoreView = (() => {
 
     // ---- cuenta y nube ----
     if (Cloud.configured()) view.appendChild(Cloud.card());
+    if (Cloud.configured() && Cloud.signedIn()) view.appendChild(Admin.card());
 
     // ---- respaldo ----
     const backupCard = Utils.el('div', { class: 'card' });

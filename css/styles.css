@@ -2007,3 +2007,12 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .cloud-rank { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; padding: 10px 12px; border-radius: 14px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.08); font-weight: 700; font-size: 0.9rem; }
 .cloud-rank.col { flex-direction: column; align-items: stretch; gap: 8px; }
 .online-wrap { margin: 10px 0; }
+
+/* administración */
+.admin-card .btn-primary { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.admin-dot { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center; font-size: 0.75rem; font-weight: 900; background: #fff; color: #c1392b; }
+.fb-item { margin: 10px 0; padding: 12px 14px; border-radius: 16px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.08); }
+.fb-item.done { opacity: 0.6; }
+.fb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.fb-msg { white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+.fb-actions { display: flex; gap: 6px; margin-top: 10px; }
