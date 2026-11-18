@@ -55,10 +55,10 @@ const CalculatorView = (() => {
     const weightInput = Utils.el('input', { type: 'number', step: '0.1', value: savedKg ? Units.num(savedKg) : '' });
     const heightInput = Utils.el('input', { type: 'number', value: settings.heightCm || '' });
     const ageInput = Utils.el('input', { type: 'number', value: settings.age || '' });
-    const sexSel = Utils.el('select', {});
+    const sexSel = Utils.el('select', { 'aria-label': 'Sexo' });
     [['M', 'Hombre'], ['F', 'Mujer']].forEach(([v, l]) => sexSel.appendChild(Utils.el('option', { value: v, text: l })));
     sexSel.value = settings.sex || 'M';
-    const activitySel = Utils.el('select', {});
+    const activitySel = Utils.el('select', { 'aria-label': 'Nivel de actividad' });
     Object.entries(Nutrition.ACTIVITY_MULTIPLIERS).forEach(([key, def]) => activitySel.appendChild(Utils.el('option', { value: key, text: def.label })));
     activitySel.value = settings.activityLevel || 'moderado';
 

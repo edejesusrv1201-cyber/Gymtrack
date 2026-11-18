@@ -2016,3 +2016,8 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .fb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .fb-msg { white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
 .fb-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+/* la serie recién registrada entra con un pequeño rebote y el contador «salta» */
+@keyframes setpop { 0% { opacity: 0; transform: translateX(-16px) scale(.96); background-color: var(--accent-soft); } 55% { opacity: 1; transform: translateX(3px) scale(1.01); } 100% { transform: none; } }
+:root[data-ui="on"] .set-line.set-new { animation: setpop .5s cubic-bezier(.2, .9, .3, 1) both; border-radius: 12px; }
+:root[data-ui="on"] .counter-chip.bump { animation: pop .45s cubic-bezier(.2, .9, .3, 1) both; }

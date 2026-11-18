@@ -53,7 +53,7 @@ const MeasurementsView = (() => {
       ]));
       const fieldsWithData = ALL_FIELDS.filter((f) => measurements.some((m) => m[f.key] !== undefined && m[f.key] !== null && m[f.key] !== ''));
       if (!fieldsWithData.some((f) => f.key === chartField)) chartField = fieldsWithData[0].key;
-      const fieldSelect = Utils.el('select', {});
+      const fieldSelect = Utils.el('select', { 'aria-label': 'Medida a graficar' });
       fieldsWithData.forEach((f) => {
         fieldSelect.appendChild(Utils.el('option', { value: f.key, text: f.label, selected: f.key === chartField ? 'selected' : null }));
       });

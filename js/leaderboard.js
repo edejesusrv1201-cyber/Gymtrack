@@ -399,7 +399,7 @@ const Leaderboard = (() => {
   function boardCard(u) {
     const card = Utils.el('div', { class: 'card' });
     const body = Utils.el('div');
-    const exSel = Utils.el('select', { class: 'lb-select' });
+    const exSel = Utils.el('select', { class: 'lb-select', 'aria-label': 'Ejercicio del ranking' });
     const groups = Utils.el('div');
 
     const fillSelect = () => {

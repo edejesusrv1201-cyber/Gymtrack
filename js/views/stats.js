@@ -308,7 +308,7 @@ const StatsView = (() => {
       exCard.appendChild(emptyNote('Registra series de algún ejercicio y aquí verás su evolución (peso, 1RM estimado y volumen).'));
     } else {
       if (!withHistory.some((r) => r.ex.id === selectedExerciseId)) selectedExerciseId = withHistory[0].ex.id;
-      const sel = Utils.el('select', {});
+      const sel = Utils.el('select', { 'aria-label': 'Ejercicio' });
       withHistory.forEach((r) => sel.appendChild(Utils.el('option', { value: r.ex.id, text: r.ex.name })));
       sel.value = selectedExerciseId;
       const host = Utils.el('div', { class: 'mt-12' });

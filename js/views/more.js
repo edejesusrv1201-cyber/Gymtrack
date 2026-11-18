@@ -182,7 +182,7 @@ const MoreView = (() => {
     const settingsCard = Utils.el('div', { class: 'card' });
     settingsCard.appendChild(Utils.el('h3', { text: '⚙️ Ajustes' }));
 
-    const unitsSel = Utils.el('select', {});
+    const unitsSel = Utils.el('select', { 'aria-label': 'Unidades' });
     ['kg', 'lb'].forEach((u) => unitsSel.appendChild(Utils.el('option', { value: u, text: u, selected: u === settings.units ? 'selected' : null })));
     unitsSel.value = settings.units;
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Ver los pesos en' }), unitsSel]));

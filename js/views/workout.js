@@ -52,6 +52,8 @@ const WorkoutView = (() => {
   let nowObserver = null;
   // si la última serie de un ejercicio fue dropset, la siguiente sugiere dropset
   const typeMemory = {};
+  // la serie que acabas de registrar: aparece con una animación corta (se usa una sola vez)
+  let justAdded = null;
   let warmupOpen = false;
   let notesOpen = false;
 
@@ -436,7 +438,7 @@ const WorkoutView = (() => {
     // --- cabecera: nombre, contador y acciones ---
     const complete = !!(target && workingN >= target.targetSets);
     const counterChip = Utils.el('span', {
-      class: 'counter-chip' + (complete ? ' done' : ''),
+      class: 'counter-chip' + (complete ? ' done' : '') + (justAdded && justAdded.key === key ? ' bump' : ''),
       text: target ? `${workingN}/${target.targetSets}${complete ? ' ✓' : ''}` : `${workingN}`,
     });
     const removeEntry = () => {
@@ -594,6 +596,7 @@ const WorkoutView = (() => {
         Utils.el('button', { class: 'icon-btn', text: '✏️', title: 'Editar esta serie', onclick: () => openEditSet(iso, log, entry, sIdx, ex, isCardio, rerender) }),
         Utils.el('button', { class: 'icon-btn', text: '✕', title: Metrics.isDrop(set) ? 'Quitar este drop' : 'Quitar la serie (y sus drops)', onclick: () => removeSet(sIdx) }),
       ]);
+      if (justAdded && justAdded.key === key && justAdded.idx === sIdx) row.classList.add('set-new');
       if (Metrics.isDrop(set) && group) {
         row.classList.add('drop-line');
         group.appendChild(row);
@@ -604,6 +607,7 @@ const WorkoutView = (() => {
       }
     });
     card.appendChild(setsWrap);
+    if (justAdded && justAdded.key === key) justAdded = null;
     const dropSlot = Utils.el('div');
     adv.tools.appendChild(dropSlot);
 
@@ -794,6 +798,7 @@ const WorkoutView = (() => {
         const prs = Metrics.detectPR(entry.exerciseId, true, cardioSet);
         if (prs.length) cardioSet.pr = prs.map((x) => x.kind).join(',');
         entry.sets.push(cardioSet);
+        justAdded = { key, idx: entry.sets.length - 1 };
         saveLog(iso, log);
         Utils.vibrate(40);
         rerender();
@@ -822,6 +827,7 @@ const WorkoutView = (() => {
       const prs = Metrics.detectPR(entry.exerciseId, false, set);
       if (prs.length) set.pr = prs.map((x) => x.kind).join(',');
       entry.sets.push(set);
+      justAdded = { key, idx: entry.sets.length - 1 };
       saveLog(iso, log);
       Utils.vibrate(40);
       if (typeSelected === 'normal' && typeof Leaderboard !== 'undefined') Leaderboard.onSet(entry.exerciseId);

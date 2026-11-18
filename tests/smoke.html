@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MyGymTrack · pruebas de humo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; background: #10131a; color: #e8ecf5; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  #sum { font-weight: 800; margin: 8px 0 14px; font-size: 16px; }
+  .row { padding: 3px 0; border-bottom: 1px solid #222a3a; }
+  .ok::before { content: '✓ '; color: #35d49a; } .bad::before { content: '✗ '; color: #ff5d73; } .bad { color: #ffb3bd; }
+  iframe { position: fixed; right: 8px; bottom: 8px; width: 375px; height: 520px; border: 1px solid #333; border-radius: 12px; opacity: .9; background: #000; }
+</style>
+</head>
+<body>
+<h1>MyGymTrack · pruebas de humo</h1>
+<div>Abre esta página con el servidor local (por ejemplo <code>/tests/smoke.html</code>). Recorre la app con datos de ejemplo y revisa que nada se rompa. <b>Ojo:</b> borra los datos guardados de esta dirección del navegador (usa solo el servidor de desarrollo, nunca tu app real).</div>
+<div id="sum">Ejecutando…</div>
+<div id="out"></div>
+<iframe id="app" src="../index.html"></iframe>
+<script>
+(async () => {
+  // seguridad: estas pruebas borran los datos guardados de la dirección donde corren
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    document.getElementById('sum').textContent = 'Estas pruebas solo corren en un servidor local (localhost), porque borran los datos guardados de la dirección.';
+    document.getElementById('app').remove();
+    return;
+  }
+  const out = document.getElementById('out');
+  const frame = document.getElementById('app');
+  let pass = 0; let fail = 0;
+  const log = (ok, msg) => { (ok ? pass++ : fail++); const d = document.createElement('div'); d.className = `row ${ok ? 'ok' : 'bad'}`; d.textContent = msg; out.appendChild(d); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const errors = [];
+  async function test(name, fn) {
+    const before = errors.length;
+    try { await fn(); } catch (e) { log(false, `${name}: ${e && e.message || e}`); return; }
+    const newErr = errors.slice(before).filter((m) => !/vibrate/i.test(m));
+    log(newErr.length === 0, newErr.length ? `${name}: errores de consola → ${newErr.join(' | ').slice(0, 220)}` : name);
+  }
+
+  // esperar a que cargue la app dentro del iframe
+  await new Promise((r) => { if (frame.contentDocument && frame.contentDocument.readyState === 'complete') r(); else frame.addEventListener('load', r, { once: true }); });
+  await wait(900);
+  const w = frame.contentWindow; const d = frame.contentDocument;
+  // los módulos son «const» globales: no cuelgan de window, se leen con eval
+  const A = {};
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  bind();
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
+  const ce = w.console.error; w.console.error = (...a) => { errors.push(a.map(String).join(' ')); ce.apply(w.console, a); };
+  // sin red: nada sale a internet durante las pruebas
+  w.fetch = async () => new w.Response('[]', { status: 200 });
+  const { DB, Utils } = A;
+  const today = Utils.todayISO();
+  const iso = (n) => Utils.toISODate(new Date(Date.now() - n * 86400000));
+
+  // ---- datos de ejemplo
+  await test('Datos de ejemplo', async () => {
+    w.localStorage.clear();
+    const lib = A.ExerciseUI.LIB;
+    const pick = (re) => lib.find((l) => re.test(l[0].toLowerCase()));
+    const names = [/press de banca con barra/, /sentadilla con barra/, /peso muerto convencional/, /remo con barra/, /curl/, /jalón al pecho/, /prensa/, /elevaciones laterales/, /extensión de cuádriceps/, /press de pecho en máquina/];
+    const exs = names.map((re) => pick(re)).filter(Boolean).map((l) => ({ id: DB.uid(), name: l[0], group: l[1], equipment: l[2] }));
+    DB.saveExercises(exs);
+    const wl = {};
+    for (let i = 0; i < 24; i += 3) {
+      wl[iso(i)] = { exercises: exs.slice(0, 5).map((e, k) => ({ exerciseId: e.id, sets: [1, 2, 3].map((s) => ({ weight: 40 + k * 10 + (24 - i) * 0.5, reps: 10 - s, felt: 'normal' })) })) };
+    }
+    DB.saveWorkoutLog(wl);
+    const s = DB.getSettings(); Object.assign(s, { calorieGoal: 2400, proteinGoal: 150, carbGoal: 270, fatGoal: 70, userName: 'Prueba' }); DB.saveSettings(s);
+    const cl = {};
+    for (let i = 0; i < 10; i++) cl[iso(i)] = [{ id: DB.uid(), foodName: 'Comida', kcal: 2300 + i * 20, protein: 130, carbs: 250, fat: 65, meal: 'almuerzo' }];
+    DB.saveCalorieLog(cl);
+    DB.saveMeasurements([0, 30, 60].map((n, k) => ({ id: DB.uid(), date: iso(n), weight: 65 + k, chest: 98 - k, waist: 82 + k, armR: 34 - k * 0.5 })));
+    if (!exs.length) throw new Error('no se pudieron crear ejercicios');
+  });
+  await test('Recargar la app con los datos', async () => { w.location.reload(); await new Promise((r) => frame.addEventListener('load', r, { once: true })); await wait(1000); });
+  const W = frame.contentWindow; const D = frame.contentDocument; bind();
+  W.addEventListener('error', (e) => errors.push(e.message));
+  W.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
+  const ce2 = W.console.error; W.console.error = (...a) => { errors.push(a.map(String).join(' ')); ce2.apply(W.console, a); };
+  W.fetch = async () => new W.Response('[]', { status: 200 });
+  try { A.Modal.close(); } catch (e) { /* sin modal */ }
+
+  const overflow = () => D.documentElement.scrollWidth - frame.clientWidth;
+  async function view(name, params, label) {
+    await test(`Pantalla: ${label || name}`, async () => {
+      A.App.navigate(name, params || {}); await wait(700);
+      const root = D.getElementById('viewRoot');
+      if (!root || root.children.length === 0) throw new Error('pantalla vacía');
+      if (overflow() > 1) throw new Error(`se sale de la pantalla (${overflow()} px)`);
+    });
+  }
+  await view('hoy'); await view('plan'); await view('calorias');
+  for (const s of ['entreno', 'cuerpo', 'nutricion', 'logros', 'ranking']) await view('progreso', { section: s }, `progreso → ${s}`);
+  await view('mas'); await view('calculadora'); await view('plancomidas');
+
+  // ---- accesibilidad básica: botones y campos con nombre
+  await test('Accesibilidad: botones y campos tienen nombre', async () => {
+    const problems = [];
+    const routes = [['hoy'], ['plan'], ['calorias'], ['progreso', { section: 'entreno' }], ['progreso', { section: 'cuerpo' }], ['mas']];
+    for (const [n, p] of routes) {
+      A.App.navigate(n, p || {}); await wait(600);
+      D.querySelectorAll('button, [role="button"]').forEach((b) => {
+        const name = (b.textContent || '').trim() || b.getAttribute('aria-label') || b.getAttribute('title');
+        if (!name) problems.push(`${n}: botón sin nombre (${(b.className || '').toString().slice(0, 30)})`);
+      });
+      D.querySelectorAll('input:not([type=hidden]), select, textarea').forEach((i) => {
+        const hasName = i.getAttribute('aria-label') || i.getAttribute('placeholder') || i.getAttribute('title') || i.id && D.querySelector(`label[for="${i.id}"]`) || i.closest('label') || (i.closest('.field') && i.closest('.field').querySelector('label'));
+        if (!hasName) problems.push(`${n}: campo sin etiqueta (${i.type || i.tagName})`);
+      });
+    }
+    if (problems.length) throw new Error(`${problems.length} sin nombre: ${[...new Set(problems)].slice(0, 6).join('; ')}`);
+  });
+
+  // ---- tema claro: nada se sale de la pantalla
+  await test('Tema claro: las pantallas no se salen', async () => {
+    const st = A.DB.getSettings(); st.themeScheme = 'claro'; A.DB.saveSettings(st);
+    try { frame.contentWindow.eval('Theme.apply()'); } catch (e) { /* sin tema */ }
+    const bad = [];
+    for (const [n, p] of [['hoy'], ['plan'], ['calorias'], ['progreso', { section: 'entreno' }], ['progreso', { section: 'nutricion' }], ['mas']]) { A.App.navigate(n, p || {}); await wait(600); if (overflow() > 1) bad.push(n); }
+    st.themeScheme = 'oscuro'; A.DB.saveSettings(st); try { frame.contentWindow.eval('Theme.apply()'); } catch (e) { /* sin tema */ }
+    if (bad.length) throw new Error(`se salen en tema claro: ${bad.join(', ')}`);
+  });
+
+  // ---- entrenamiento: registrar una serie
+  await test('Entrenamiento: registrar una serie', async () => {
+    const exs = A.DB.getExercises();
+    const log = A.DB.getWorkoutLog(); log[today] = { exercises: [{ exerciseId: exs[0].id, sets: [] }, { exerciseId: exs[1].id, sets: [] }] }; A.DB.saveWorkoutLog(log);
+    A.App.navigate('workout', { date: today }); await wait(800);
+    const inputs = D.querySelectorAll('.exercise-card input.sf-num'); if (inputs.length < 2) throw new Error('no aparece el formulario de la serie');
+    inputs[0].value = '60'; inputs[1].value = '8';
+    [...D.querySelectorAll('.exercise-card .btn-primary')].find((b) => /Registrar serie/.test(b.textContent)).click(); await wait(600);
+    if (!D.querySelector('.set-line')) throw new Error('la serie no quedó registrada');
+    if (overflow() > 1) throw new Error('la fila de la serie se sale de la pantalla');
+    if (!D.querySelector('.adv-fold')) throw new Error('falta «Más opciones»');
+    if (!D.querySelector('.set-line.set-new')) throw new Error('la serie nueva no tiene su animación');
+  });
+  await test('Entrenamiento: menú ⋯ cabe en pantalla', async () => {
+    D.querySelector('.exercise-card .ex-actions .icon-btn[title="Más opciones"]').click(); await wait(1600); /* la hoja termina su animación */
+    const sheet = D.querySelector('.modal-sheet'); if (!sheet) throw new Error('no abre el menú');
+    try { sheet.getAnimations({ subtree: true }).forEach((a) => a.finish()); } catch (e) { /* sin API de animaciones */ } /* dentro del iframe las animaciones pueden ir detenidas */
+    const r = sheet.getBoundingClientRect();
+    if (r.bottom > frame.clientHeight + 2 || r.top < 0) throw new Error(`el menú se sale (arriba ${Math.round(r.top)}, abajo ${Math.round(r.bottom)} de ${frame.clientHeight})`);
+    A.Modal.close(); await wait(300);
+  });
+
+  // ---- guía animada: todos los patrones × equipos
+  await test('Guía: todos los patrones y equipos se dibujan', async () => {
+    let n = 0;
+    for (const k of A.Guide.allPatterns()) for (const e of ['', 'maquina', 'barra', 'mancuernas', 'polea', 'corporal']) {
+      const svg = A.Guide.svgFor(k, { equip: e });
+      if (!/^<svg/.test(svg) || /NaN|undefined/.test(svg)) throw new Error(`dibujo inválido: ${k} / ${e || 'base'}`);
+      n++;
+    }
+    log(true, `  (${n} dibujos generados)`);
+  });
+  await test('Guía: cada ejercicio de la biblioteca tiene movimiento', async () => {
+    const bad = A.ExerciseUI.LIB.filter((l) => !A.Guide.PATTERNS[A.Guide.patternFor(l[0], l[1], l[2])]);
+    if (bad.length) throw new Error(`sin patrón: ${bad.slice(0, 5).map((l) => l[0]).join(', ')}`);
+  });
+  await test('Músculos: cada ejercicio de fuerza trabaja algún músculo', async () => {
+    const bad = A.ExerciseUI.LIB.filter((l) => !['cardio', 'movilidad', 'otro'].includes(l[1]) && !A.Muscles.mapOf({ name: l[0], group: l[1] }).p.length);
+    if (bad.length) throw new Error(`sin músculo: ${bad.slice(0, 5).map((l) => l[0]).join(', ')}`);
+  });
+
+  // ---- pantallas emergentes
+  const modal = async (name, open) => test(`Modal: ${name}`, async () => { open(); await wait(600); if (!D.querySelector('.modal-sheet')) throw new Error('no se abrió'); if (overflow() > 1) throw new Error('se sale de la pantalla'); A.Modal.close(); await wait(350); });
+  await modal('Privacidad', () => A.Privacy.open());
+  await modal('Guía de un ejercicio', () => A.Guide.open({ name: 'Press de pecho en máquina', group: 'pecho', equipment: 'maquina' }));
+  await modal('Armar dieta', () => A.Diet.open());
+
+  // ---- dieta: totales cerca de la meta
+  await test('Dieta: el día armado queda cerca de tus metas', async () => {
+    const s = A.DB.getSettings();
+    const prefs = { type: 'omni', noDairy: false, noEgg: false, noGluten: false, noNuts: false, noFish: false, noPork: false, extra: '' };
+    const day = A.Diet.buildDay({ kcal: s.calorieGoal, protein: s.proteinGoal, carbs: s.carbGoal, fat: s.fatGoal }, ['desayuno', 'almuerzo', 'cena'], prefs, 1, 0, {});
+    const t = A.Diet.dayTotals(day);
+    const dev = Math.abs(t.kcal - s.calorieGoal) / s.calorieGoal;
+    if (dev > 0.1) throw new Error(`se desvía ${Math.round(dev * 100)} % de las calorías`);
+  });
+
+  // ---- ranking: diagnóstico sin red
+  await test('Ranking: la revisión de ejercicios funciona', async () => { const r = A.Leaderboard.diagnose(); if (!Array.isArray(r) || !r.length) throw new Error('sin resultados'); });
+
+  // ---- respaldo: exportar e importar mantiene los datos
+  await test('Respaldo: exportar → importar conserva los datos', async () => {
+    const a = JSON.stringify(A.DB.exportAll());
+    const n = A.DB.getWorkoutLog(); const before = Object.keys(n).length;
+    A.DB.importAll(JSON.parse(a));
+    if (Object.keys(A.DB.getWorkoutLog()).length !== before) throw new Error('cambió la cantidad de entrenos');
+  });
+
+  document.getElementById('sum').textContent = fail ? `✗ ${fail} fallo(s) · ${pass} correctas` : `✓ Todo bien · ${pass} pruebas correctas`;
+  document.title = (fail ? 'FALLO' : 'OK') + ` · ${pass}/${pass + fail}`;
+  window.__done = { pass, fail };
+  w.localStorage.clear();
+})();
+</script>
+</body>
+</html>

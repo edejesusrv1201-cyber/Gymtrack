@@ -144,7 +144,7 @@ const PlanView = (() => {
     const routines = DB.getRoutines();
     const selects = [];
     Utils.DIAS.forEach((dowName, dowIdx) => {
-      const sel = Utils.el('select', {});
+      const sel = Utils.el('select', { 'aria-label': `Rutina del ${dowName}` });
       sel.appendChild(Utils.el('option', { value: '', text: '— Sin asignar —' }));
       routines.forEach((r) => sel.appendChild(Utils.el('option', { value: r.id, text: r.name })));
       if (pattern[dowIdx] && routines.some((r) => r.id === pattern[dowIdx])) sel.value = pattern[dowIdx];
@@ -432,7 +432,7 @@ const PlanView = (() => {
     // ---- agregar ejercicio: primero grupo muscular, luego ejercicio ----
     body.appendChild(Utils.el('div', { class: 'small text-dim mt-8', text: 'AGREGAR EJERCICIO' }));
     const chipsRow = Utils.el('div', { class: 'rt-chips' });
-    const exSelect = Utils.el('select', {});
+    const exSelect = Utils.el('select', { 'aria-label': 'Ejercicio' });
     const setsInput = Utils.el('input', { type: 'number', min: '1', inputmode: 'numeric', value: '3' });
     const repsInput = Utils.el('input', { type: 'text', value: '10' });
     const repsLabel = Utils.el('label', { text: 'Reps objetivo' });
