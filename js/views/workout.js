@@ -1139,6 +1139,7 @@ const WorkoutView = (() => {
         const t = all.find((e) => e.id === ex.id);
         if (t) { t.unilateral = uni; DB.saveExercises(all); }
       }
+      if (!isCardio && type === 'normal' && typeof Leaderboard !== 'undefined') Leaderboard.onSet(entry.exerciseId);
       Modal.close();
       Utils.toast('Serie actualizada');
       rerender();

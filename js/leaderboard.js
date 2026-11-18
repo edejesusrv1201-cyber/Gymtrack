@@ -133,7 +133,17 @@ const Leaderboard = (() => {
     }
     return null;
   }
-  const bestForLift = (key) => bestFor((e) => { const l = liftOf(e); return !!l && l.key === key; });
+  // tus ejercicios propios (que no están en la biblioteca) también entran solos con el nombre que les pusiste
+  const customOn = () => DB.getSettings().lbCustom !== false;
+  function liftAny(ex) {
+    const l = liftOf(ex);
+    if (l) return l;
+    if (!ex || !customOn() || ex.bodyweight || ex.unilateral || !LIFT_GROUPS.includes(ex.group)) return null;
+    const key = `c:${slug(ex.name)}`;
+    if (key.length < 4) return null;
+    return { key, name: cleanName(ex.name), group: 'propio' };
+  }
+  const bestForLift = (key) => bestFor((e) => { const l = liftAny(e); return !!l && l.key === key; });
 
   // ---- publicación automática
   const PUB_KEY = 'gt_lbPub';          // lo último que sé que está publicado: { clave: e1rm }
@@ -151,6 +161,9 @@ const Leaderboard = (() => {
     await rpc('gt_publish', { p_secret: u.secret, p_key: lift.key, p_name: lift.name, p_weight: Math.round(best.kg * 100) / 100, p_reps: best.reps });
     const m = pubMap(); m[lift.key] = best.e1rm; savePub(m);
   }
+  const ERR_KEY = 'gt_lbErr';
+  const saveErr = (msg) => { try { if (msg) localStorage.setItem(ERR_KEY, JSON.stringify({ msg, t: Date.now() })); else localStorage.removeItem(ERR_KEY); } catch (e) { /* sin almacenamiento */ } };
+  const lastErr = () => { try { return JSON.parse(localStorage.getItem(ERR_KEY) || 'null'); } catch (e) { return null; } };
   const timers = {};
   // se llama cada vez que registras una serie: si mejora tu marca en un ejercicio del ranking, se publica sola
   function onSet(exerciseId) {
@@ -160,7 +173,7 @@ const Leaderboard = (() => {
     timers[exerciseId] = setTimeout(async () => {
       try {
         const ex = DB.getExercises().find((e) => e.id === exerciseId);
-        const lift = liftOf(ex);
+        const lift = liftAny(ex);
         if (!lift) return;
         const best = bestForLift(lift.key);
         if (!best || best.kg > 700) return;
@@ -168,9 +181,13 @@ const Leaderboard = (() => {
         const prev = pubMap()[lift.key];
         if (prev && best.e1rm <= prev * 1.005) return;
         await publishBest(u, lift, best);
+        saveErr(null);
         Utils.toast(`🌍 Marca publicada en el ranking: ${lift.name} ${Units.label(best.kg)} × ${best.reps}`);
         ui.mine = []; ui.list = null;
-      } catch (e) { /* sin conexión: se intentará con la próxima serie */ }
+      } catch (e) {
+        // sin conexión se reintenta solo; cualquier otro motivo se guarda para mostrarlo en «Mis marcas»
+        if (!/conectarme/.test(e.message)) saveErr(e.message);
+      }
     }, 1500);
   }
   // publica de una vez todas tus mejores marcas de ejercicios del ranking
@@ -179,17 +196,47 @@ const Leaderboard = (() => {
     try { rememberMine(await rpc('gt_my_scores', { p_secret: u.secret })); pubLoaded = true; } catch (e) { return -1; }
     const seen = new Set();
     for (const ex of DB.getExercises()) {
-      const lift = liftOf(ex);
+      const lift = liftAny(ex);
       if (!lift || seen.has(lift.key)) continue;
       seen.add(lift.key);
       const best = bestForLift(lift.key);
       if (!best || best.kg > 700) continue;
       const prev = pubMap()[lift.key];
       if (prev && best.e1rm <= prev * 1.005) continue;
-      try { await publishBest(u, lift, best); n += 1; } catch (e) { if (/máximo de 40/.test(e.message)) break; if (/conectarme/.test(e.message)) return n || -1; }
+      try { await publishBest(u, lift, best); n += 1; } catch (e) { if (/conectarme/.test(e.message)) return n || -1; saveErr(e.message); if (/máximo de 40|sesión ya no/.test(e.message)) break; }
     }
+    if (n >= 0) { try { localStorage.setItem('gt_lbSyncDay', Utils.todayISO()); } catch (e) { /* sin almacenamiento */ } }
     ui.mine = []; ui.list = null;
     return n;
+  }
+  // al abrir la app (una vez al día): pone al día lo que no se publicó, p. ej. series de otra versión o sin internet
+  function dailySync() {
+    const u = user();
+    if (!u || !configured() || !autoOn()) return;
+    let last = ''; try { last = localStorage.getItem('gt_lbSyncDay') || ''; } catch (e) { /* nada */ }
+    if (last === Utils.todayISO()) return;
+    setTimeout(() => { syncAll(u).then((n) => { if (n > 0) Utils.toast(`🌍 ${n} marca${n === 1 ? '' : 's'} publicada${n === 1 ? '' : 's'} en el ranking`); }).catch(() => {}); }, 4000);
+  }
+
+  // revisa cada ejercicio con series y dice si entra al ranking y, si no, por qué
+  function diagnose() {
+    const wl = DB.getWorkoutLog(); const counts = {};
+    Object.keys(wl).forEach((d) => (wl[d].exercises || []).forEach((en) => {
+      const n = (en.sets || []).filter(Metrics.isNormal).length;
+      if (n) counts[en.exerciseId] = (counts[en.exerciseId] || 0) + n;
+    }));
+    return DB.getExercises().filter((e) => counts[e.id] && e.group !== 'cardio' && e.group !== 'movilidad').map((ex) => {
+      const lift = liftAny(ex);
+      let why = '';
+      if (!lift) {
+        if (ex.bodyweight) why = 'es de peso corporal (no se compara por peso)';
+        else if (ex.unilateral) why = 'está marcado como unilateral (peso por lado)';
+        else if (!LIFT_GROUPS.includes(ex.group)) why = `el grupo «${ex.group}» no entra al ranking`;
+        else if (!customOn()) why = 'no está en la biblioteca y tus ejercicios propios están apagados';
+        else why = 'su nombre no se puede usar';
+      }
+      return { ex, lift, why, sets: counts[ex.id], best: lift ? bestForLift(lift.key) : null, pub: lift ? ui.mine.find((m) => m.exercise_key === lift.key) : null };
+    }).sort((a, b) => (a.lift ? 0 : 1) - (b.lift ? 0 : 1) || b.sets - a.sets);
   }
 
   // ---------------------------------------------------------------- pantalla
@@ -460,6 +507,47 @@ const Leaderboard = (() => {
     });
     if (empty.length) card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: `Aún sin registros: ${empty.map((r) => r.name).join(', ')}.` }));
 
+    // si la última publicación falló por algo que no es internet, se muestra aquí
+    const err = lastErr();
+    if (err && err.msg) {
+      const warn = Utils.el('div', { class: 'sm-warn', style: 'margin-top:10px;' }, [`⚠️ La última publicación automática falló: ${err.msg} `]);
+      const dismiss = Utils.el('button', { class: 'link-btn small', type: 'button', text: 'Quitar aviso', onclick: () => { saveErr(null); paintMine(host, u); } });
+      warn.appendChild(dismiss);
+      card.appendChild(warn);
+    }
+
+    // incluir ejercicios propios
+    const cust = Utils.el('button', { class: `uni-chip${customOn() ? ' on' : ''}`, type: 'button', style: 'margin:10px 0 4px;', text: customOn() ? '✓ Incluir también mis ejercicios propios' : 'Incluir también mis ejercicios propios (apagado)' });
+    cust.addEventListener('click', () => { const st = DB.getSettings(); st.lbCustom = !customOn(); DB.saveSettings(st); if (customOn() && autoOn()) syncAll(u).then(() => loadMine(u).then(() => paintMine(host, u))); paintMine(host, u); });
+    card.appendChild(cust);
+
+    // revisión de todos tus ejercicios
+    const diag = diagnose();
+    if (diag.length) {
+      const bad = diag.filter((x) => !x.lift).length; const pend = diag.filter((x) => x.lift && x.best && (!x.pub || x.best.e1rm > Number(x.pub.e1rm) * 1.005)).length;
+      const det = Utils.el('details', { class: 'fold fold-flat diag-fold' });
+      det.appendChild(Utils.el('summary', { class: 'fold-sum' }, [
+        Utils.el('span', { class: 'fold-t', text: '🔍 Revisar mis ejercicios' }),
+        Utils.el('span', { class: 'fold-sub', text: bad || pend ? `${pend} pendientes · ${bad} no entran` : 'todo al día' }),
+        Utils.el('i', { class: 'fold-chev' }),
+      ]));
+      const list = Utils.el('div', { class: 'diag-list' });
+      diag.forEach((x) => {
+        const state = !x.lift ? 'no' : !x.best ? 'sin' : !x.pub ? 'pend' : x.best.e1rm > Number(x.pub.e1rm) * 1.005 ? 'pend' : 'ok';
+        const label = { no: 'No entra', sin: 'Sin marca', pend: 'Por publicar', ok: 'Publicado ✓' }[state];
+        list.appendChild(Utils.el('div', { class: 'diag-row' }, [
+          Utils.el('div', { class: 'diag-main' }, [
+            Utils.el('b', { text: x.ex.name }),
+            Utils.el('span', { class: 'small text-dim', text: !x.lift ? `Motivo: ${x.why}.` : x.best ? `Mejor: ${Units.label(x.best.kg)} × ${x.best.reps} · cuenta como «${x.lift.name}»` : `Cuenta como «${x.lift.name}»` }),
+          ]),
+          Utils.el('span', { class: `diag-chip ${state}`, text: label }),
+        ]));
+      });
+      det.appendChild(list);
+      det.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:8px 2px 0;', text: 'Cuentan las series normales con peso (no aproximaciones). Si algo dice «No entra», cámbialo en el ejercicio (quita «unilateral» o «peso corporal») o usa «Publicar un ejercicio propio».' }));
+      card.appendChild(det);
+    }
+
     const now = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:10px;', text: '⚡ Publicar ahora todas mis mejores marcas' });
     now.addEventListener('click', async () => {
       now.disabled = true; now.textContent = 'Publicando…';
@@ -573,5 +661,5 @@ const Leaderboard = (() => {
     Modal.open('👤 Mi cuenta', body);
   }
 
-  return { render, configured, rpc, BASICS, onSet, syncAll, liftOf, lifts };
+  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, diagnose, liftOf, liftAny, lifts };
 })();

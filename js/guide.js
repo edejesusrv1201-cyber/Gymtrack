@@ -371,6 +371,26 @@ const Guide = (() => {
     ['saltar la cuerda', 'Salta bajito, con las muñecas haciendo el giro y aterrizando suave en la punta de los pies.'],
   ];
 
+  // máquina · barra · mancuernas · polea · peso corporal (lo que marcaste o lo que dice el nombre)
+  const EQ_INFO = {
+    maquina: { icon: '⚙️', label: 'Máquina', note: 'Ajusta el asiento y el respaldo; el movimiento va guiado.' },
+    barra: { icon: '🏋️', label: 'Barra libre', note: 'Tú controlas todo el recorrido: calienta y sube el peso poco a poco.' },
+    mancuernas: { icon: '💪', label: 'Mancuernas', note: 'Cada brazo trabaja por separado y estabiliza el peso.' },
+    polea: { icon: '🪢', label: 'Polea', note: 'Tensión constante durante todo el movimiento.' },
+    corporal: { icon: '🤸', label: 'Peso corporal', note: 'Tu cuerpo es la carga.' },
+  };
+  function equipOf(item) {
+    const n = norm(item.name);
+    const q = item.equipment;
+    if (EQ_INFO[q]) return q;
+    if (/maquina|smith|peck|asistid|hack|prensa|sillon/.test(n)) return 'maquina';
+    if (/polea|jalon|cruce|face pull/.test(n)) return 'polea';
+    if (/mancuerna|goblet|bulgara/.test(n)) return 'mancuernas';
+    if (/barra|banca|militar|peso muerto|hip thrust/.test(n)) return 'barra';
+    if (/dominada|flexion|fondos|plancha|abdominal|crunch/.test(n)) return 'corporal';
+    return '';
+  }
+
   function guideFor(item) {
     const name = item.name || '';
     const key = patternFor(name, item.group, item.equipment);
@@ -380,12 +400,22 @@ const Guide = (() => {
     SPECIFIC.forEach(([k, tip]) => { if (n.includes(k)) extra.push(tip); });
     if (item.equipment && EQUIP_TIPS[item.equipment]) extra.push(EQUIP_TIPS[item.equipment]);
     if (item.group !== 'cardio' && item.group !== 'movilidad') extra.push('Si eres principiante: elige un peso con el que te sobren 3–4 repeticiones al terminar cada serie.');
-    return { key, base, extra, name };
+    return { key, base, extra, name, equip: equipOf(item) };
   }
 
   // ---------------------------------------------------------------- dibujo animado
   const fmtPts = (arr) => arr.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
   const DUR = '3.4s';
+
+  // cómo se dibuja la máquina según el patrón: 'smith' = barra guiada por rieles; 'lever:X' = brazo articulado con pila de pesas
+  const MACHINE = {
+    bench: 'smith', incline: 'smith', ohp: 'smith', squat: 'smith', hinge: 'smith', hipthrust: 'smith', lunge: 'smith',
+    row: 'lever:W', pulldown: 'lever:W', seatedrow: 'lever:W', chestpress: 'lever:W', fly: 'lever:W', curl: 'lever:W', pushdown: 'lever:W', skull: 'lever:W', raise: 'lever:W', facepull: 'lever:W', shrug: 'lever:W',
+    legext: 'lever:A', legcurl: 'lever:A', legpress: 'lever:A', calf: 'lever:S', crunch: 'lever:S', pullup: 'lever:K', dips: 'lever:K',
+  };
+  const SEATED = ['pulldown', 'seatedrow', 'chestpress', 'legext', 'legcurl'];
+  // polea de origen por patrón cuando haces el ejercicio con polea y el dibujo base no la trae
+  const CABLE_DEFAULT = { curl: [98, 84], raise: [98, 84], row: [100, 80], fly: [92, 10], hinge: [100, 84], squat: [98, 80] };
 
   function svgFor(key, opts = {}) {
     const P = PATTERNS[key];
@@ -400,28 +430,97 @@ const Guide = (() => {
     const first = states[0];
     const anim = (attr, f) => `<animate attributeName="${attr}" dur="${DUR}" repeatCount="indefinite" values="${states.map(f).join(';')}"/>`;
     const poly = (cls, pick, extraAttr = '') => `<polyline class="${cls}" ${extraAttr} points="${fmtPts(pick(first))}">${anim('points', (s) => fmtPts(pick(s)))}</polyline>`;
+    const dot = (cls, r, pick) => `<circle class="${cls}" r="${r}" cx="${pick(first)[0].toFixed(1)}" cy="${pick(first)[1].toFixed(1)}">${anim('cx', (s) => pick(s)[0].toFixed(1))}${anim('cy', (s) => pick(s)[1].toFixed(1))}</circle>`;
+
+    // qué implemento se dibuja: el equipo del ejercicio manda sobre el dibujo base
+    const q = opts.equip;
+    const base = P.eq === 'bar' || P.eq === 'barHip' ? 'barbell' : P.eq === 'db' ? 'dumbbell' : P.eq === 'cable' ? 'cable' : P.eq === 'pad' ? 'machine' : 'body';
+    let kind = base;
+    if (q === 'maquina') kind = MACHINE[key] ? 'machine' : base;
+    else if (q === 'barra') kind = P.eq === 'none' ? 'body' : (base === 'machine' ? 'machine' : 'barbell');
+    else if (q === 'mancuernas') kind = P.eq === 'none' || P.eq === 'pad' ? base : 'dumbbell';
+    else if (q === 'polea') kind = (P.eq === 'cable' || CABLE_DEFAULT[key]) ? 'cable' : base;
+    else if (q === 'corporal') kind = 'body';
+    const cableAt = P.cable || CABLE_DEFAULT[key];
+    const mode = kind === 'machine' ? (MACHINE[key] || 'lever:A') : '';
+    const smith = mode === 'smith';
+
+    // ---- máquina: pila de pesas que sube y baja con el movimiento + brazo articulado
+    const trackPick = { W: (s) => s.W, A: (s) => s.A, S: (s) => s.S, K: (s) => s.K };
+    let stackSvg = ''; let leverSvg = '';
+    const prog = (pick) => {
+      const a = pick(states[0]); const b = pick(frame(specB));
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return (s) => Math.min(1, Math.hypot(pick(s)[0] - a[0], pick(s)[1] - a[1]) / L);
+    };
+    if (kind === 'machine' && !smith) {
+      const pick = trackPick[mode.split(':')[1]] || trackPick.W;
+      const pr = prog(pick);
+      const a = pick(first); const b = pick(frame(specB));
+      // pivote: sobre la mediatriz del recorrido, del lado de la pila (a la derecha)
+      const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2;
+      let dx = -(b[1] - a[1]); let dy = b[0] - a[0];
+      const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+      const reach = Math.max(18, Math.hypot(b[0] - a[0], b[1] - a[1]) * 1.15);
+      let sgn = dx >= 0 ? 1 : -1;
+      let px = mx + sgn * dx * reach; let py = my + sgn * dy * reach;
+      px = Math.max(4, Math.min(84, px)); py = Math.max(8, Math.min(84, py));
+      const topY = (s) => 40 - pr(s) * 9;
+      // pila fija a la derecha (fuera del grupo desplazado): 9 placas, 3 se levantan
+      let plates = '';
+      for (let i = 0; i < 9; i += 1) plates += `<rect class="gd-stack" x="89" y="${(46 + i * 5.2).toFixed(1)}" width="12" height="4.2" rx="1"/>`;
+      stackSvg = `<g class="gd-machine-fixed"><line class="gd-rod" x1="95" y1="30" x2="95" y2="94"/>${plates}`
+        + `<rect class="gd-stack on" x="89" y="${topY(first).toFixed(1)}" width="12" height="13" rx="1.5">${anim('y', (s) => (46 - pr(s) * 9 - 6).toFixed(1))}</rect>`
+        + '<circle class="gd-solid" cx="95" cy="26" r="2.6"/></g>';
+      leverSvg = `<line class="gd-cable" x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="95" y2="26"/>`
+        + `<line class="gd-lever" x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${a[0].toFixed(1)}" y2="${a[1].toFixed(1)}">${anim('x2', (s) => pick(s)[0].toFixed(1))}${anim('y2', (s) => pick(s)[1].toFixed(1))}</line>`
+        + `<circle class="gd-pivot" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.8"/>`
+        + dot('gd-grip', 3, pick);
+    }
+    // statics: en máquina se quita la polea del dibujo base (círculo lejano a la derecha)
+    let statics = P.statics || '';
+    if (kind !== 'cable') statics = statics.replace(/<circle[^>]*class="gd-solid"[^>]*\/>/g, '');
+    if (kind === 'machine' && SEATED.includes(key)) {
+      const h = first.H; const sh = first.S;
+      statics += `<line class="gd-back" x1="${(h[0] - 5).toFixed(1)}" y1="${(h[1] + 3).toFixed(1)}" x2="${(sh[0] - 5).toFixed(1)}" y2="${(sh[1] - 2).toFixed(1)}"/>`;
+    }
+    if (smith) {
+      const w = first.W; const w2 = frame(specB).W;
+      const rx = ((w[0] + w2[0]) / 2).toFixed(1);
+      statics += `<line class="gd-rail" x1="${rx}" y1="2" x2="${rx}" y2="${P.ground || 90}"/>`;
+    }
+
     let out = '';
     if (P.ground) out += `<line x1="6" y1="${P.ground}" x2="94" y2="${P.ground}" class="gd-floor"/>`;
+    out += stackSvg;
     out += `<g transform="translate(${P.dx || 0},0)">`;
-    out += `<g class="gd-static">${P.statics || ''}</g>`;
+    out += `<g class="gd-static">${statics}</g>`;
     if (first.K2) out += poly('gd-leg2', (s) => [s.H, s.K2, s.A2]);
     out += poly('gd-leg', (s) => [s.H, s.K, s.A]);
     if (!P.nofoot) out += poly('gd-leg', (s) => [s.A, s.toe]);
     out += poly('gd-torso', (s) => [s.H, s.S]);
-    if (P.eq === 'cable') {
-      const [cx, cy] = P.cable;
+    out += leverSvg;
+    if (kind === 'cable' && cableAt) {
+      const [cx, cy] = cableAt;
+      out += `<circle class="gd-solid" cx="${cx}" cy="${cy}" r="2.5"/>`;
       out += `<line class="gd-cable" x1="${cx}" y1="${cy}" x2="${first.W[0].toFixed(1)}" y2="${first.W[1].toFixed(1)}">${anim('x2', (s) => s.W[0].toFixed(1))}${anim('y2', (s) => s.W[1].toFixed(1))}</line>`;
     }
     out += poly('gd-arm', (s) => [s.S, s.E, s.W]);
     out += `<circle class="gd-head" r="6" cx="${first.C[0].toFixed(1)}" cy="${first.C[1].toFixed(1)}">${anim('cx', (s) => s.C[0].toFixed(1))}${anim('cy', (s) => s.C[1].toFixed(1))}</circle>`;
-    const dot = (cls, r, pick) => `<circle class="${cls}" r="${r}" cx="${pick(first)[0].toFixed(1)}" cy="${pick(first)[1].toFixed(1)}">${anim('cx', (s) => pick(s)[0].toFixed(1))}${anim('cy', (s) => pick(s)[1].toFixed(1))}</circle>`;
-    if (P.eq === 'bar') out += dot('gd-plate', 6, (s) => s.W);
-    else if (P.eq === 'db') out += dot('gd-db', 4.2, (s) => s.W);
-    else if (P.eq === 'cable') out += dot('gd-db', 2.6, (s) => s.W);
-    else if (P.eq === 'pad') out += dot('gd-pad', 3.6, (s) => s.A);
-    else if (P.eq === 'barHip') out += dot('gd-plate', 6, (s) => [s.H[0] + 1, s.H[1] - 5]);
+    if (kind === 'barbell') out += dot('gd-plate', 6, P.eq === 'barHip' ? (s) => [s.H[0] + 1, s.H[1] - 5] : (s) => s.W) + dot('gd-hub', 1.8, P.eq === 'barHip' ? (s) => [s.H[0] + 1, s.H[1] - 5] : (s) => s.W);
+    else if (kind === 'dumbbell') out += dot('gd-db', 4.2, (s) => s.W) + dot('gd-hub', 1.4, (s) => s.W);
+    else if (kind === 'cable') out += dot('gd-db', 2.6, (s) => s.W);
+    else if (smith) out += dot('gd-plate smith', 5.2, (s) => s.W);
+    else if (kind === 'machine' && P.eq === 'pad' && !leverSvg) out += dot('gd-pad', 3.6, (s) => s.A);
     out += '</g>';
     return `<svg class="gd-svg" viewBox="-6 -8 112 112" role="img" aria-label="${P.title}" xmlns="http://www.w3.org/2000/svg">${out}</svg>`;
+  }
+
+  // etiqueta con el equipo: «⚙️ Máquina · movimiento guiado»
+  function eqChip(equip) {
+    const e = EQ_INFO[equip];
+    if (!e) return null;
+    return Utils.el('div', { class: `gd-eq eq-${equip}` }, [Utils.el('b', { text: `${e.icon} ${e.label}` }), Utils.el('span', { text: e.note })]);
   }
 
   // ---------------------------------------------------------------- pantallas
@@ -445,9 +544,11 @@ const Guide = (() => {
     const g = guideFor(item);
     const body = Utils.el('div', { class: 'gd-body' });
     const fig = Utils.el('div', { class: 'gd-fig' });
-    fig.innerHTML = svgFor(g.key);
+    fig.innerHTML = svgFor(g.key, { equip: g.equip });
     body.appendChild(fig);
     body.appendChild(Utils.el('div', { class: 'gd-cap', text: `${g.base.title}${item.group ? ` · ${item.group}` : ''}` }));
+    const chip = eqChip(g.equip);
+    if (chip) body.appendChild(chip);
     body.appendChild(section('Cómo hacerlo', g.base.steps, 'steps'));
     body.appendChild(section('Consejos', g.base.tips.concat(g.extra), 'tips'));
     body.appendChild(section('Errores comunes', g.base.mistakes, 'mistakes'));
@@ -476,7 +577,7 @@ const Guide = (() => {
       card.appendChild(Utils.el('div', { class: 'gd-in-head' }, [Utils.el('b', { text: '🎓 Cómo hacerlo' }), Utils.el('span', { class: 'small text-dim', text: g.base.title })]));
       const row = Utils.el('div', { class: 'gd-in-row' });
       const fig = Utils.el('div', { class: 'gd-fig sm' });
-      fig.innerHTML = svgFor(g.key);
+      fig.innerHTML = svgFor(g.key, { equip: g.equip });
       row.appendChild(fig);
       const ol = Utils.el('ol', { class: 'gd-mini' });
       g.base.steps.slice(0, 3).forEach((s) => ol.appendChild(Utils.el('li', { text: s })));
@@ -497,5 +598,5 @@ const Guide = (() => {
   // vista de depuración: todos los movimientos en cuadrícula
   function allPatterns() { return Object.keys(PATTERNS); }
 
-  return { open, inline, svgFor, patternFor, guideFor, allPatterns, isBeginner, setBeginner, PATTERNS };
+  return { open, inline, svgFor, patternFor, guideFor, equipOf, allPatterns, isBeginner, setBeginner, PATTERNS };
 })();

@@ -1971,3 +1971,34 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .micro-fold { margin: 0 0 10px; }
 .micro-fold > .fold-sum { padding: 10px 14px; border-radius: 14px; font-size: 0.86rem; background: rgba(var(--ov), 0.04); }
 .micro-form { padding: 10px 2px 0; }
+
+/* ranking: revisión de ejercicios */
+.diag-fold { margin: 10px 0 0; }
+.diag-fold > .fold-sum { padding: 10px 14px; border-radius: 14px; font-size: 0.86rem; background: rgba(var(--ov), 0.04); }
+.diag-list { padding-top: 6px; }
+.diag-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid rgba(var(--ov), 0.06); }
+.diag-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.diag-chip { flex: none; padding: 3px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; background: rgba(var(--ov), 0.08); color: var(--text-dim); }
+.diag-chip.ok { background: rgba(53, 212, 154, 0.16); color: var(--green); }
+.diag-chip.pend { background: rgba(255, 194, 71, 0.16); color: var(--yellow); }
+.diag-chip.no { background: rgba(255, 93, 115, 0.14); color: var(--red); }
+.diag-fold .fold-t { white-space: nowrap; }
+.diag-fold .fold-sub { min-width: 0; font-size: 0.74rem; overflow: hidden; text-overflow: ellipsis; }
+
+/* guía: máquina vs peso libre */
+.gd-stack { fill: rgba(var(--ov), 0.2); }
+.gd-stack.on { fill: var(--accent-light); opacity: 0.92; }
+.gd-rod { stroke: rgba(var(--ov), 0.35); stroke-width: 1.6; }
+.gd-lever { stroke: rgba(var(--ov), 0.55); stroke-width: 3.2; stroke-linecap: round; }
+.gd-pivot { fill: rgba(var(--ov), 0.7); }
+.gd-grip { fill: var(--accent-light); stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.8; }
+.gd-back { stroke: rgba(255, 194, 71, 0.8); stroke-width: 5; stroke-linecap: round; }
+.gd-rail { stroke: rgba(var(--ov), 0.35); stroke-width: 1.4; stroke-dasharray: 3 3; }
+.gd-hub { fill: rgba(0, 0, 0, 0.35); }
+.gd-plate.smith { fill: #5b8cff; stroke: #2c4a99; }
+.gd-eq { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: -4px 0 10px; text-align: center; }
+.gd-eq b { font-size: 0.82rem; padding: 3px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-light); }
+.gd-eq span { font-size: 0.76rem; color: var(--text-dim); max-width: 260px; }
+.gd-eq.eq-maquina b { background: rgba(91, 140, 255, 0.18); color: #8fb0ff; }
+.gd-eq.eq-corporal b { background: rgba(53, 212, 154, 0.16); color: var(--green); }
+:root[data-scheme="light"] .gd-eq.eq-maquina b { color: #2f5bd0; }

@@ -130,6 +130,7 @@ const App = (() => {
     RestTimer.init();
     AutoBackup.init();
     try { Cloud.init(); } catch (e) { console.warn('nube', e); }
+    try { Leaderboard.dailySync(); } catch (e) { console.warn('ranking', e); }
     navigate('hoy');
     try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
     registerServiceWorker();
