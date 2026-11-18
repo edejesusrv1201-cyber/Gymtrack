@@ -620,7 +620,79 @@ const CaloriesView = (() => {
       items.forEach((sp) => listWrap.appendChild(row(sp)));
     }
 
-    search.addEventListener('input', () => { query = search.value.trim(); paintChips(); paintList(); });
+    // búsqueda en internet (Open Food Facts, a través de tu cuenta): solo si la tocas, y solo se envía el texto escrito
+    const onlineWrap = Utils.el('div', { class: 'online-wrap' });
+    body.insertBefore(onlineWrap, listWrap.nextSibling);
+    let onlineQuery = '';
+    function paintOnline() {
+      onlineWrap.innerHTML = '';
+      if (query.length < 3 || onlineQuery === query) { if (query.length < 3) onlineQuery = ''; return; }
+      if (typeof Cloud === 'undefined' || !Cloud.configured()) return;
+      if (!Cloud.signedIn()) {
+        onlineWrap.appendChild(Utils.el('div', { class: 'small text-dim', style: 'text-align:center;', text: '🌐 ¿No lo encuentras? Entra a tu cuenta (Más → ☁️ Nube) y podrás buscar productos de supermercado en internet.' }));
+        return;
+      }
+      const btn = Utils.el('button', { type: 'button', class: 'btn-secondary btn-block online-btn', text: `🌐 Buscar «${query}» en internet` });
+      btn.addEventListener('click', () => runOnline(query));
+      onlineWrap.appendChild(btn);
+      onlineWrap.appendChild(Utils.el('div', { class: 'small text-dim', style: 'text-align:center;margin-top:4px;', text: 'Productos de Open Food Facts. Solo se envía lo que escribiste.' }));
+    }
+    async function runOnline(q) {
+      onlineQuery = q;
+      onlineWrap.innerHTML = '';
+      const status = Utils.el('div', { class: 'small text-dim', style: 'text-align:center;padding:10px 0;', text: '🔎 Buscando en internet…' });
+      onlineWrap.appendChild(status);
+      let list = null; let lastErr = null;
+      for (let i = 0; i < 3 && list === null; i += 1) {
+        if (onlineQuery !== q) return;
+        try { list = await Cloud.rpcAuth('gt_food_search', { p_q: q }); } catch (e) {
+          lastErr = e;
+          if (e.message !== 'busy') break;
+          status.textContent = `🔎 El servicio está ocupado, reintentando (${i + 1}/3)…`;
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+      if (onlineQuery !== q) return;
+      onlineWrap.innerHTML = '';
+      if (list === null) {
+        onlineWrap.appendChild(Utils.el('div', { class: 'nut-hint', text: lastErr && lastErr.message !== 'busy' ? lastErr.message : 'El servicio de productos está ocupado. Prueba de nuevo en un momento.' }));
+        onlineQuery = '';
+        return;
+      }
+      const seen = new Set(); const items = [];
+      (Array.isArray(list) ? list : []).forEach((p) => {
+        const info = Barcode.parseProduct(p);
+        if (info.empty || !info.name || !(info.kcal >= 0)) return;
+        const key = `${info.name}|${info.brand}|${info.kcal}`.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        items.push(Object.assign({ code: String(p.code || '').replace(/\D/g, '') }, info));
+      });
+      if (!items.length) { onlineWrap.appendChild(Utils.el('div', { class: 'small text-dim', style: 'padding:8px 0;', text: `No encontré «${q}» en internet. Prueba con otra palabra o crea el alimento.` })); return; }
+      onlineWrap.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:10px 0 6px;', text: `🌐 En internet · ${items.length} productos` }));
+      items.forEach((info) => {
+        const r = Utils.el('div', { class: 'food-row' }, [
+          Utils.el('div', { class: 'fr-main' }, [
+            Utils.el('div', { class: 'fr-name', text: info.name }),
+            Utils.el('div', { class: 'meta', text: `${info.brand ? `${info.brand} · ` : ''}${r0(info.kcal)} kcal · P ${r1(info.protein)} · C ${r1(info.carbs)} · G ${r1(info.fat)} por 100 g` }),
+          ]),
+          Utils.el('span', { class: 'fr-add', text: '+' }),
+        ]);
+        r.addEventListener('click', () => {
+          const extra = Utils.el('div', { class: 'scan-result' });
+          extra.appendChild(Utils.el('div', { class: 'sm-ok', text: `✓ Dato de Open Food Facts${info.brand ? ` (${info.brand})` : ''}. Lo aportan usuarios: compáralo con tu empaque antes de guardar. Valores por 100 g.` }));
+          openFoodForm(null, (food) => openQuantity({ sp: FoodDB.spec(food), meal, onBack: () => openAddFood(meal), after: 'list' }), '', {
+            basis: 'g', name: [info.name, info.brand && !String(info.name).toLowerCase().includes(info.brand.toLowerCase()) ? `(${info.brand})` : ''].filter(Boolean).join(' '),
+            kcal: info.kcal, protein: info.protein, carbs: info.carbs, fat: info.fat, fiber: info.fiber, sugar: info.sugar, sodium: info.sodium,
+            servingLabel: info.servingG ? (info.servingLabel || `1 porción (${info.servingG} g)`) : '', portionG: info.servingG || null,
+            barcode: info.code || '', extra,
+          });
+        });
+        onlineWrap.appendChild(r);
+      });
+    }
+
+    search.addEventListener('input', () => { query = search.value.trim(); paintChips(); paintList(); onlineQuery = ''; paintOnline(); });
 
     const barBtn = Utils.el('button', { class: 'btn-primary btn-block', text: '▮▮ Escanear código de barras' });
     barBtn.addEventListener('click', () => scanBarcode(meal));

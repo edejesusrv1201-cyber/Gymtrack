@@ -410,6 +410,7 @@ const MoreView = (() => {
     const wzBtn = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:8px;', text: '👋 Ver la bienvenida otra vez' });
     wzBtn.addEventListener('click', () => Welcome.open());
     fbCard.appendChild(wzBtn);
+    fbCard.appendChild(Utils.el('div', { style: 'margin-top:10px;text-align:center;' }, [Privacy.link('🔒 Privacidad y datos')]));
     view.appendChild(fbCard);
 
     const aboutCard = Utils.el('div', { class: 'card' });

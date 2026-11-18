@@ -140,6 +140,18 @@ const Cloud = (() => {
     if (!r.ok) throw new Error(authMessage(r));
     if (r.json && r.json.id) lset(SESSION_KEY, Object.assign({}, session(), { uid: r.json.id, email: r.json.email || email() }));
   }
+  // llama a una función del servidor con tu sesión (p. ej. la búsqueda de alimentos)
+  async function rpcAuth(fn, args) {
+    const tk = await token();
+    const r = await api(`/rest/v1/rpc/${fn}`, { method: 'POST', token: tk, body: args || {}, timeout: 25000 });
+    if (!r.ok) {
+      const code = r.json && r.json.message ? String(r.json.message) : '';
+      const e = new Error(code === 'upstream_busy' ? 'busy' : code === 'too_many_searches' ? 'Hiciste muchas búsquedas esta hora. Intenta más tarde.' : code === 'not_auth' ? 'Tu sesión venció. Entra de nuevo.' : 'No pude buscar ahora.');
+      e.code = code;
+      throw e;
+    }
+    return r.json;
+  }
   async function deleteAccount() {
     const tk = await token();
     const r = await api('/rest/v1/rpc/gt_cloud_delete_me', { method: 'POST', token: tk, body: {} });
@@ -431,6 +443,7 @@ const Cloud = (() => {
       });
       box.appendChild(forgot);
       box.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Se guarda una copia de tus datos (entrenos, comidas, medidas, rutinas y ajustes). Las fotos de progreso no se suben. Puedes borrar tu cuenta y tus datos cuando quieras. Tus datos quedan en el servidor de la app: quien la administra podría verlos solo si hace falta para ayudarte.' }));
+      if (typeof Privacy !== 'undefined') box.appendChild(Privacy.link('🔒 Ver qué se guarda y quién lo ve'));
     }
 
     function paintIn() {
@@ -512,5 +525,5 @@ const Cloud = (() => {
     if (signedIn()) setTimeout(() => sync(), 5000);
   }
 
-  return { init, card, touch, sync, signedIn, email, configured, onChange };
+  return { init, card, touch, sync, signedIn, email, configured, onChange, rpcAuth };
 })();

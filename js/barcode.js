@@ -146,5 +146,5 @@ const Barcode = (() => {
     Modal.open('▮▮ Escanear código de barras', body, { onClose: stop });
   }
 
-  return { open, lookup, cameraOk };
+  return { open, lookup, cameraOk, parseProduct: parse };
 })();
