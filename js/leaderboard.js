@@ -239,6 +239,28 @@ const Leaderboard = (() => {
     }).sort((a, b) => (a.lift ? 0 : 1) - (b.lift ? 0 : 1) || b.sets - a.sets);
   }
 
+  // crea el usuario del ranking sin pantallas extra (lo usa la cuenta de la nube). Si el nombre está tomado, prueba con un número.
+  const rankName = (t) => String(t || '').replace(/[^\p{L}\p{N} ._-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+  async function autoJoin(rawName) {
+    if (!configured()) throw new Error('El ranking no está disponible.');
+    if (user()) return { user: user(), published: 0 };
+    const base = rankName(rawName);
+    if (base.length < 2) throw new Error('Escribe un nombre de al menos 2 letras para el ranking.');
+    const sex = DB.getSettings().userSex || null;
+    let lastErr = null;
+    for (let i = 0; i < 4; i += 1) {
+      const name = i === 0 ? base : `${base.slice(0, 20)}${10 + Math.floor(Math.random() * 990)}`;
+      try {
+        const r = await rpc('gt_register', { p_name: name, p_sex: sex === 'M' || sex === 'F' ? sex : null, p_pass: null });
+        setUser({ id: r.id, secret: r.secret, name: r.name, sex: r.sex || null });
+        setAuto(true); pubLoaded = false;
+        const n = await syncAll(user());
+        return { user: user(), published: Math.max(0, n) };
+      } catch (e) { lastErr = e; if (!/ya está en uso/.test(e.message)) throw e; }
+    }
+    throw lastErr;
+  }
+
   // ---------------------------------------------------------------- pantalla
   let ui = { joining: false, auto: true, sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
   let rootRef = null;
@@ -661,5 +683,5 @@ const Leaderboard = (() => {
     Modal.open('👤 Mi cuenta', body);
   }
 
-  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, diagnose, liftOf, liftAny, lifts };
+  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, diagnose, liftOf, liftAny, lifts };
 })();

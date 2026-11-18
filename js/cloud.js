@@ -35,6 +35,7 @@ const Cloud = (() => {
   const signedIn = () => !!(session() && session().refresh_token);
   const email = () => (session() && session().email) || '';
   function onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+  const notify = () => listeners.forEach((f) => { try { f(); } catch (e) { /* vista cerrada */ } });
 
   // ---------------------------------------------------------------- conexión
   function conf() {
@@ -333,6 +334,30 @@ const Cloud = (() => {
     return `hace ${Math.round(s / 86400)} d`;
   };
 
+  // ---- ranking: al crear la cuenta se ofrece aparecer con un nombre (se guarda la intención hasta el primer ingreso)
+  const INTENT_KEY = 'gt_lbIntent';
+  const getIntent = () => { try { return JSON.parse(localStorage.getItem(INTENT_KEY) || 'null'); } catch (e) { return null; } };
+  const setIntent = (v) => { try { if (v) localStorage.setItem(INTENT_KEY, JSON.stringify(v)); else localStorage.removeItem(INTENT_KEY); } catch (e) { /* nada */ } };
+  const lbReady = () => typeof Leaderboard !== 'undefined' && Leaderboard.configured();
+  const suggestName = (mail) => {
+    const st = DB.getSettings();
+    const raw = st.userName || String(mail || email() || '').split('@')[0];
+    return (typeof Leaderboard !== 'undefined' ? Leaderboard.rankName(raw) : raw).slice(0, 24);
+  };
+  let joining = false;
+  async function joinNow(name) {
+    if (joining || !lbReady() || Leaderboard.user()) return;
+    joining = true;
+    try {
+      const r = await Leaderboard.autoJoin(name);
+      setIntent(null);
+      Utils.toast(`🌍 Ya apareces en el ranking como ${r.user.name}${r.published ? ` · ${r.published} marca${r.published === 1 ? '' : 's'} publicada${r.published === 1 ? '' : 's'}` : ''}`);
+    } catch (e) { setIntent(null); Utils.toast(`Ranking: ${e.message}`); }
+    joining = false;
+    notify();
+  }
+  function pendingIntent() { const it = getIntent(); if (it && signedIn() && lbReady() && !Leaderboard.user()) joinNow(it.name); }
+
   function card() {
     const box = Utils.el('div', { class: 'card cloud-card' });
     let msg = '';
@@ -354,6 +379,19 @@ const Cloud = (() => {
       box.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Correo' }), mail]));
       box.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Contraseña' }), pass]));
       if (msg) box.appendChild(note(msg, 'backup-last due'));
+      // ranking (opcional)
+      let rankOn = true; let rankIn = null;
+      if (lbReady() && !Leaderboard.user()) {
+        const chip = Utils.el('button', { type: 'button', class: 'uni-chip on', style: 'margin:6px 0 4px;' });
+        rankIn = Utils.el('input', { type: 'text', maxlength: '24', placeholder: 'Nombre que verán otros en el ranking', value: suggestName(mail.value) });
+        const paintRank = () => { chip.classList.toggle('on', rankOn); chip.textContent = rankOn ? '🌍 Aparecer en el ranking (tocar para no)' : '🌍 No aparecer en el ranking'; rankIn.classList.toggle('hidden', !rankOn); };
+        chip.addEventListener('click', () => { rankOn = !rankOn; paintRank(); });
+        paintRank();
+        box.appendChild(chip);
+        box.appendChild(rankIn);
+        box.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:2px 0 8px;', text: 'Solo se publica ese nombre y tus mejores marcas de fuerza (peso × repeticiones). Puedes salir cuando quieras.' }));
+      }
+      const saveIntent = () => { if (rankOn && rankIn) setIntent({ name: rankIn.value.trim() || suggestName(mail.value) }); else setIntent(null); };
       const row = Utils.el('div', { class: 'cloud-row' });
       const inBtn = Utils.el('button', { class: 'btn-primary', type: 'button', text: 'Entrar' });
       const upBtn = Utils.el('button', { class: 'btn-secondary', type: 'button', text: 'Crear cuenta' });
@@ -366,15 +404,17 @@ const Cloud = (() => {
       inBtn.addEventListener('click', async () => {
         const m = check(); if (!m || busy) return;
         busy = true; inBtn.disabled = upBtn.disabled = true; inBtn.textContent = 'Entrando…';
-        try { await signIn(m, pass.value); msg = ''; paint(); await sync({ manual: true }); } catch (e) { msg = e.message; busy = false; paint(); return; }
+        saveIntent();
+        try { await signIn(m, pass.value); msg = ''; paint(); await sync({ manual: true }); pendingIntent(); } catch (e) { msg = e.message; busy = false; paint(); return; }
         busy = false; paint();
       });
       upBtn.addEventListener('click', async () => {
         const m = check(); if (!m || busy) return;
         busy = true; inBtn.disabled = upBtn.disabled = true; upBtn.textContent = 'Creando…';
         try {
+          saveIntent();
           const r = await signUp(m, pass.value);
-          if (r.needsConfirm) { msg = 'Te mandé un correo para confirmar tu cuenta. Ábrelo y luego toca "Entrar".'; } else { msg = ''; paint(); await sync({ manual: true }); }
+          if (r.needsConfirm) { msg = 'Te mandé un correo para confirmar tu cuenta. Ábrelo y luego toca "Entrar".'; } else { msg = ''; paint(); await sync({ manual: true }); pendingIntent(); }
         } catch (e) { msg = e.message; }
         busy = false; paint();
       });
@@ -387,7 +427,7 @@ const Cloud = (() => {
         try { await recover(m); Utils.toast('Si ese correo tiene cuenta, te llegó un enlace'); } catch (e) { Utils.toast(e.message); }
       });
       box.appendChild(forgot);
-      box.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Se guarda una copia de tus datos (entrenos, comidas, medidas, rutinas y ajustes). Las fotos de progreso no se suben. Puedes borrar tu cuenta y tus datos cuando quieras.' }));
+      box.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Se guarda una copia de tus datos (entrenos, comidas, medidas, rutinas y ajustes). Las fotos de progreso no se suben. Puedes borrar tu cuenta y tus datos cuando quieras. Tus datos quedan en el servidor de la app: quien la administra podría verlos solo si hace falta para ayudarte.' }));
     }
 
     function paintIn() {
@@ -399,6 +439,25 @@ const Cloud = (() => {
       else if (m.dirty) { status = '🕒 Cambios pendientes de subir'; cls = 'backup-last due'; }
       else status = `✅ Al día · ${ago(m.lastOk)}`;
       box.appendChild(note(status, cls));
+
+      // ranking
+      if (lbReady()) {
+        const u = Leaderboard.user();
+        if (u) {
+          const r = Utils.el('div', { class: 'cloud-rank' }, [Utils.el('span', { text: `🌍 En el ranking como ${u.name}` })]);
+          const go = Utils.el('button', { type: 'button', class: 'link-btn small', text: 'Ver ranking', onclick: () => App.navigate('progreso', { section: 'ranking' }) });
+          r.appendChild(go);
+          box.appendChild(r);
+        } else {
+          const wrap = Utils.el('div', { class: 'cloud-rank col' });
+          const nm = Utils.el('input', { type: 'text', maxlength: '24', placeholder: 'Nombre para el ranking', value: suggestName() });
+          const go = Utils.el('button', { type: 'button', class: 'btn-secondary btn-block', text: '🌍 Unirme al ranking con este nombre' });
+          go.addEventListener('click', async () => { go.disabled = true; go.textContent = 'Uniendo…'; await joinNow(nm.value); go.disabled = false; });
+          wrap.appendChild(nm); wrap.appendChild(go);
+          box.appendChild(wrap);
+          pendingIntent();
+        }
+      }
 
       const auto = Utils.el('button', { type: 'button', class: `uni-chip${m.autoOn ? ' on' : ''}`, text: m.autoOn ? '✓ Sincronizar automáticamente' : 'Sincronización automática apagada' });
       auto.addEventListener('click', () => { setMeta({ autoOn: !meta().autoOn }); if (meta().autoOn) touch(); });

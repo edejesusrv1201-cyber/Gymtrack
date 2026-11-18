@@ -2002,3 +2002,7 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .gd-eq.eq-maquina b { background: rgba(91, 140, 255, 0.18); color: #8fb0ff; }
 .gd-eq.eq-corporal b { background: rgba(53, 212, 154, 0.16); color: var(--green); }
 :root[data-scheme="light"] .gd-eq.eq-maquina b { color: #2f5bd0; }
+
+/* nube: ranking */
+.cloud-rank { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; padding: 10px 12px; border-radius: 14px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.08); font-weight: 700; font-size: 0.9rem; }
+.cloud-rank.col { flex-direction: column; align-items: stretch; gap: 8px; }
