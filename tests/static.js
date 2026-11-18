@@ -46,7 +46,19 @@ try {
   const m = JSON.parse(read('manifest.json'));
   ok(`manifest válido («${m.name}»)`);
   (m.icons || []).forEach((i) => check(fs.existsSync(path.join(root, i.src.split('?')[0])), `ícono ${i.src}`, `FALTA el ícono ${i.src}`));
+  check(Array.isArray(m.categories) && m.categories.length > 0, 'manifest con categorías', 'manifest sin categories');
+  const idxJs = read('js/app.js');
+  (m.shortcuts || []).forEach((sc) => { const go = (sc.url.match(/go=(\w+)/) || [])[1]; check(go && idxJs.includes(`'${go}'`), `acceso directo «${sc.name}» (go=${go}) lo entiende app.js`, `el acceso directo «${sc.name}» apunta a go=${go} que app.js no maneja`); });
 } catch (e) { bad(`manifest.json: ${e.message}`); }
+
+console.log('Privacidad pública');
+try {
+  const pv = new vm.Script(read('js/privacy.js').replace(/^const Privacy/m, 'var Privacy'));
+  const c2 = { Utils: {}, Modal: {} }; vm.createContext(c2); pv.runInContext(c2);
+  const html = read('privacy.html');
+  const miss = c2.Privacy.SECTIONS.filter(([t]) => !html.includes(t.replace(/&/g, '&amp;')));
+  check(miss.length === 0, 'privacy.html está al día con js/privacy.js', `privacy.html está desactualizada (falta: ${miss.map((x) => x[0]).join(', ')}). Corre: node tests/build-privacy.js`);
+} catch (e) { bad(`privacy.html: ${e.message}`); }
 
 console.log('Datos');
 // el catálogo de alimentos: ids únicos y calorías coherentes con los macros

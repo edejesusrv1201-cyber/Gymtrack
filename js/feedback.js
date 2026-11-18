@@ -31,13 +31,16 @@ const Feedback = (() => {
     const dev = Utils.el('button', { type: 'button', class: 'uni-chip on', style: 'margin-top:10px;', text: '✓ Incluir versión y modelo del celular (ayuda a arreglar fallas)' });
     dev.addEventListener('click', () => { withDevice = !withDevice; dev.classList.toggle('on', withDevice); dev.textContent = withDevice ? '✓ Incluir versión y modelo del celular (ayuda a arreglar fallas)' : 'No incluir datos del celular'; });
     body.appendChild(dev);
-    body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:6px;', text: 'No se envían tus entrenos, comidas ni fotos: solo lo que escribas aquí.' }));
+    body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:6px;', text: 'No se envían tus entrenos, comidas ni fotos: solo lo que escribas aquí (y, si dejas marcada la casilla de arriba, los últimos errores internos de la app).' }));
     const send = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', style: 'margin-top:8px;', text: '📨 Enviar' });
     send.addEventListener('click', async () => {
       const text = msg.value.trim();
       if (text.length < 3) { Utils.toast('Escribe tu mensaje'); return; }
       send.disabled = true; send.textContent = 'Enviando…';
-      const payload = { p_kind: kind, p_message: text, p_version: version(), p_device: withDevice ? device() : '', p_name: name.value.trim() };
+      // con "incluir datos del celular" también van los últimos errores internos (ayudan a encontrar la falla)
+      const errs = withDevice && typeof ErrLog !== 'undefined' ? ErrLog.summary(3) : '';
+      const sent = errs ? `${text.slice(0, 1500)}\n\n[Errores recientes]\n${errs}`.slice(0, 2000) : text;
+      const payload = { p_kind: kind, p_message: sent, p_version: version(), p_device: withDevice ? device() : '', p_name: name.value.trim() };
       try {
         if (typeof Leaderboard === 'undefined' || !Leaderboard.configured()) throw new Error('sin servidor');
         await Leaderboard.rpc('gt_send_feedback', payload);
@@ -45,7 +48,7 @@ const Feedback = (() => {
         Utils.toast('¡Gracias! Lo recibí 🙌');
       } catch (e) {
         // sin internet o sin servidor: lo comparte o lo copia para que no se pierda
-        const full = `[MyGymTrack ${payload.p_version}] ${KINDS.find((x) => x[0] === kind)[1]}\n${text}${payload.p_name ? `\n— ${payload.p_name}` : ''}${withDevice ? `\n${payload.p_device}` : ''}`;
+        const full = `[MyGymTrack ${payload.p_version}] ${KINDS.find((x) => x[0] === kind)[1]}\n${sent}${payload.p_name ? `\n— ${payload.p_name}` : ''}${withDevice ? `\n${payload.p_device}` : ''}`;
         send.disabled = false; send.textContent = '📨 Enviar';
         if (navigator.share) { try { await navigator.share({ text: full }); Modal.close(); return; } catch (err) { /* cerró */ } }
         try { await navigator.clipboard.writeText(full); Utils.toast('No pude enviarlo: lo copié para que lo pegues en un mensaje'); } catch (err) { Utils.toast('No pude enviarlo. Revisa tu internet.'); }

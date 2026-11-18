@@ -2,11 +2,14 @@
   "id": "./",
   "name": "MyGymTrack",
   "lang": "es",
+  "dir": "ltr",
   "short_name": "MyGymTrack",
-  "description": "Progreso de gym, medidas, calorías y rutinas mensuales",
+  "description": "Tu progreso de gym en el bolsillo: entrenos, series, récords, medidas, calorías y dieta. Funciona sin internet.",
+  "categories": ["health", "fitness", "lifestyle"],
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#090b10",
   "theme_color": "#090b10",
@@ -14,5 +17,10 @@
     { "src": "icons/icon-192.png?v=48", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png?v=48", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512-maskable.png?v=48", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Entrenar hoy", "short_name": "Entrenar", "description": "Abre el entrenamiento de hoy", "url": "./index.html?go=entreno", "icons": [{ "src": "icons/icon-192.png?v=48", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Registrar comida", "short_name": "Comida", "description": "Anota lo que comiste", "url": "./index.html?go=comida", "icons": [{ "src": "icons/icon-192.png?v=48", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Mi progreso", "short_name": "Progreso", "description": "Gráficas, récords y medidas", "url": "./index.html?go=progreso", "icons": [{ "src": "icons/icon-192.png?v=48", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

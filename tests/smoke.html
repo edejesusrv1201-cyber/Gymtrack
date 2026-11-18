@@ -46,7 +46,7 @@
   const w = frame.contentWindow; const d = frame.contentDocument;
   // los módulos son «const» globales: no cuelgan de window, se leen con eval
   const A = {};
-  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
   bind();
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
@@ -172,6 +172,18 @@
   await modal('Privacidad', () => A.Privacy.open());
   await modal('Guía de un ejercicio', () => A.Guide.open({ name: 'Press de pecho en máquina', group: 'pecho', equipment: 'maquina' }));
   await modal('Armar dieta', () => A.Diet.open());
+
+  await modal('Enviar feedback', () => A.Feedback.open());
+
+  // ---- registro de errores internos
+  await test('Registro de errores: guarda y resume', async () => {
+    A.ErrLog.clear();
+    A.ErrLog.add('prueba uno', 'a.js:1:1'); A.ErrLog.add('prueba uno', 'a.js:1:1'); A.ErrLog.add('prueba dos', '');
+    const t = A.ErrLog.summary(3);
+    if (A.ErrLog.count() !== 2 || !/prueba uno.*×2/.test(t) || !/prueba dos/.test(t)) throw new Error(`resumen raro: ${t}`);
+    A.ErrLog.clear();
+    if (A.ErrLog.count() !== 0) throw new Error('no se borró');
+  });
 
   // ---- dieta: totales cerca de la meta
   await test('Dieta: el día armado queda cerca de tus metas', async () => {

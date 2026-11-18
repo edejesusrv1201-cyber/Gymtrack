@@ -114,6 +114,21 @@ const App = (() => {
     }).catch(() => { /* sin conexión */ });
   }
 
+  // accesos directos del ícono instalado (mantener pulsado): index.html?go=entreno|comida|progreso
+  function openShortcut() {
+    let go = '';
+    try { go = new URLSearchParams(location.search).get('go') || ''; } catch (e) { return; }
+    if (!go) return;
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* nada */ }
+    if (go === 'comida') navigate('calorias');
+    else if (go === 'progreso') navigate('progreso');
+    else if (go === 'entreno') {
+      // solo el botón de entrenar de hoy (no otros avisos como "plan de regreso")
+      const cta = [...document.querySelectorAll('#viewRoot .hero .btn-primary')].find((b) => /Iniciar entrenamiento|Continuar|Completo|Entrenar/.test(b.textContent));
+      if (cta) cta.click();
+    }
+  }
+
   function init() {
     DB.ensureSeed();
     // pide al navegador (Safari incluido) que no borre los datos si hay poco espacio
@@ -132,6 +147,7 @@ const App = (() => {
     try { Cloud.init(); } catch (e) { console.warn('nube', e); }
     try { Leaderboard.dailySync(); } catch (e) { console.warn('ranking', e); }
     navigate('hoy');
+    openShortcut();
     try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
     registerServiceWorker();
     setTimeout(checkForUpdate, 3500);

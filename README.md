@@ -10,7 +10,10 @@ App personal (offline, sin servidor) para llevar tu progreso de gym:
 - **Calorías**: guarda tus alimentos frecuentes (con calorías y macros) y regístralos rápido por comida (desayuno/almuerzo/cena/snacks). Ves el total del día contra tu meta.
 - **Medidas corporales**: peso, cintura, pecho, brazo, muslo, etc., con fecha y un gráfico simple de progreso.
 - **Reporte en Excel**: Más → "Exportar reporte en Excel" genera un .xlsx con formato: Resumen (métricas y barras), Entrenamientos (una fila por serie, con filtros), Récords, Constancia (mapa de calor), Medidas, Nutrición, Comidas y Rutinas. Incluye hojas ocultas `_datos_*` para restaurar todo al importarlo en otro celular.
-- **Todo tus datos se guardan en tu propio celular** (no hay servidor ni internet involucrado). Puedes exportar/importar un respaldo en JSON desde "Más".
+- **Tus datos se guardan en tu propio celular** y la app funciona sin internet. Si quieres, creas una cuenta (Más → Cuenta y nube) para tener copia en la nube y aparecer en el ranking. También puedes exportar/importar un respaldo en JSON desde "Más".
+- **Más cosas**: guía animada de cada ejercicio, mapa de músculos, dieta automática, plan de comidas, escáner de códigos de barras, ranking, modo claro/oscuro y panel de administración para el dueño de la app.
+
+Para publicarla en una tienda mira [STORE.md](STORE.md). Para probar cambios: [tests/README.md](tests/README.md).
 
 ## Cómo probarla ahora mismo (en tu computadora)
 

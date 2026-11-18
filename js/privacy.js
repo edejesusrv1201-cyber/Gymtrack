@@ -22,8 +22,15 @@ const Privacy = (() => {
     ['🍽️ Búsqueda de alimentos', [
       'Al buscar un producto en internet solo se envía el texto que escribiste, a través de nuestro servidor, a Open Food Facts (una base de datos abierta). Al escanear un código de barras, solo viaja ese número.',
     ]],
+    ['🐞 Errores de la app', [
+      'La app guarda en tu teléfono los últimos errores técnicos (sin tus datos de entrenamiento). Solo se envían si mandas feedback con la casilla «Incluir versión y modelo del celular» marcada.',
+    ]],
     ['💬 Comentarios', [
       'Lo que escribes en «Enviar feedback» llega a quien administra la app, con tu nombre solo si lo pones y los datos del dispositivo solo si los marcas.',
+    ]],
+    ['⚕️ Aviso de salud', [
+      'MyGymTrack es una herramienta para llevar registros y no sustituye el consejo de un médico, nutriólogo o entrenador. Las calorías, macros y dietas son estimaciones.',
+      'Antes de empezar una dieta o un plan de ejercicio, sobre todo si tienes alguna condición médica, consúltalo con un profesional. Si sientes dolor o malestar, detente.',
     ]],
   ];
 
@@ -39,6 +46,8 @@ const Privacy = (() => {
       body.appendChild(sec);
     });
     body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:14px;', text: 'Si tienes dudas o quieres que borremos algo, escríbelo en Más → Enviar feedback.' }));
+    const web = Utils.el('a', { class: 'small', href: 'privacy.html', target: '_blank', rel: 'noopener', text: 'Ver esta política como página web', style: 'display:block;margin-top:8px;text-align:center;' });
+    body.appendChild(web);
     Modal.open('🔒 Privacidad y datos', body);
   }
 
@@ -49,5 +58,5 @@ const Privacy = (() => {
     return b;
   }
 
-  return { open, link };
+  return { open, link, SECTIONS };
 })();
