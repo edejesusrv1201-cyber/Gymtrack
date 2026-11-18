@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v69';
+const CACHE_NAME = 'migymtrack-v70';
 const ASSETS = [
   './',
   './index.html',
@@ -70,9 +70,13 @@ const ASSETS = [
   './icons/icon-512-maskable.png',
 ];
 
+// la versión sale del nombre del caché: los archivos se piden como "archivo?v=NN" (ver index.html)
+const VERSION = CACHE_NAME.split('-v')[1];
+const withVersion = (a) => (/\.(js|css|png)$/.test(a) ? `${a}?v=${VERSION}` : a);
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {})
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS.map(withVersion))).catch(() => {})
   );
   self.skipWaiting();
 });
@@ -96,6 +100,19 @@ self.addEventListener('fetch', (event) => {
       caches.match(event.request, { ignoreSearch: true }).then((hit) => hit || fetch(event.request).then((resp) => {
         const copy = resp.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+        return resp;
+      }))
+    );
+    return;
+  }
+  // Archivos con "?v=NN" no cambian nunca (cada versión nueva trae otro NN): se leen del caché al instante
+  // y solo van a internet si faltan. (En tu computadora, localhost, siempre red primero para probar cambios.)
+  const u = new URL(event.request.url);
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname);
+  if (!local && /^v=\d+$/.test(u.search.slice(1)) && u.search.slice(1) === `v=${VERSION}`) {
+    event.respondWith(
+      caches.match(event.request).then((hit) => hit || fetch(event.request).then((resp) => {
+        if (resp && resp.ok) { const copy = resp.clone(); caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {}); }
         return resp;
       }))
     );
