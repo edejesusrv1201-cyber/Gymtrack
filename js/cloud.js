@@ -180,6 +180,8 @@ const Cloud = (() => {
     const uid = await ensureUser(tk);
     const seq = changeSeq;
     const data = DB.exportAll();
+    // tu usuario del ranking viaja dentro de tu copia privada para recuperarlo en otro teléfono
+    try { const lb = typeof Leaderboard !== 'undefined' ? Leaderboard.user() : null; if (lb) data.__lbUser = lb; } catch (e) { /* sin ranking */ }
     const size = JSON.stringify(data).length;
     if (size > 7900000) throw new Error('Tus datos son demasiado grandes para la nube (más de 8 MB).');
     const r = await api('/rest/v1/gt_cloud_backup?on_conflict=user_id&select=updated_at', {
@@ -204,6 +206,7 @@ const Cloud = (() => {
       const cur = DB.getSettings();
       KEEP_LOCAL.forEach((k) => { if (cur[k] !== undefined) keep[k] = cur[k]; });
       DB.importAll(row.data);
+      try { if (row.data && row.data.__lbUser && typeof Leaderboard !== 'undefined') Leaderboard.adopt(row.data.__lbUser); } catch (e) { /* sin ranking */ }
       const next = DB.getSettings();
       Object.assign(next, keep);
       DB.saveSettings(next);

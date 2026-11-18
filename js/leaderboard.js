@@ -195,6 +195,7 @@ const Leaderboard = (() => {
     let n = 0;
     try { rememberMine(await rpc('gt_my_scores', { p_secret: u.secret })); pubLoaded = true; } catch (e) { return -1; }
     const seen = new Set();
+    const queue = [];
     for (const ex of DB.getExercises()) {
       const lift = liftAny(ex);
       if (!lift || seen.has(lift.key)) continue;
@@ -203,6 +204,11 @@ const Leaderboard = (() => {
       if (!best || best.kg > 700) continue;
       const prev = pubMap()[lift.key];
       if (prev && best.e1rm <= prev * 1.005) continue;
+      queue.push({ lift, best });
+    }
+    // primero los básicos y luego las marcas más fuertes: si se llega al tope de 40, lo importante ya entró
+    queue.sort((a, b) => (a.lift.group === 'básico' ? 0 : 1) - (b.lift.group === 'básico' ? 0 : 1) || b.best.e1rm - a.best.e1rm);
+    for (const { lift, best } of queue) {
       try { await publishBest(u, lift, best); n += 1; } catch (e) { if (/conectarme/.test(e.message)) return n || -1; saveErr(e.message); if (/máximo de 40|sesión ya no/.test(e.message)) break; }
     }
     if (n >= 0) { try { localStorage.setItem('gt_lbSyncDay', Utils.todayISO()); } catch (e) { /* sin almacenamiento */ } }
@@ -683,5 +689,8 @@ const Leaderboard = (() => {
     Modal.open('👤 Mi cuenta', body);
   }
 
-  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, diagnose, liftOf, liftAny, lifts };
+  // al restaurar desde la nube en otro teléfono: recupera tu usuario del ranking
+  function adopt(u) { if (u && u.id && u.secret && !user()) { setUser({ id: u.id, secret: u.secret, name: u.name, sex: u.sex || null }); pubLoaded = false; return true; } return false; }
+
+  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, lifts };
 })();
