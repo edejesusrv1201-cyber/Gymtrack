@@ -51,6 +51,15 @@ try {
   (m.shortcuts || []).forEach((sc) => { const go = (sc.url.match(/go=(\w+)/) || [])[1]; check(go && idxJs.includes(`'${go}'`), `acceso directo «${sc.name}» (go=${go}) lo entiende app.js`, `el acceso directo «${sc.name}» apunta a go=${go} que app.js no maneja`); });
 } catch (e) { bad(`manifest.json: ${e.message}`); }
 
+console.log('Cuenta (correo de confirmación)');
+{
+  const cj = read('js/cloud.js');
+  // sin redirect_to explícito, Supabase usa el origen del navegador y el enlace del correo cae en un 404
+  check(/auth\/v1\/signup\?redirect_to=/.test(cj), 'el registro manda redirect_to explícito (evita el 404 del correo)', 'signUp NO manda redirect_to: el enlace del correo caerá en la raíz y dará 404');
+  check(/auth\/v1\/recover\?redirect_to=/.test(cj), 'recuperar contraseña manda redirect_to', 'recover no manda redirect_to');
+  check(/type'\) === 'signup'/.test(cj), 'la app entiende el enlace de confirmación (type=signup)', 'falta manejar type=signup al volver del correo');
+}
+
 console.log('Privacidad pública');
 try {
   const pv = new vm.Script(read('js/privacy.js').replace(/^const Privacy/m, 'var Privacy'));

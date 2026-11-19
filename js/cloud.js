@@ -118,8 +118,11 @@ const Cloud = (() => {
   }
 
   // ---------------------------------------------------------------- cuenta
+  // A dónde vuelve la persona tras tocar el enlace del correo. Hay que mandarlo SIEMPRE explícito:
+  // si no, Supabase usa el origen del navegador (sin la carpeta /Gymtrack/) y el enlace cae en un 404.
+  const backUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
   async function signUp(mail, pass) {
-    const r = await api('/auth/v1/signup', { method: 'POST', body: { email: mail, password: pass } });
+    const r = await api(`/auth/v1/signup?redirect_to=${encodeURIComponent(backUrl())}`, { method: 'POST', body: { email: mail, password: pass } });
     if (!r.ok) throw new Error(authMessage(r));
     if (storeSession(r.json)) return { needsConfirm: false };
     return { needsConfirm: true };
@@ -130,7 +133,7 @@ const Cloud = (() => {
     storeSession(r.json);
   }
   async function recover(mail) {
-    const back = encodeURIComponent(location.origin + location.pathname);
+    const back = encodeURIComponent(backUrl());
     const r = await api(`/auth/v1/recover?redirect_to=${back}`, { method: 'POST', body: { email: mail } });
     if (!r.ok) throw new Error(authMessage(r));
   }
@@ -318,6 +321,21 @@ const Cloud = (() => {
     const p = new URLSearchParams(h.replace(/^#/, ''));
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* sin history */ }
     if (p.get('error_description')) { Utils.toast(String(p.get('error_description')).replace(/\+/g, ' ')); return; }
+    // enlace de confirmación del correo: entra solo y avisa
+    if ((p.get('type') === 'signup' || p.get('type') === 'email') && p.get('access_token')) {
+      storeSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'), expires_in: Number(p.get('expires_in')) || 3600 });
+      Utils.toast('✓ Correo confirmado: ya entraste a tu cuenta');
+      setTimeout(async () => {
+        try {
+          // el enlace no trae el correo: se pide a la cuenta
+          const u = await api('/auth/v1/user', { token: session().access_token });
+          if (u.ok && u.json) lset(SESSION_KEY, Object.assign({}, session(), { email: u.json.email || '', uid: u.json.id || '' }));
+          notify();
+          await sync({ manual: true }); pendingIntent(); notify();
+        } catch (e) { /* se reintenta luego */ }
+      }, 800);
+      return;
+    }
     if (p.get('type') === 'recovery' && p.get('access_token')) {
       storeSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'), expires_in: Number(p.get('expires_in')) || 3600 });
       // el correo no viene en el enlace: se completa al renovar la sesión
