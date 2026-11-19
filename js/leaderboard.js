@@ -18,10 +18,10 @@ const Leaderboard = (() => {
     { key: 'sentadilla', name: 'Sentadilla', re: /sentadilla/, not: /bulgara|hack|goblet|sissy|maquina|smith|salto|pistol|bandas?|frontal|mancuerna|cinturon|belt|zercher|una pierna|pendular/ },
     { key: 'peso_muerto', name: 'Peso muerto', re: /peso muerto/, not: /rumano|stiff|mancuerna|piernas rigidas|unilateral|una pierna|hexagonal|kettlebell/ },
     { key: 'press_militar', name: 'Press militar', re: /press militar/, not: /mancuerna|maquina|smith|arnold/ },
-    { key: 'remo_barra', name: 'Remo con barra', re: /remo (con )?barra|pendlay/, not: /mancuerna|maquina|polea|t-?bar|meadows|smith|invertido/ },
+    { key: 'remo_barra', name: 'Remo con barra', re: /remo (con )?barra|pendlay/, not: /mancuerna|maquina|polea|t ?bar|meadows|smith|invertido/ },
     { key: 'hip_thrust', name: 'Hip thrust', re: /hip thrust|empuje de cadera/, not: /maquina|mancuerna|una pierna/ },
   ];
-  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-_.]+/g, ' ').replace(/\s+/g, ' ').trim();
   const slug = (t) => norm(t).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
   const fmt = (n) => String(Math.round(n * 10) / 10);
 
@@ -166,6 +166,17 @@ const Leaderboard = (() => {
     await rpc('gt_publish', { p_secret: u.secret, p_key: lift.key, p_name: lift.name, p_weight: Math.round(best.kg * 100) / 100, p_reps: best.reps });
     const m = pubMap(); m[lift.key] = best.e1rm; savePub(m);
   }
+  // si antes tu ejercicio entró como «propio» (p. ej. «hip-thrust») y ahora cuenta como un básico, quita la marca duplicada vieja
+  async function dropOld(u, ex, lift) {
+    try {
+      if (!ex || !lift || lift.group === 'propio') return;
+      const old = `c:${slug(ex.name)}`;
+      if (old === lift.key || pubMap()[old] === undefined) return;
+      if (DB.getExercises().some((e) => { const l = liftAny(e); return l && l.key === old; })) return;
+      await rpc('gt_remove', { p_secret: u.secret, p_key: old });
+      const m = pubMap(); delete m[old]; savePub(m);
+    } catch (e) { /* se reintenta la próxima vez */ }
+  }
   const ERR_KEY = 'gt_lbErr';
   const saveErr = (msg) => { try { if (msg) localStorage.setItem(ERR_KEY, JSON.stringify({ msg, t: Date.now() })); else localStorage.removeItem(ERR_KEY); } catch (e) { /* sin almacenamiento */ } };
   const lastErr = () => { try { return JSON.parse(localStorage.getItem(ERR_KEY) || 'null'); } catch (e) { return null; } };
@@ -186,6 +197,7 @@ const Leaderboard = (() => {
         const prev = pubMap()[lift.key];
         if (prev && best.e1rm <= prev * 1.005) return;
         await publishBest(u, lift, best);
+        dropOld(u, ex, lift);
         saveErr(null);
         Utils.toast(`🌍 Marca publicada en el ranking: ${lift.name} ${Units.label(best.kg)} × ${best.reps}`);
         ui.mine = []; ui.list = null;
@@ -209,12 +221,12 @@ const Leaderboard = (() => {
       if (!best || best.kg > 700) continue;
       const prev = pubMap()[lift.key];
       if (prev && best.e1rm <= prev * 1.005) continue;
-      queue.push({ lift, best });
+      queue.push({ lift, best, ex });
     }
     // primero los básicos y luego las marcas más fuertes: si se llega al tope de 40, lo importante ya entró
     queue.sort((a, b) => (a.lift.group === 'básico' ? 0 : 1) - (b.lift.group === 'básico' ? 0 : 1) || b.best.e1rm - a.best.e1rm);
-    for (const { lift, best } of queue) {
-      try { await publishBest(u, lift, best); n += 1; } catch (e) { if (/conectarme/.test(e.message)) return n || -1; saveErr(e.message); if (/máximo de 40|sesión ya no/.test(e.message)) break; }
+    for (const { lift, best, ex } of queue) {
+      try { await publishBest(u, lift, best); n += 1; dropOld(u, ex, lift); } catch (e) { if (/conectarme/.test(e.message)) return n || -1; saveErr(e.message); if (/máximo de 40|sesión ya no/.test(e.message)) break; }
     }
     if (n >= 0) { try { localStorage.setItem('gt_lbSyncDay', Utils.todayISO()); } catch (e) { /* sin almacenamiento */ } }
     ui.mine = []; ui.list = null;

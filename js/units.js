@@ -1,15 +1,15 @@
 /* ============================================================
    units.js — Unidades de peso (kg / lb).
 
-   Todos los pesos se GUARDAN en kg (series, peso corporal). Al
-   escribirlos puedes usar kg o lb (cada máquina es distinta) y la
-   unidad elegida en Más > Ajustes decide cómo se MUESTRAN.
+   Todos los pesos se GUARDAN en kg (series, peso corporal). La unidad
+   principal es la LIBRA (lb); en Más > Ajustes se puede pasar a kg.
+   Al escribirlos puedes usar kg o lb (cada máquina es distinta).
    ============================================================ */
 
 const Units = (() => {
   const KG_PER_LB = 0.45359237;
 
-  const current = () => (DB.getSettings().units === 'lb' ? 'lb' : 'kg');
+  const current = () => (DB.getSettings().units === 'kg' ? 'kg' : 'lb');
 
   // valor escrito en `unit` -> kg
   const toKg = (value, unit) => {

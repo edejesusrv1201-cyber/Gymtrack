@@ -14,7 +14,7 @@ const Guide = (() => {
   const add = (p, q) => [p[0] + q[0], p[1] + q[1]];
   const LEN0 = { t: 28, l: 22, a: 14 };
   let LEN = LEN0;
-  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-_]+/g, ' ');
 
   // ---------------------------------------------------------------- figura
   function ik(H, F, bend) {

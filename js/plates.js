@@ -126,8 +126,8 @@ const Plates = (() => {
 
   // prefillKg: peso total con el que abrir · opts: { onUse(kg) } para devolver el peso a tu serie
   function open(prefillKg, opts = {}) {
-    const unit = Units.current();
     const s0 = DB.getSettings();
+    let unit = s0.plateUnit === 'kg' || s0.plateUnit === 'lb' ? s0.plateUnit : Units.current();   // la calculadora recuerda su unidad (libras por defecto)
     let type = s0.plateType === 'db' ? 'db' : 'bar';
     let mode = 'calc';
     let c = cfg(unit, type);
@@ -136,15 +136,29 @@ const Plates = (() => {
     const counts = {};     // modo "armar": discos por lado
     const body = Utils.el('div');
 
+    const unitSeg = Utils.el('div', { class: 'seg small', style: 'margin-bottom:8px;' });
     const typeSeg = Utils.el('div', { class: 'seg small', style: 'margin-bottom:8px;' });
     const modeSeg = Utils.el('div', { class: 'seg small', style: 'margin-bottom:10px;' });
     const content = Utils.el('div');
+    body.appendChild(unitSeg);
     body.appendChild(typeSeg);
     body.appendChild(modeSeg);
     body.appendChild(content);
 
     const paintSegs = () => {
-      typeSeg.innerHTML = ''; modeSeg.innerHTML = '';
+      typeSeg.innerHTML = ''; modeSeg.innerHTML = ''; unitSeg.innerHTML = '';
+      [['lb', 'Libras (lb)'], ['kg', 'Kilos (kg)']].forEach(([k, t]) => {
+        const b = Utils.el('button', { class: `seg-btn${k === unit ? ' active' : ''}`, type: 'button', text: t });
+        b.addEventListener('click', () => {
+          if (k === unit) return;
+          unit = k;
+          const st = DB.getSettings(); st.plateUnit = k; DB.saveSettings(st);
+          c = cfg(unit, type); bar = c.bar; off = c.off.slice();
+          Object.keys(counts).forEach((x) => delete counts[x]);
+          paintSegs(); paintContent();
+        });
+        unitSeg.appendChild(b);
+      });
       [['bar', '🏋️ Barra olímpica'], ['db', '💪 Mancuerna ajustable']].forEach(([k, t]) => {
         const b = Utils.el('button', { class: `seg-btn${k === type ? ' active' : ''}`, type: 'button', text: t });
         b.addEventListener('click', () => {

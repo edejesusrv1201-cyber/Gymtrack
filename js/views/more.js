@@ -199,8 +199,8 @@ const MoreView = (() => {
     settingsCard.appendChild(Utils.el('h3', { text: '⚙️ Ajustes' }));
 
     const unitsSel = Utils.el('select', { 'aria-label': 'Unidades' });
-    ['kg', 'lb'].forEach((u) => unitsSel.appendChild(Utils.el('option', { value: u, text: u, selected: u === settings.units ? 'selected' : null })));
-    unitsSel.value = settings.units;
+    [['lb', 'Libras (lb)'], ['kg', 'Kilos (kg)']].forEach(([u, t]) => unitsSel.appendChild(Utils.el('option', { value: u, text: t })));
+    unitsSel.value = settings.units === 'kg' ? 'kg' : 'lb';
     settingsCard.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Ver los pesos en' }), unitsSel]));
     settingsCard.appendChild(Utils.el('p', { class: 'small', style: 'margin:-4px 0 12px;', text: 'Al registrar una serie o tu peso puedes escribirlo en kg o lb (botón junto al campo, útil según la máquina). Aquí eliges en qué unidad se muestra todo; los datos se guardan siempre en kg.' }));
 
@@ -282,7 +282,7 @@ const MoreView = (() => {
     const exChips = Utils.el('div', { class: 'rt-chips nut-chips' });
     const exList = Utils.el('div');
     let exGroup = 'todos';
-    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[-_]+/g, ' ');
     function refreshExList() {
       const all = DB.getExercises();
       exCard.querySelector('#exCount').textContent = `${all.length}`;

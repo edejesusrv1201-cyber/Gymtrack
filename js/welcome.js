@@ -35,7 +35,7 @@ const Welcome = (() => {
     const s0 = DB.getSettings();
     const st = {
       name: s0.userName || '', sex: s0.userSex || null,
-      level: s0.beginner ? 'principiante' : 'intermedio', units: s0.units || 'kg',
+      level: s0.beginner ? 'principiante' : 'intermedio', units: s0.units === 'kg' ? 'kg' : 'lb',
       goal: 'mantener', age: '', height: '', weight: '', activity: 'moderado', days: 3, step: 0,
     };
     const STEPS = 5;
@@ -100,7 +100,7 @@ const Welcome = (() => {
       content.appendChild(Utils.el('p', { class: 'small text-dim', text: 'Con «Principiante» te muestro una guía animada de cómo hacer cada ejercicio la primera vez que lo abres.' }));
       content.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:10px 0 6px;', text: 'Unidades de peso' }));
       const u = Utils.el('div', { class: 'rt-chips' });
-      const pu = () => { u.innerHTML = ''; [['kg', 'Kilos (kg)'], ['lb', 'Libras (lb)']].forEach(([k, t]) => u.appendChild(chip(t, st.units === k, () => { st.units = k; pu(); }))); };
+      const pu = () => { u.innerHTML = ''; [['lb', 'Libras (lb)'], ['kg', 'Kilos (kg)']].forEach(([k, t]) => u.appendChild(chip(t, st.units === k, () => { st.units = k; pu(); }))); };
       pu();
       content.appendChild(u);
     }

@@ -352,6 +352,31 @@
   // ---- ranking: diagnóstico sin red
   await test('Ranking: la revisión de ejercicios funciona', async () => { const r = A.Leaderboard.diagnose(); if (!Array.isArray(r) || !r.length) throw new Error('sin resultados'); });
 
+  await test('Ranking: «hip-thrust», «Hip Thrust» y «hip thrust» cuentan como el mismo básico', async () => {
+    ['hip-thrust', 'Hip Thrust', 'hip thrust', 'HIP_THRUST', 'Hip  -  thrust'].forEach((n) => {
+      const l = A.Leaderboard.liftAny({ id: 'zz', name: n, group: 'pierna' });
+      if (!l || l.key !== 'hip_thrust') throw new Error(`«${n}» → ${l ? l.key : 'nada'}`);
+    });
+    const l2 = A.Leaderboard.liftAny({ id: 'zz', name: 'Press-de-banca', group: 'pecho' });
+    if (!l2 || l2.key !== 'banca') throw new Error('press-de-banca no es banca');
+    const l3 = A.Leaderboard.liftAny({ id: 'zz', name: 'Remo T-bar', group: 'espalda' });
+    if (l3 && l3.key === 'remo_barra') throw new Error('T-bar no debe contar como remo con barra');
+  });
+
+  await test('Unidades: libras por defecto y la calculadora de discos tiene lb y kg', async () => {
+    const st = A.DB.getSettings(); const prev = st.units;
+    delete st.units; A.DB.saveSettings(st);
+    try {
+      const u = frame.contentWindow.eval('Units.current()');
+      if (u !== 'lb') throw new Error(`por defecto ${u}`);
+    } finally { const s2 = A.DB.getSettings(); s2.units = prev; A.DB.saveSettings(s2); }
+    frame.contentWindow.eval('Plates.open(0)'); await wait(600);
+    await new Promise((r) => setTimeout(r, 200));
+    const txt = Array.from(frame.contentDocument.querySelectorAll('.modal-sheet .seg-btn')).map((b) => b.textContent).join('|');
+    A.Modal.close();
+    if (!/Libras/.test(txt) || !/Kilos/.test(txt)) throw new Error(`botones: ${txt}`);
+  });
+
   // ---- respaldo: exportar e importar mantiene los datos
   await test('Respaldo: exportar → importar conserva los datos', async () => {
     const a = JSON.stringify(A.DB.exportAll());

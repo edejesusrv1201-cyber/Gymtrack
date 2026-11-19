@@ -66,7 +66,8 @@ const DB = (() => {
 
   // ---- Defaults / seed data (solo la primera vez) ----
   const DEFAULT_SETTINGS = {
-    units: 'kg',            // unidad para VER los pesos (se guardan siempre en kg)
+    units: 'lb',            // unidad para VER los pesos (se guardan siempre en kg); en Panamá y casi todo el gimnasio: libras
+    unitsLbDefault: true,
     weightsInKg: true,
     exerciseUnits: {},      // unidad con la que se escribe cada ejercicio (kg o lb)
     weeklySetsMin: 10,      // meta de series por semana y grupo muscular
@@ -213,7 +214,22 @@ const DB = (() => {
   // Antes la unidad elegida (kg/lb) solo cambiaba la etiqueta y los números se
   // guardaban tal cual. Ahora todo se guarda en kg: si alguien usaba lb, se
   // convierte una sola vez (la marca weightsInKg evita repetirlo).
+  // La unidad principal ahora es libras (lb). Una sola vez, a quien la tenía en kg por defecto se le pasa a lb
+  // y se le avisa; puede volver a kg en Más → Ajustes.
+  function migrateUnitsDefault() {
+    const s = read(KEYS.settings, null);
+    if (!s || s.unitsLbDefault) return;
+    s.unitsLbDefault = true;
+    if (s.units !== 'lb') { s.units = 'lb'; s.unitsNotice = true; }
+    write(KEYS.settings, s);
+  }
+
   function migrateWeightUnits() {
+    migrateWeights();
+    migrateUnitsDefault();
+  }
+
+  function migrateWeights() {
     const s = read(KEYS.settings, null);
     if (!s || s.weightsInKg) return;
     if (s.units === 'lb') {

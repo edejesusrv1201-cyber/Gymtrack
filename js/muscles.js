@@ -33,7 +33,7 @@ const Muscles = (() => {
   const STATUS_COLOR = { low: '#ffc247', ok: '#35d49a', high: '#5b8cff' };
   const REC_COLOR = ['#ff5c6c', '#ff9f43', '#ffd23f', '#35d49a'];
 
-  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-_]+/g, ' ');
 
   // ---------------------------------------------------------------- qué músculos trabaja un ejercicio
   // [expresión, principales, secundarios] — gana la primera que coincide

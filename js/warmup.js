@@ -8,7 +8,7 @@
    ============================================================ */
 
 const Warmup = (() => {
-  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-_]+/g, ' ');
 
   // ¿el ejercicio se hace normalmente con barra olímpica?
   function usesBar(name) {

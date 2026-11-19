@@ -1373,7 +1373,7 @@ const WorkoutView = (() => {
   function openAddExercise(iso, log, onDone) {
     const body = Utils.el('div');
     const unremove = (id) => { if (Array.isArray(log.removed)) log.removed = log.removed.filter((x) => x !== id); };
-    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[-_]+/g, ' ');
     const GROUP_ORDER = ['pecho', 'espalda', 'pierna', 'hombro', 'brazo', 'core', 'cardio', 'movilidad', 'otro'];
     const added = new Set();
     let filter = null; // 'recientes' | nombre de grupo | 'todos'

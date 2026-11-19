@@ -151,6 +151,14 @@ const App = (() => {
     openShortcut();
     try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
     setTimeout(() => { try { RoutineShare.checkLink(); } catch (e) { /* nada */ } }, 900);
+    setTimeout(() => {
+      try {
+        const st = DB.getSettings();
+        if (!st.unitsNotice) return;
+        delete st.unitsNotice; DB.saveSettings(st);
+        Utils.toast('⚖️ Ahora los pesos se ven en libras (lb). Puedes pasarlos a kg en Más → Ajustes.');
+      } catch (e) { /* sin aviso */ }
+    }, 2500);
     registerServiceWorker();
     setTimeout(checkForUpdate, 3500);
     try { Perf.measure(); } catch (e) { /* sin medición */ }
