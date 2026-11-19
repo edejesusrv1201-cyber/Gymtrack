@@ -46,7 +46,7 @@
   const w = frame.contentWindow; const d = frame.contentDocument;
   // los módulos son «const» globales: no cuelgan de window, se leen con eval
   const A = {};
-  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats', 'Stories'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats', 'Stories', 'RoutineShare'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
   bind();
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
@@ -176,6 +176,44 @@
   await modal('Armar dieta', () => A.Diet.open());
 
   await modal('Enviar feedback', () => A.Feedback.open());
+  // ---- compartir rutinas
+  await test('Rutinas compartidas: ida y vuelta, enlace, mensaje y datos peligrosos', async () => {
+    const R = A.RoutineShare; const exAll = A.DB.getExercises(); let rt = A.DB.getRoutines().find((r) => r.exercises.length >= 2 && r.exercises.every((re) => exAll.some((e) => e.id === re.exerciseId)));
+    if (!rt) { rt = { id: 'rt_prueba', name: 'Rutina de prueba', color: '#e0663d', exercises: exAll.slice(0, 3).map((e, i) => ({ exerciseId: e.id, targetSets: 3 + i, targetReps: '10' })) }; const all = A.DB.getRoutines(); all.push(rt); A.DB.saveRoutines(all); }
+    const code = R.encode(rt); const plan = R.decode(code);
+    if (!plan || plan.name !== rt.name || plan.items.length !== rt.exercises.length) throw new Error('la rutina no sobrevive a codificar y decodificar');
+    if (plan.items[0].sets !== rt.exercises[0].targetSets) throw new Error('cambian las series');
+    const link = R.linkFor(rt), msg = R.messageFor(rt);
+    if (R.extractCode(link) !== code || R.extractCode(msg) !== code || R.extractCode('MGT1.' + code) !== code || R.extractCode(code) !== code) throw new Error('no extrae el código del enlace, mensaje o código suelto');
+    if (R.extractCode('hola cómo estás') !== null) throw new Error('acepta texto cualquiera');
+    // datos manipulados: se limpian
+    const evil = btoa(JSON.stringify({ v: 1, n: 'X'.repeat(500), c: 'red; background:url(x)', e: [{ n: '<img src=x onerror=alert(1)>', g: 'hacker', s: 9999, r: 'y'.repeat(99), q: 'laser', ss: '../../x y' }].concat(Array.from({ length: 80 }, (_, i) => ({ n: 'Ej ' + i, g: 'pecho', s: 3, r: '10' })))})).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const p2 = R.decode(evil); if (!p2) throw new Error('rechaza un paquete sucio en vez de limpiarlo');
+    if (p2.name.length > 60 || p2.items.length > 40 || p2.items[0].sets !== 20 || p2.items[0].group !== 'otro' || p2.items[0].equipment !== '' || !/^#[0-9a-f]{6}$/i.test(p2.color) || p2.items[0].reps.length > 20 || /[^A-Za-z0-9_-]/.test(p2.items[0].ss || '')) throw new Error('no limpió los datos: ' + JSON.stringify(p2.items[0]));
+    if (R.decode('esto-no-es-un-codigo') !== null) throw new Error('acepta un código inválido');
+  });
+  await test('Rutinas compartidas: guardar crea la rutina, los ejercicios nuevos y no pisa nombres', async () => {
+    const R = A.RoutineShare; const before = A.DB.getRoutines().length; const exBefore = A.DB.getExercises().length;
+    const plan = { name: 'Rutina del Amigo', color: '#3d8de0', items: [{ name: A.DB.getExercises()[0].name, group: 'pecho', equipment: 'barra', uni: 0, bw: 0, sets: 4, reps: '6-8' }, { name: 'Ejercicio Inventado Xyz', group: 'espalda', equipment: 'polea', uni: 1, bw: 0, sets: 3, reps: '12', ss: 'ssA' }, { name: 'Otro Inventado Xyz', group: 'espalda', equipment: '', uni: 0, bw: 0, sets: 3, reps: '12', ss: 'ssA' }] };
+    const a = R.save(plan); const b = R.save(plan);
+    if (A.DB.getRoutines().length !== before + 2) throw new Error('no agregó las rutinas');
+    if (a.routine.name !== 'Rutina del Amigo' || b.routine.name !== 'Rutina del Amigo (2)') throw new Error(`nombres: ${a.routine.name} / ${b.routine.name}`);
+    if (a.created !== 2 || b.created !== 0) throw new Error(`ejercicios creados: ${a.created}/${b.created}`);
+    const exs = A.DB.getExercises(); if (exs.length !== exBefore + 2) throw new Error('duplicó ejercicios');
+    const nuevo = exs.find((e) => e.name === 'Ejercicio Inventado Xyz'); if (!nuevo || nuevo.group !== 'espalda' || nuevo.equipment !== 'polea' || !nuevo.unilateral) throw new Error('el ejercicio nuevo perdió datos');
+    if (!a.routine.exercises[1].ss || a.routine.exercises[1].ss !== a.routine.exercises[2].ss) throw new Error('perdió la superserie');
+    if (a.routine.exercises[0].exerciseId !== A.DB.getExercises()[0].id) throw new Error('no reutilizó el ejercicio que ya tenía');
+  });
+  await test('Rutinas compartidas: pantallas (compartir, recibir, pegar, lista de rutinas)', async () => {
+    const R = A.RoutineShare; const exAll = A.DB.getExercises(); const rt = A.DB.getRoutines().find((r) => r.exercises.length >= 2 && r.exercises.every((re) => exAll.some((e) => e.id === re.exerciseId)));
+    const shut = async () => { A.Modal.close(); await wait(350); };
+    R.openShare(rt.id); await wait(600); if (!D.querySelector('.rs-preview') || overflow() > 1) throw new Error('compartir: falta el mensaje o se sale'); await shut();
+    R.openImport(R.decode(R.encode(rt))); await wait(600); if (D.querySelectorAll('.rs-row').length !== rt.exercises.length || overflow() > 1) throw new Error('recibir: filas mal o se sale'); await shut();
+    R.openPaste(); await wait(600); if (!D.querySelector('.modal-sheet textarea') || overflow() > 1) throw new Error('pegar: no se abrió'); await shut();
+    W.sessionStorage.setItem('gt_rs_pending', R.encode(rt)); R.checkLink(); await wait(700); if (!D.querySelector('.rs-list')) throw new Error('el enlace pendiente no abrió la ventana de recibir'); await shut();
+    A.App.navigate('plan'); await wait(700); [...D.querySelectorAll('#viewRoot button')].find((b) => /Gestionar rutinas/.test(b.textContent)).click(); await wait(700);
+    if (!D.querySelector('.rt-card-btns button[aria-label^="Compartir"]') || overflow() > 1) throw new Error('lista de rutinas: falta compartir o se sale'); await shut();
+  });
   await modal('Historias (menú)', () => A.Stories.hub());
   await test('Historias: cada tipo, formato y estilo se dibuja (el transparente de verdad lo es)', async () => {
     const act = A.Activity.list()[0];

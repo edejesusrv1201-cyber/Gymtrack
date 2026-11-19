@@ -146,9 +146,11 @@ const App = (() => {
     AutoBackup.init();
     try { Cloud.init(); } catch (e) { console.warn('nube', e); }
     try { Leaderboard.dailySync(); } catch (e) { console.warn('ranking', e); }
+    try { RoutineShare.takeFromUrl(); } catch (e) { /* sin enlace de rutina */ }
     navigate('hoy');
     openShortcut();
     try { Welcome.maybeShow(); } catch (e) { /* sin bienvenida */ }
+    setTimeout(() => { try { RoutineShare.checkLink(); } catch (e) { /* nada */ } }, 900);
     registerServiceWorker();
     setTimeout(checkForUpdate, 3500);
     try { Perf.measure(); } catch (e) { /* sin medición */ }

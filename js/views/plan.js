@@ -224,11 +224,13 @@ const PlanView = (() => {
               Utils.el('button', { class: 'btn-small', text: 'Editar' }),
               Utils.el('button', { class: 'icon-btn', text: '⧉', title: 'Duplicar' }),
               Utils.el('button', { class: 'icon-btn', text: '🗑️', title: 'Eliminar' }),
+              Utils.el('button', { class: 'icon-btn', text: '📤', title: 'Compartir', 'aria-label': `Compartir ${r.name}` }),
             ]),
           ]),
           Object.keys(by).length ? Utils.el('div', { class: 'rt-summary' }, Object.keys(by).map((g) => Utils.el('span', { class: 'rt-pill', style: `color:${Utils.GROUP_COLORS[g] || '#8d95a8'}`, text: `${g} ${by[g]}` }))) : null,
         ]);
-        const [edit, dup, del] = row.querySelectorAll('button');
+        const [edit, dup, del, shr] = row.querySelectorAll('button');
+        shr.addEventListener('click', () => { Modal.close(); setTimeout(() => RoutineShare.openShare(r.id), 260); });
         edit.addEventListener('click', () => openRoutineEditor(r.id, refresh));
         dup.addEventListener('click', () => {
           const all = DB.getRoutines();
@@ -249,6 +251,11 @@ const PlanView = (() => {
       const addBtn = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: '➕ Nueva rutina' });
       addBtn.addEventListener('click', () => openNewRoutine(refresh, onDone));
       body.appendChild(addBtn);
+      if (typeof RoutineShare !== 'undefined') {
+        const imp = Utils.el('button', { class: 'btn-secondary btn-block', style: 'margin-top:8px;', text: '📥 Importar rutina (pegar enlace)' });
+        imp.addEventListener('click', () => { Modal.close(); setTimeout(() => RoutineShare.openPaste((rt) => { openRoutineList(onDone); }), 260); });
+        body.appendChild(imp);
+      }
     }
     refresh();
     Modal.open('Mis rutinas', body, { onClose: onDone });
@@ -313,6 +320,7 @@ const PlanView = (() => {
     });
     paintDots();
     body.appendChild(Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Color' }), colorRow]));
+    if (typeof RoutineShare !== 'undefined') body.appendChild(RoutineShare.shareButton(r.id));
 
     // ---- lista de ejercicios (se edita en el lugar) ----
     body.appendChild(Utils.el('div', { class: 'small text-dim mt-8', text: 'EJERCICIOS DE LA RUTINA' }));
