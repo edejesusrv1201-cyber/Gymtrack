@@ -4,7 +4,7 @@
      contraseña corta para volver a entrar desde otro celular).
    · Tú decides qué marcas publicas; nada se envía antes.
    · Listas: Mixto / Hombres / Mujeres, por ejercicios básicos o de
-     la comunidad. Se ordena por 1RM estimado (Epley).
+     la comunidad. Gana quien levantó MÁS PESO; si el peso es igual, quien hizo más repeticiones (sin 1RM estimado).
    Servidor: Supabase (ver supabase/setup.sql). Solo se envía tu
    nombre elegido, tu sexo (opcional) y las marcas que publiques.
    ============================================================ */
@@ -77,7 +77,11 @@ const Leaderboard = (() => {
   const setUser = (u) => { try { if (u) localStorage.setItem(USER_KEY, JSON.stringify(u)); else localStorage.removeItem(USER_KEY); } catch (e) { /* sin almacenamiento */ } };
 
   // ---------------------------------------------------------------- tus marcas locales
-  // mejor serie (1RM estimado) de tus ejercicios que corresponden a una prueba
+  // ¿la marca a es mejor que la b? Más peso gana; con el mismo peso, más repeticiones
+  const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+  const beats = (a, b) => { if (!b || !(b.kg > 0)) return !!(a && a.kg > 0); const d = r2(a.kg) - r2(b.kg); return d > 0 || (d === 0 && (Number(a.reps) || 0) > (Number(b.reps) || 0)); };
+  const cmpBest = (a, b) => (beats(a, b) ? -1 : beats(b, a) ? 1 : 0);   // para ordenar: la mejor primero
+  // mejor serie (el mayor peso; con el mismo peso, más repeticiones) de tus ejercicios que corresponden a una prueba
   function bestFor(match) {
     const wl = DB.getWorkoutLog();
     const exs = DB.getExercises().filter(match);
@@ -89,8 +93,8 @@ const Leaderboard = (() => {
         if (!Metrics.isNormal(s) || s.uni) return;
         const kg = Metrics.loadOf(s); const reps = Number(s.reps) || 0;
         if (!(kg > 0) || !(reps > 0) || reps > 30) return;
-        const e = Metrics.e1rm(kg, reps);
-        if (!best || e > best.e1rm) best = { kg, reps, e1rm: e, date: d, name: (exs.find((x) => x.id === en.exerciseId) || {}).name };
+        const cand = { kg, reps };
+        if (!best || beats(cand, best)) best = { kg, reps, date: d, name: (exs.find((x) => x.id === en.exerciseId) || {}).name };
       });
     }));
     return best;
@@ -151,7 +155,7 @@ const Leaderboard = (() => {
   const bestForLift = (key) => bestFor((e) => { const l = liftAny(e); return !!l && l.key === key; });
 
   // ---- publicación automática
-  const PUB_KEY = 'gt_lbPub';          // lo último que sé que está publicado: { clave: e1rm }
+  const PUB_KEY = 'gt_lbPub';          // lo último que sé que está publicado: { clave: { kg, reps } }
   const pubMap = () => { try { return JSON.parse(localStorage.getItem(PUB_KEY) || '{}') || {}; } catch (e) { return {}; } };
   const savePub = (m) => { try { localStorage.setItem(PUB_KEY, JSON.stringify(m)); } catch (e) { /* sin almacenamiento */ } };
   const autoOn = () => DB.getSettings().lbAuto !== false;
@@ -159,12 +163,12 @@ const Leaderboard = (() => {
   let pubLoaded = false;
   function rememberMine(list) {
     const m = pubMap();
-    (list || []).forEach((x) => { m[x.exercise_key] = Number(x.e1rm) || 0; });
+    (list || []).forEach((x) => { m[x.exercise_key] = { kg: Number(x.weight_kg) || 0, reps: Number(x.reps) || 0 }; });
     savePub(m);
   }
   async function publishBest(u, lift, best) {
     await rpc('gt_publish', { p_secret: u.secret, p_key: lift.key, p_name: lift.name, p_weight: Math.round(best.kg * 100) / 100, p_reps: best.reps });
-    const m = pubMap(); m[lift.key] = best.e1rm; savePub(m);
+    const m = pubMap(); m[lift.key] = { kg: r2(best.kg), reps: best.reps }; savePub(m);
   }
   // si antes tu ejercicio entró como «propio» (p. ej. «hip-thrust») y ahora cuenta como un básico, quita la marca duplicada vieja
   async function dropOld(u, ex, lift) {
@@ -195,7 +199,7 @@ const Leaderboard = (() => {
         if (!best || best.kg > 700) return;
         if (!pubLoaded) { rememberMine(await rpc('gt_my_scores', { p_secret: u.secret })); pubLoaded = true; }
         const prev = pubMap()[lift.key];
-        if (prev && best.e1rm <= prev * 1.005) return;
+        if (prev && typeof prev === 'object' && !beats(best, prev)) return;
         await publishBest(u, lift, best);
         dropOld(u, ex, lift);
         saveErr(null);
@@ -220,11 +224,11 @@ const Leaderboard = (() => {
       const best = bestForLift(lift.key);
       if (!best || best.kg > 700) continue;
       const prev = pubMap()[lift.key];
-      if (prev && best.e1rm <= prev * 1.005) continue;
+      if (prev && typeof prev === 'object' && !beats(best, prev)) continue;
       queue.push({ lift, best, ex });
     }
     // primero los básicos y luego las marcas más fuertes: si se llega al tope de 40, lo importante ya entró
-    queue.sort((a, b) => (a.lift.group === 'básico' ? 0 : 1) - (b.lift.group === 'básico' ? 0 : 1) || b.best.e1rm - a.best.e1rm);
+    queue.sort((a, b) => (a.lift.group === 'básico' ? 0 : 1) - (b.lift.group === 'básico' ? 0 : 1) || cmpBest(a.best, b.best));
     for (const { lift, best, ex } of queue) {
       try { await publishBest(u, lift, best); n += 1; dropOld(u, ex, lift); } catch (e) { if (/conectarme/.test(e.message)) return n || -1; saveErr(e.message); if (/máximo de 40|sesión ya no/.test(e.message)) break; }
     }
@@ -464,7 +468,7 @@ const Leaderboard = (() => {
     function paintRows(rows) {
       body.innerHTML = '';
       if (!rows.length) { body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'text-align:center;padding:14px 0;', text: 'Nadie ha publicado esta marca todavía. ¡Sé la primera persona!' })); return; }
-      const top = Number(rows[0].e1rm) || 1;
+      const top = Number(rows[0].weight_kg) || 1;
       const sexMark = (r) => (r.sex === 'M' ? ' ♂' : r.sex === 'F' ? ' ♀' : '');
       const isMe = (r) => !!u && norm(r.name) === norm(u.name);
       // podio con los 3 primeros (2.º · 1.º · 3.º)
@@ -477,27 +481,27 @@ const Leaderboard = (() => {
           Utils.el('div', { class: 'lb-medal', text: medal }),
           Utils.el('div', { class: 'lb-av', text: (r.name || '?').trim().charAt(0).toUpperCase() }),
           Utils.el('div', { class: 'lb-pod-name', text: `${r.name}${sexMark(r)}` }),
-          Utils.el('b', { class: 'lb-pod-e1', text: Units.label(Number(r.e1rm)) }),
-          Utils.el('div', { class: 'lb-pod-sub', text: `${Units.label(Number(r.weight_kg))} × ${r.reps}` }),
+          Utils.el('b', { class: 'lb-pod-e1', text: Units.label(Number(r.weight_kg)) }),
+          Utils.el('div', { class: 'lb-pod-sub', text: `${r.reps} rep${r.reps === 1 ? '' : 's'}` }),
           Utils.el('div', { class: 'lb-pod-bar' }),
         ]));
       });
       body.appendChild(pod);
       rows.slice(3).forEach((r) => {
         const me = isMe(r);
-        const pct = Math.max(6, Math.round(((Number(r.e1rm) || 0) / top) * 100));
+        const pct = Math.max(6, Math.round(((Number(r.weight_kg) || 0) / top) * 100));
         body.appendChild(Utils.el('div', { class: `lb-row${me ? ' me' : ''}` }, [
           Utils.el('div', { class: 'lb-rank', text: String(r.rank) }),
           Utils.el('div', { class: 'lb-av sm', text: (r.name || '?').trim().charAt(0).toUpperCase() }),
           Utils.el('div', { class: 'lb-main' }, [
             Utils.el('div', { class: 'lb-name', text: `${r.name}${sexMark(r)}` }),
-            Utils.el('div', { class: 'meta', text: `${Units.label(Number(r.weight_kg))} × ${r.reps}` }),
+            Utils.el('div', { class: 'meta', text: new Date(r.updated_at).toLocaleDateString('es', { day: 'numeric', month: 'short' }) }),
             Utils.el('div', { class: 'lb-bar' }, [Utils.el('i', { style: `width:${pct}%` })]),
           ]),
-          Utils.el('div', { class: 'lb-e1' }, [Utils.el('b', { text: Units.label(Number(r.e1rm)) }), Utils.el('div', { class: 'small text-dim', text: '1RM est.' })]),
+          Utils.el('div', { class: 'lb-e1' }, [Utils.el('b', { text: Units.label(Number(r.weight_kg)) }), Utils.el('div', { class: 'small text-dim', text: `${r.reps} rep${r.reps === 1 ? '' : 's'}` })]),
         ]));
       });
-      body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Se ordena por 1RM estimado (fórmula de Epley), así una serie de 5 reps y una de 1 rep se pueden comparar.' }));
+      body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Gana quien levantó más peso. Si dos levantaron el mismo peso, gana quien hizo más repeticiones.' }));
     }
     card.appendChild(Utils.el('div', { class: 'card-title-row' }, [Utils.el('h3', { text: '🏆 Lista' }), Utils.el('button', { class: 'btn-small', type: 'button', text: '↻', title: 'Actualizar', onclick: () => { loadExercises().then(fillSelect); load(); } })]));
     card.appendChild(groups);
@@ -572,7 +576,7 @@ const Leaderboard = (() => {
     // revisión de todos tus ejercicios
     const diag = diagnose();
     if (diag.length) {
-      const bad = diag.filter((x) => !x.lift).length; const pend = diag.filter((x) => x.lift && x.best && (!x.pub || x.best.e1rm > Number(x.pub.e1rm) * 1.005)).length;
+      const bad = diag.filter((x) => !x.lift).length; const pend = diag.filter((x) => x.lift && x.best && (!x.pub || beats(x.best, { kg: Number(x.pub.weight_kg), reps: x.pub.reps }))).length;
       const det = Utils.el('details', { class: 'fold fold-flat diag-fold' });
       det.appendChild(Utils.el('summary', { class: 'fold-sum' }, [
         Utils.el('span', { class: 'fold-t', text: '🔍 Revisar mis ejercicios' }),
@@ -581,7 +585,7 @@ const Leaderboard = (() => {
       ]));
       const list = Utils.el('div', { class: 'diag-list' });
       diag.forEach((x) => {
-        const state = !x.lift ? 'no' : !x.best ? 'sin' : !x.pub ? 'pend' : x.best.e1rm > Number(x.pub.e1rm) * 1.005 ? 'pend' : 'ok';
+        const state = !x.lift ? 'no' : !x.best ? 'sin' : !x.pub ? 'pend' : beats(x.best, { kg: Number(x.pub.weight_kg), reps: x.pub.reps }) ? 'pend' : 'ok';
         const label = { no: 'No entra', sin: 'Sin marca', pend: 'Por publicar', ok: 'Publicado ✓' }[state];
         list.appendChild(Utils.el('div', { class: 'diag-row' }, [
           Utils.el('div', { class: 'diag-main' }, [
@@ -611,12 +615,12 @@ const Leaderboard = (() => {
   }
 
   function markRow(u, o, host) {
-    const better = o.local && o.pub && o.local.e1rm > Number(o.pub.e1rm) * 1.005;
+    const better = o.local && o.pub && beats(o.local, { kg: Number(o.pub.weight_kg), reps: o.pub.reps });
     const row = Utils.el('div', { class: 'mk-row' });
     const status = o.pub ? (better ? 'Mejor marca sin publicar' : 'Publicada') : (o.local ? 'Sin publicar' : '');
     row.appendChild(Utils.el('div', { class: 'mk-main' }, [
       Utils.el('div', { class: 'mk-name', text: o.name }),
-      Utils.el('div', { class: 'meta', text: o.pub ? `${Units.label(Number(o.pub.weight_kg))} × ${o.pub.reps} · 1RM ${Units.label(Number(o.pub.e1rm))}${better ? ` · ahora ${Units.label(o.local.kg)} × ${o.local.reps}` : ''}` : o.local ? `Tu mejor: ${Units.label(o.local.kg)} × ${o.local.reps}` : 'Aún sin registros' }),
+      Utils.el('div', { class: 'meta', text: o.pub ? `${Units.label(Number(o.pub.weight_kg))} × ${o.pub.reps}${better ? ` · ahora ${Units.label(o.local.kg)} × ${o.local.reps}` : ''}` : o.local ? `Tu mejor: ${Units.label(o.local.kg)} × ${o.local.reps}` : 'Aún sin registros' }),
     ]));
     row.appendChild(Utils.el('span', { class: `mk-chip ${o.pub ? (better ? 'warn' : 'ok') : 'off'}`, text: o.pub ? (better ? '↑' : '✓') : '·', title: status }));
     const btn = Utils.el('button', { class: `btn-small${o.pub && !better ? '' : ' btn-primary-s'}`, type: 'button', text: o.pub ? (better ? 'Actualizar' : 'Editar') : 'Publicar' });
@@ -637,11 +641,8 @@ const Leaderboard = (() => {
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: `Peso (${unit})` }), w]),
       Utils.el('div', { class: 'field' }, [Utils.el('label', { text: 'Repeticiones' }), r]),
     ]));
-    const est = Utils.el('div', { class: 'small text-dim', style: 'margin:-4px 0 10px;' });
-    const upd = () => { const kg = Units.toKg(parseFloat(w.value) || 0, unit); const rp = parseInt(r.value, 10) || 0; est.textContent = kg > 0 && rp > 0 ? `1RM estimado: ${Units.label(Metrics.e1rm(kg, rp))}` : ''; };
-    w.addEventListener('input', upd); r.addEventListener('input', upd); upd();
     const msg = Utils.el('div', { class: 'sm-warn hidden', style: 'margin-bottom:8px;' });
-    body.appendChild(est); body.appendChild(msg);
+    body.appendChild(msg);
     const go = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', text: o.pub ? 'Guardar cambios' : '📤 Publicar' });
     go.addEventListener('click', async () => {
       const kg = Units.toKg(parseFloat(w.value) || 0, unit); const rp = parseInt(r.value, 10);
@@ -674,7 +675,7 @@ const Leaderboard = (() => {
     const paint = () => {
       list.innerHTML = '';
       const q = norm(search.value);
-      const items = mine.filter((e) => !q || norm(e.name).includes(q)).map((e) => ({ e, best: bestOfExercise(e.id) })).filter((x) => x.best).sort((a, b) => b.best.e1rm - a.best.e1rm).slice(0, 60);
+      const items = mine.filter((e) => !q || norm(e.name).includes(q)).map((e) => ({ e, best: bestOfExercise(e.id) })).filter((x) => x.best).sort((a, b) => cmpBest(a.best, b.best)).slice(0, 60);
       if (!items.length) list.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: 'No hay ejercicios con series registradas que coincidan.' }));
       items.forEach(({ e, best }) => {
         const r = Utils.el('div', { class: 'food-row' }, [
@@ -712,5 +713,5 @@ const Leaderboard = (() => {
   // al restaurar desde la nube en otro teléfono: recupera tu usuario del ranking
   function adopt(u) { if (u && u.id && u.secret && !user()) { setUser({ id: u.id, secret: u.secret, name: u.name, sex: u.sex || null }); pubLoaded = false; return true; } return false; }
 
-  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, lifts };
+  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, lifts, beats };
 })();

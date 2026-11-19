@@ -38,7 +38,7 @@ create table if not exists public.gt_scores (
   updated_at     timestamptz not null default now(),
   unique (profile_id, exercise_key)
 );
-create index if not exists gt_scores_board on public.gt_scores (exercise_key, e1rm desc);
+create index if not exists gt_scores_board on public.gt_scores (exercise_key, weight_kg desc, reps desc);
 
 -- Seguridad: con RLS activado y SIN políticas, la clave pública no puede tocar las tablas.
 alter table public.gt_profiles enable row level security;
@@ -157,13 +157,13 @@ language sql
 security definer
 set search_path = public, extensions
 as $$
-  select row_number() over (order by s.e1rm desc, s.updated_at asc) as rank,
+  select row_number() over (order by s.weight_kg desc, s.reps desc, s.updated_at asc) as rank,
          p.name, p.sex, s.weight_kg, s.reps, s.e1rm, s.updated_at
   from public.gt_scores s
   join public.gt_profiles p on p.id = s.profile_id
   where s.exercise_key = lower(btrim(coalesce(p_key, '')))
     and (p_sex is null or p.sex = p_sex)
-  order by s.e1rm desc, s.updated_at asc
+  order by s.weight_kg desc, s.reps desc, s.updated_at asc
   limit least(greatest(coalesce(p_limit, 50), 1), 100);
 $$;
 

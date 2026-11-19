@@ -377,6 +377,15 @@
     if (!/Libras/.test(txt) || !/Kilos/.test(txt)) throw new Error(`botones: ${txt}`);
   });
 
+  await test('Ranking: gana el mayor peso; con el mismo peso, más repeticiones (sin 1RM)', async () => {
+    const b = A.Leaderboard.beats;
+    if (!b({ kg: 100, reps: 9 }, { kg: 100, reps: 8 })) throw new Error('9 reps debe ganar a 8 con el mismo peso');
+    if (b({ kg: 100, reps: 8 }, { kg: 100, reps: 9 })) throw new Error('8 reps no debe ganar a 9');
+    if (!b({ kg: 120, reps: 1 }, { kg: 100, reps: 12 })) throw new Error('más peso debe ganar aunque sea 1 rep');
+    if (b({ kg: 100, reps: 5 }, { kg: 100, reps: 5 })) throw new Error('empate no es mejora');
+    if (!b({ kg: 102.0582, reps: 5 }, { kg: 102.06, reps: 4 })) throw new Error('mismo peso en lb con redondeo');
+  });
+
   // ---- respaldo: exportar e importar mantiene los datos
   await test('Respaldo: exportar → importar conserva los datos', async () => {
     const a = JSON.stringify(A.DB.exportAll());
