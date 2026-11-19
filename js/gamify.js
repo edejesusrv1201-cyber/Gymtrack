@@ -102,6 +102,7 @@ const Gamify = (() => {
 
   // ---------------------------------------------------------------- nivel
   const TITLES = [[1, 'Novato'], [3, 'Aprendiz'], [5, 'Constante'], [8, 'Atleta'], [12, 'Fuerte'], [16, 'Élite'], [20, 'Leyenda']];
+  const titleFor = (lv) => TITLES.filter((t) => lv >= t[0]).pop()[1];
   const addDays = (iso, n) => { const d = Utils.parseISO(iso); d.setDate(d.getDate() + n); return Utils.toISODate(d); };
   const baseXp = (st) => (st.actXp || 0) + (st.goodNights || 0) * 10 + st.sessions * 100 + st.sets * 4 + st.prs * 60 + st.foodDays * 15 + st.waterDays * 10 + st.weighIns * 20 + st.streak * 50;
   function levelInfo(xp) {
@@ -298,7 +299,13 @@ const Gamify = (() => {
   // ventana de celebración con los logros nuevos / subida de nivel
   function announce(res) {
     if (!res || (!res.fresh.length && !res.up && !(res.challenges || []).length)) return;
-    if (document.querySelector('.modal-backdrop:not(.closing)')) return; // no interrumpe otra ventana
+    if (document.querySelector('.modal-backdrop:not(.closing)') || document.querySelector('.lvlup')) return; // no interrumpe otra ventana
+    // subir de nivel: pantalla completa animada; después, si hay logros o retos nuevos, se muestran aparte
+    if (res.up && typeof Fx !== 'undefined' && Fx.levelUp && motionOk() && document.documentElement.dataset.ui === 'on') {
+      const rest = Object.assign({}, res, { up: null });
+      Fx.levelUp(res, () => announce(rest));
+      return;
+    }
     const body = Utils.el('div', { class: 'unlock-body' });
     if (res.up) {
       body.appendChild(Utils.el('div', { class: 'levelup' }, [
@@ -400,5 +407,5 @@ const Gamify = (() => {
     if ((prList.length || res.fresh.length || res.up || (res.challenges || []).length) && motionOk()) { Celebrate.fireworks(); Utils.vibrate([60, 40, 60, 40, 140]); }
   }
 
-  return { challengesFor, currentChallenges, computeStats, evaluate, check, levelInfo, xpOfDay, announce, showSummary, badgeEl, ACH, CATS, MIN_WEEKLY };
+  return { titleFor, challengesFor, currentChallenges, computeStats, evaluate, check, levelInfo, xpOfDay, announce, showSummary, badgeEl, ACH, CATS, MIN_WEEKLY };
 })();

@@ -558,8 +558,14 @@ const TodayView = (() => {
     [qFood, qWater, qWeight, qSleep].forEach((b) => quick.appendChild(b));
     view.appendChild(quick);
 
-    try { view.appendChild(Energy.card(rerender)); } catch (e) { console.warn('energia', e); }
-    try { view.appendChild(Activity.card(rerender)); } catch (e) { console.warn('deporte', e); }
+    // una sola tarjeta "Tu día": energía + deporte (antes eran dos tarjetas largas)
+    try {
+      const day = Utils.el('div', { class: 'card day-card' });
+      day.appendChild(Energy.block(rerender));
+      day.appendChild(Utils.el('div', { class: 'dc-sep' }));
+      day.appendChild(Activity.block(rerender, true));
+      view.appendChild(day);
+    } catch (e) { console.warn('tu día', e); }
 
     const gapCard = renderGaps(rerender);
     if (gapCard) view.appendChild(gapCard);

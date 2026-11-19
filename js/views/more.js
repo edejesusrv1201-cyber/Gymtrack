@@ -87,6 +87,13 @@ const MoreView = (() => {
       card.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:-4px;', text: 'Tu teléfono pide reducir animaciones, por eso viene quieto. Toca "Activado" para ver la lava.' }));
     }
 
+    const lvBtn = Utils.el('button', { type: 'button', class: 'link-btn small', style: 'margin:-2px 0 10px;', text: '▶ Ver la animación de subir de nivel' });
+    lvBtn.addEventListener('click', () => {
+      const ev = Gamify.evaluate();
+      if (document.documentElement.dataset.ui !== 'on') { Utils.toast('Activa «Animaciones en los menús» para verla'); return; }
+      Fx.levelUp({ up: { from: Math.max(1, ev.lvl.level - 1), to: ev.lvl.level }, ev }, null);
+    });
+    card.appendChild(lvBtn);
     card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:6px 0 8px;', text: 'Rendimiento' }));
     card.appendChild(Utils.segmented(
       [{ key: 'auto', label: 'Automático' }, { key: 'max', label: 'Máximo' }, { key: 'ahorro', label: 'Ahorro' }],

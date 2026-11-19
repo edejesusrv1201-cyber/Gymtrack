@@ -313,12 +313,13 @@ const Activity = (() => {
   const liveActive = () => !!readLive();
 
   // ---------- tarjeta de Hoy ----------
-  function card(rerender) {
+  // merged = dentro de la tarjeta "Tu día" de Hoy (título más discreto)
+  function block(rerender, merged) {
     const wk = weekSum();
     const todays = byDate(Utils.todayISO());
-    const c = Utils.el('div', { class: 'card act-card' });
+    const c = Utils.el('div', { class: 'act-block' });
     const head = Utils.el('div', { class: 'act-head' }, [
-      Utils.el('div', {}, [Utils.el('h3', { text: '🏃 Deporte' }), Utils.el('div', { class: 'small text-dim', text: wk.n ? `Esta semana: ${wk.n} ${wk.n === 1 ? 'actividad' : 'actividades'} · ${minText(wk.min)}${wk.km > 0 ? ` · ${kmText(wk.km)}` : ''}` : 'Correr, bici, fútbol, natación… todo suma.' })]),
+      Utils.el('div', {}, [merged ? Utils.el('div', { class: 'dc-title', text: '🏃 Deporte' }) : Utils.el('h3', { text: '🏃 Deporte' }), Utils.el('div', { class: 'small text-dim', text: wk.n ? `Esta semana: ${wk.n} ${wk.n === 1 ? 'actividad' : 'actividades'} · ${minText(wk.min)}${wk.km > 0 ? ` · ${kmText(wk.km)}` : ''}` : 'Correr, bici, fútbol, natación… todo suma.' })]),
     ]);
     c.appendChild(head);
     todays.slice(0, 3).forEach((a) => {
@@ -333,6 +334,11 @@ const Activity = (() => {
     manual.addEventListener('click', () => openForm({}, rerender));
     btns.appendChild(live); btns.appendChild(manual);
     c.appendChild(btns);
+    return c;
+  }
+  function card(rerender) {
+    const c = Utils.el('div', { class: 'card act-card' });
+    c.appendChild(block(rerender, false));
     return c;
   }
   function pickLive(rerender) {
@@ -400,5 +406,5 @@ const Activity = (() => {
     Utils.drawBarChart(canvas, weeks, { format: (v) => `${v}'` });
   }
 
-  return { TYPES, typeOf, all, list, byDate, add, update, remove, kcalOf, kcalOfDay, xpOf, xpOfDay, stats, records, weekSum, recentCount, paceText, kmText, minText, detail, openForm, openLive, liveActive, card, render, gpsStep };
+  return { TYPES, typeOf, all, list, byDate, add, update, remove, kcalOf, kcalOfDay, xpOf, xpOfDay, stats, records, weekSum, recentCount, paceText, kmText, minText, detail, openForm, openLive, liveActive, block, card, render, gpsStep };
 })();

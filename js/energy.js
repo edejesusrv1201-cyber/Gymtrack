@@ -33,26 +33,29 @@ const Energy = (() => {
     return { value, tier, sleepH: h, load: l };
   }
 
-  function card(rerender) {
+  function block(rerender) {
     const e = today();
-    const c = Utils.el('div', { class: 'card energy-card' });
-    const top = Utils.el('div', { class: 'en-top' }, [
+    const c = Utils.el('div', { class: 'energy-block' });
+    c.appendChild(Utils.el('div', { class: 'en-top' }, [
       Utils.el('div', { class: 'en-title' }, [Utils.el('span', { class: 'en-ico', text: e.tier.icon }), Utils.el('b', { text: `Energía ${e.value}%` }), Utils.el('span', { class: 'en-tier', text: ` · ${e.tier.title}` })]),
-    ]);
-    const bar = Utils.el('div', { class: 'en-bar', role: 'img', 'aria-label': `Energía ${e.value} por ciento` }, [Utils.el('i', { style: `width:${e.value}%;background:${e.tier.color}` })]);
-    c.appendChild(top); c.appendChild(bar);
-    const bits = [e.tier.text];
-    if (!e.sleepH) bits.push('Anota cómo dormiste para afinarla.');
-    c.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:6px;', text: bits.join(' ') }));
-    const det = Utils.el('div', { class: 'small text-dim en-det', text: `${e.sleepH ? `😴 ${String(e.sleepH).replace('.', ',')} h anoche` : '😴 sin dato de anoche'} · 🏋️ ${e.load.sets} series y 🏃 ${Math.round(e.load.actMin)} min en 48 h` });
-    c.appendChild(det);
+    ]));
+    c.appendChild(Utils.el('div', { class: 'en-bar', role: 'img', 'aria-label': `Energía ${e.value} por ciento` }, [Utils.el('i', { style: `width:${e.value}%;background:${e.tier.color}` })]));
+    c.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:6px;', text: e.tier.text }));
+    const sleepTxt = e.sleepH ? `😴 ${String(e.sleepH).replace('.', ',')} h` : '😴 sin dato';
+    const det = Utils.el('div', { class: 'small text-dim en-det' }, [`${sleepTxt} · 🏋️ ${e.load.sets} series · 🏃 ${Math.round(e.load.actMin)} min (48 h)`]);
     if (!e.sleepH) {
-      const b = Utils.el('button', { type: 'button', class: 'btn-secondary', style: 'margin-top:8px;', text: '😴 Anotar mi sueño' });
+      const b = Utils.el('button', { type: 'button', class: 'link-btn small', text: '· Anotar sueño' });
       b.addEventListener('click', () => Treats.openSleep(Utils.todayISO(), rerender));
-      c.appendChild(b);
+      det.appendChild(b);
     }
+    c.appendChild(det);
+    return c;
+  }
+  function card(rerender) {
+    const c = Utils.el('div', { class: 'card energy-card' });
+    c.appendChild(block(rerender));
     return c;
   }
 
-  return { today, card, TIERS };
+  return { today, block, card, TIERS };
 })();

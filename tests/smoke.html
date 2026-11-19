@@ -236,11 +236,22 @@
     const e2 = A.Energy.today(); if (!(e2.value < e1.value)) throw new Error('dormir 4,5 h no baja la energía');
     if (A.Treats.qualityOf(today) !== 1) throw new Error('no lee la calidad del sueño');
     A.App.navigate('hoy'); await wait(700);
-    if (!D.querySelector('.energy-card')) throw new Error('no aparece la tarjeta de energía en Hoy');
+    if (!D.querySelector('.day-card .energy-block') || !D.querySelector('.day-card .act-block')) throw new Error('no aparece la tarjeta «Tu día» (energía + deporte) en Hoy');
     D.documentElement.dataset.ui = 'on'; A.Fx.xp(10, '🏆'); await wait(150);
     if (!D.querySelector('.fx-xp')) throw new Error('no apareció el XP flotante');
     await wait(1400); if (D.querySelector('.fx-xp')) throw new Error('el XP flotante no se quitó');
     await modal('Sueño', () => A.Treats.openSleep(today, () => {}));
+  });
+  await test('Subir de nivel: pantalla completa, se cierra y avisa', async () => {
+    D.documentElement.dataset.ui = 'on';
+    let called = false;
+    A.Fx.levelUp({ up: { from: 2, to: 3 }, ev: { lvl: { pct: 0.3, toNext: 420, level: 3 } } }, () => { called = true; });
+    await wait(300);
+    const ov = D.querySelector('.lvlup'); if (!ov) throw new Error('no apareció la pantalla de nivel');
+    if (!/3/.test(ov.querySelector('.lu-new').textContent) || !/Aprendiz/.test(ov.querySelector('.lu-title').textContent)) throw new Error('muestra mal el nivel o el título');
+    if (overflow() > 1) throw new Error('se sale de la pantalla');
+    ov.querySelector('.lu-btn').click(); await wait(500);
+    if (D.querySelector('.lvlup')) throw new Error('no se cerró'); if (!called) throw new Error('no avisó al cerrar');
   });
   await test('Logros: aparecen los de deporte y suman XP', async () => {
     const ev = A.Gamify.evaluate();
