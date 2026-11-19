@@ -43,6 +43,11 @@ const Leaderboard = (() => {
     bad_values: 'Esa marca no parece válida (peso máx. 700 kg, 1 a 30 repeticiones).',
     bad_exercise: 'Ese nombre de ejercicio no es válido.',
     too_many: 'Llegaste al máximo de 40 ejercicios publicados.',
+    friend_code_bad: 'No encuentro a nadie con ese código. Revisa que esté bien escrito.',
+    friend_self: 'Ese es tu propio código 😄 Pásaselo a un amigo.',
+    friend_limit: 'Llegaste al máximo de 50 amigos.',
+    bad_week: 'La fecha de la semana no es válida. Revisa la hora de tu teléfono.',
+    try_again: 'Intenta de nuevo en un momento.',
   };
 
   async function rpc(fn, args) {
@@ -268,7 +273,7 @@ const Leaderboard = (() => {
   }
 
   // ---------------------------------------------------------------- pantalla
-  let ui = { joining: false, auto: true, sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
+  let ui = { mode: 'global', joining: false, auto: true, sex: null, key: 'banca', mine: [], list: null, listKey: null, listSex: null, exercises: [], loading: false, error: '' };
   let rootRef = null;
   const refresh = () => { if (rootRef) render(rootRef); };
 
@@ -280,6 +285,9 @@ const Leaderboard = (() => {
     if (!configured()) return renderSetup(view);
     const u = user();
     if (!u && ui.joining) return renderJoin(view);
+    const friendsOn = typeof Friends !== 'undefined' && Friends.enabled();
+    if (friendsOn) view.appendChild(Utils.segmented([{ key: 'global', label: '🌍 Global' }, { key: 'amigos', label: '👥 Amigos' }], ui.mode || 'global', (k) => { ui.mode = k; refresh(); }, true));
+    if (friendsOn && ui.mode === 'amigos') return Friends.render(view, u, { join: () => { ui.mode = 'global'; ui.joining = true; refresh(); } });
     renderMain(view, u);          // sin usuario también se pueden ver las listas
   }
 

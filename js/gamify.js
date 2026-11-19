@@ -272,6 +272,7 @@ const Gamify = (() => {
     if (newlyDone.length) { doneMap[wkStart] = doneNow.concat(newlyDone.map((c) => c.id)); s.challengeDone = doneMap; }
     DB.saveSettings(s);
     if (newlyDone.length) { ev.xp += newlyDone.length * 60; ev.lvl = levelInfo(ev.xp); }
+    try { if (typeof Friends !== 'undefined') Friends.touch(); } catch (e) { /* sin liga */ }
     return { fresh, up, ev, challenges: newlyDone };
   }
 
@@ -282,6 +283,28 @@ const Gamify = (() => {
     let sets = 0; let prs = 0;
     (log.exercises || []).forEach((e) => (e.sets || []).forEach((s) => { if (!Metrics.isWarmup(s)) { sets += 1; if (s.pr) prs += 1; } }));
     return sets ? 100 + sets * 4 + prs * 60 : 0;
+  }
+
+  // XP ganado en una semana (domingo a sábado) para la liga de amigos
+  function weeklyXp(start) {
+    let xp = 0; let sessions = 0; let days = 0; let sportMin = 0;
+    const cal = DB.getCalorieLog(); const water = DB.getWaterLog(); const wg = DB.getSettings().waterGoalMl || 2500;
+    const weighed = new Set(DB.getMeasurements().filter((m) => m.weight).map((m) => m.date));
+    const today = Utils.todayISO();
+    for (let i = 0; i < 7; i += 1) {
+      const d = addDays(start, i); if (d > today) break;
+      const g = xpOfDay(d); const a = typeof Activity !== 'undefined' ? Activity.xpOfDay(d) : 0;
+      if (g > 0) sessions += 1;
+      if (g > 0 || a > 0) days += 1;
+      xp += g + a;
+      if ((cal[d] || []).length) xp += 15;
+      if ((water[d] || []).reduce((s, e) => s + e.ml, 0) >= wg) xp += 10;
+      if (typeof Treats !== 'undefined' && (Treats.sleepOf(d) || 0) >= 7) xp += 10;
+      if (weighed.has(d)) xp += 20;
+      if (typeof Activity !== 'undefined') sportMin += Activity.byDate(d).reduce((n, x) => n + (x.min || 0), 0);
+    }
+    xp += ((DB.getSettings().challengeDone || {})[start] || []).length * 60;
+    return { xp, sessions, days, sportMin };
   }
 
   // ---------------------------------------------------------------- visual
@@ -407,5 +430,5 @@ const Gamify = (() => {
     if ((prList.length || res.fresh.length || res.up || (res.challenges || []).length) && motionOk()) { Celebrate.fireworks(); Utils.vibrate([60, 40, 60, 40, 140]); }
   }
 
-  return { titleFor, challengesFor, currentChallenges, computeStats, evaluate, check, levelInfo, xpOfDay, announce, showSummary, badgeEl, ACH, CATS, MIN_WEEKLY };
+  return { weeklyXp, titleFor, challengesFor, currentChallenges, computeStats, evaluate, check, levelInfo, xpOfDay, announce, showSummary, badgeEl, ACH, CATS, MIN_WEEKLY };
 })();

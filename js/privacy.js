@@ -19,6 +19,10 @@ const Privacy = (() => {
       'Se publica el nombre que elijas, tu sexo (solo si lo indicas) y las mejores marcas de fuerza que se publiquen (peso × repeticiones). Es visible para todas las personas que usan el ranking.',
       'No se publican tus entrenos completos, comidas, medidas ni fotos. Puedes quitar tus marcas o tu usuario en Progreso → Ranking.',
     ]],
+    ['👥 Liga de amigos (opcional)', [
+      'Si usas la liga, tus amigos (quienes agregaste con tu código de amigo) ven tu nombre, nivel, XP de la semana, entrenos, días activos y minutos de deporte. Nada de comidas, medidas ni fotos.',
+      'Puedes quitar a un amigo cuando quieras en Progreso → Ranking → Amigos; dejan de verse mutuamente.',
+    ]],
     ['🍽️ Búsqueda de alimentos', [
       'Al buscar un producto en internet solo se envía el texto que escribiste, a través de nuestro servidor, a Open Food Facts (una base de datos abierta). Al escanear un código de barras, solo viaja ese número.',
     ]],
