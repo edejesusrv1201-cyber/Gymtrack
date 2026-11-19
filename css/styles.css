@@ -2095,3 +2095,10 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 /* respuesta al tocar: todo lo que se pulsa se hunde un poquito */
 :root[data-ui="on"] button:not(:disabled):active, :root[data-ui="on"] .tile:active, :root[data-ui="on"] .week-day:active, :root[data-ui="on"] .badge-tile:active { transform: scale(.965); transition: transform .08s ease; }
 :root[data-ui="on"] .btn-primary:not(:disabled):active { filter: brightness(1.08); }
+
+/* v74 — historias para compartir */
+.story-item { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px; margin-top: 10px; border-radius: 18px; background: rgba(var(--ov), 0.05); border: 1px solid rgba(var(--ov), 0.09); }
+.story-item .si-i { font-size: 1.9rem; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: rgba(var(--ov), 0.07); flex: none; }
+.story-item .si-t { display: flex; flex-direction: column; min-width: 0; }
+.story-item .si-t b { font-size: 1rem; }
+.story-item .si-t small { color: var(--text-dim); font-size: 0.78rem; }

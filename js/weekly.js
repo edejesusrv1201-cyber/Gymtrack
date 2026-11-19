@@ -103,7 +103,12 @@ const WeeklyReview = (() => {
     body.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:16px 0 6px;', text: 'Qué ajustar' }));
     advice(w).forEach((t) => body.appendChild(Utils.el('div', { class: 'wr-tip', text: t })));
 
-    const ok = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: 'Entendido' });
+    if (typeof Stories !== 'undefined') {
+      const st = Utils.el('button', { class: 'btn-primary btn-block mt-8', text: '📤 Compartir como historia' });
+      st.addEventListener('click', () => { Modal.close(); setTimeout(() => Stories.openWeekly(offset), 280); });
+      body.appendChild(st);
+    }
+    const ok = Utils.el('button', { class: 'btn-secondary btn-block mt-8', text: 'Entendido' });
     ok.addEventListener('click', () => Modal.close());
     body.appendChild(ok);
     Modal.open('📊 Resumen semanal', body);

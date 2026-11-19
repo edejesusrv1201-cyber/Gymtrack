@@ -410,6 +410,17 @@ const MoreView = (() => {
     backupCard.appendChild(wipeBtn);
     view.appendChild(backupCard);
 
+    // ---- historias ----
+    if (typeof Stories !== 'undefined') {
+      const stCard = Utils.el('div', { class: 'card' });
+      stCard.appendChild(Utils.el('h3', { text: '📤 Historias para compartir' }));
+      stCard.appendChild(Utils.el('p', { class: 'small', text: 'Tu semana, tu nivel, tus récords y tu deporte como imagen, incluso con fondo transparente para ponerla sobre tu foto.' }));
+      const stBtn = Utils.el('button', { type: 'button', class: 'btn-primary btn-block', text: 'Crear una historia' });
+      stBtn.addEventListener('click', () => Stories.hub());
+      stCard.appendChild(stBtn);
+      view.appendChild(stCard);
+    }
+
     // ---- acerca de ----
     const fbCard = Utils.el('div', { class: 'card' });
     fbCard.appendChild(Utils.el('h3', { text: '💬 Tu opinión importa' }));

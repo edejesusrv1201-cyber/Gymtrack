@@ -50,6 +50,11 @@ const RewardsView = (() => {
         ]),
       ]),
     ]));
+    if (typeof Stories !== 'undefined') {
+      const sb = Utils.el('button', { type: 'button', class: 'btn-secondary btn-block', style: 'margin-top:12px;', text: '📤 Compartir historia' });
+      sb.addEventListener('click', () => Stories.hub());
+      hero.appendChild(sb);
+    }
     hero.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin-top:10px;', text: `Racha: semanas seguidas con ${Gamify.MIN_WEEKLY} o más entrenos.` }));
     hero.appendChild(Utils.el('div', { class: 'lv-stats' }, [
       stat(st.sessions, 'entrenos'),

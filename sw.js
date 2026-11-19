@@ -3,7 +3,7 @@
    una vez instalada en el celular.
    ============================================================ */
 
-const CACHE_NAME = 'migymtrack-v73';
+const CACHE_NAME = 'migymtrack-v74';
 const ASSETS = [
   './',
   './index.html',
@@ -31,6 +31,7 @@ const ASSETS = [
   './js/dropflow.js',
   './js/prcalc.js',
   './js/share.js',
+  './js/stories.js',
   './js/records.js',
   './js/photos.js',
   './js/programs.js',

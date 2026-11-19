@@ -290,6 +290,23 @@ const Share = (() => {
 
   const toBlob = (canvas) => new Promise((res) => canvas.toBlob(res, 'image/png'));
 
+  // fondo de la tarjeta (se reutiliza en js/stories.js)
+  function drawBg(ctx, t, ac, fmt) {
+    if (!t.bg) return;
+    const H = fmt.H;
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
+    let g = ctx.createRadialGradient(W * 0.15, H * 0.04, 40, W * 0.15, H * 0.04, 900);
+    g.addColorStop(0, t.glowA); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    g = ctx.createRadialGradient(W * 0.95, H * 0.98, 40, W * 0.95, H * 0.98, 800);
+    g.addColorStop(0, t.glowC); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (t.ring) {
+      ctx.strokeStyle = t.ring; ctx.lineWidth = 3;
+      [260, 380, 500, 620].forEach((r) => { ctx.beginPath(); ctx.arc(W - 30, fmt.top + 40, r, 0, Math.PI * 2); ctx.stroke(); });
+    }
+  }
+
   const PREFS_KEY = 'gt_share_prefs';
   function loadPrefs() {
     try { const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); return { format: FORMATS[p.format] ? p.format : 'feed', style: STYLES[p.style] ? p.style : 'dark' }; } catch (e) { return { format: 'feed', style: 'dark' }; }
@@ -349,5 +366,7 @@ const Share = (() => {
     paint();
   }
 
-  return { open, render, gather };
+  function savePrefs(p) { try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch (e) { /* sin guardado */ } }
+  const kit = { W, FONT, GOLD, FORMATS, STYLES, theme, rrect, loadImg, fit, spaced, panel, darken, bigNum, loadPrefs, savePrefs, toBlob, drawBg };
+  return { open, render, gather, kit };
 })();

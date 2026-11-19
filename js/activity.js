@@ -195,6 +195,11 @@ const Activity = (() => {
       if (!editing) { try { Fx.xp(xpOf(rec), typeOf(rec.type).i); } catch (e) { /* sin efecto */ } celebrate(); }
     });
     body.appendChild(saveBtn);
+    if (editing && typeof Stories !== 'undefined') {
+      const sh = Utils.el('button', { type: 'button', class: 'btn-secondary btn-block', style: 'margin-top:8px;', text: '📤 Compartir como historia' });
+      sh.addEventListener('click', () => { Modal.close(); setTimeout(() => Stories.openActivity(Object.assign({}, editing)), 280); });
+      body.appendChild(sh);
+    }
     if (editing) {
       const del = Utils.el('button', { type: 'button', class: 'link-btn small', style: 'margin-top:8px;', text: '🗑️ Borrar esta actividad' });
       del.addEventListener('click', () => { remove(editing.id); Modal.close(); Utils.toast('Borrada'); if (onDone) onDone(); });

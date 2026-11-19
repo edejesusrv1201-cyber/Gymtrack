@@ -46,7 +46,7 @@
   const w = frame.contentWindow; const d = frame.contentDocument;
   // los módulos son «const» globales: no cuelgan de window, se leen con eval
   const A = {};
-  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats', 'Stories'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
   bind();
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
@@ -176,6 +176,26 @@
   await modal('Armar dieta', () => A.Diet.open());
 
   await modal('Enviar feedback', () => A.Feedback.open());
+  await modal('Historias (menú)', () => A.Stories.hub());
+  await test('Historias: cada tipo, formato y estilo se dibuja (el transparente de verdad lo es)', async () => {
+    const act = A.Activity.list()[0];
+    const makers = { semana: (p) => A.Stories.weekly(p, 0), actividad: (p) => A.Stories.activity(p, act), nivel: (p) => A.Stories.level(p), records: (p) => A.Stories.records(p) };
+    for (const [name, mk] of Object.entries(makers)) {
+      for (const format of ['feed', 'story']) {
+        for (const style of ['dark', 'clear']) {
+          const cv = await mk({ format, style });
+          const wantH = format === 'story' ? 1920 : 1350;
+          if (cv.width !== 1080 || cv.height !== wantH) throw new Error(`${name}/${format}: tamaño ${cv.width}x${cv.height}`);
+          const px = cv.getContext('2d').getImageData(4, 4, 1, 1).data[3];
+          if (style === 'clear' && px !== 0) throw new Error(`${name}/${format}: el fondo transparente no es transparente`);
+          if (style === 'dark' && px === 0) throw new Error(`${name}/${format}: el fondo oscuro es transparente`);
+          // que algo se haya dibujado en el centro
+          const mid = cv.getContext('2d').getImageData(540, Math.round(wantH * 0.45), 1, 1).data;
+          if (style === 'dark' && mid[3] === 0) throw new Error(`${name}/${format}: vacío en el centro`);
+        }
+      }
+    }
+  });
   await modal('Registrar actividad', () => A.Activity.openForm({}, () => {}));
 
   // ---- deporte: cálculos, GPS, cronómetro en vivo y logros
