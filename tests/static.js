@@ -68,6 +68,11 @@ try {
   const miss = c2.Privacy.SECTIONS.filter(([t]) => !html.includes(t.replace(/&/g, '&amp;')));
   check(miss.length === 0, 'privacy.html está al día con js/privacy.js', `privacy.html está desactualizada (falta: ${miss.map((x) => x[0]).join(', ')}). Corre: node tests/build-privacy.js`);
 } catch (e) { bad(`privacy.html: ${e.message}`); }
+try {
+  const { spawnSync } = require('child_process');
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'build-align.js'), '--check']);
+  check(r.status === 0, 'supabase/align_names.sql está al día con js/lifts.js', 'supabase/align_names.sql está desactualizado. Corre: node tests/build-align.js');
+} catch (e) { bad(`align_names.sql: ${e.message}`); }
 
 console.log('Datos');
 // el catálogo de alimentos: ids únicos y calorías coherentes con los macros

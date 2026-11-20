@@ -386,6 +386,23 @@
     if (!b({ kg: 102.0582, reps: 5 }, { kg: 102.06, reps: 4 })) throw new Error('mismo peso en lb con redondeo');
   });
 
+  await test('Ranking: una sola lista (nombres distintos del mismo ejercicio comparten clave)', async () => {
+    const key = (name, extra) => { const l = A.Leaderboard.liftAny({ id: 'zz', name, group: 'pierna', ...(extra || {}) }); return l ? l.key : null; };
+    const quad = key('Extensión de cuádriceps en máquina');
+    if (!quad) throw new Error('la biblioteca no tiene la extensión de cuádriceps');
+    ['Extensión de rodilla', 'extension-de-rodilla', 'Leg extension', 'Máquina de extensión de cuádriceps', 'Extensión de piernas en máquina'].forEach((n) => { if (key(n) !== quad) throw new Error(`«${n}» → ${key(n)}`); });
+    if (key('Extensión de rodilla a una pierna') === quad) throw new Error('a una pierna no es el mismo ejercicio');
+    const add = key('Aductores en máquina');
+    ['Aductores', 'Aductor', 'Aducción de cadera'].forEach((n) => { if (key(n) !== add) throw new Error(`«${n}» → ${key(n)}`); });
+    if (key('Aductores con liga') === add) throw new Error('con liga no es el mismo ejercicio');
+    if (key('Curl femoral sentado') === quad) throw new Error('curl femoral no es extensión');
+    if (key('Leg curl sentado') !== key('Curl femoral sentado')) throw new Error('leg curl sentado ≠ curl femoral sentado');
+    // todo destino de las reglas existe en la lista del ranking
+    const libs = A.Leaderboard.lifts().map((x) => x.libName);
+    const miss = frame.contentWindow.eval('Lifts.RULES').map((r) => r.to).filter((t) => !libs.includes(t));
+    if (miss.length) throw new Error(`reglas sin ejercicio en la biblioteca: ${miss.join(', ')}`);
+  });
+
   // ---- respaldo: exportar e importar mantiene los datos
   await test('Respaldo: exportar → importar conserva los datos', async () => {
     const a = JSON.stringify(A.DB.exportAll());

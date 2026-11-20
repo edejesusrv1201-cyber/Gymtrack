@@ -133,6 +133,14 @@ const Leaderboard = (() => {
     const all = lifts();
     const exact = all.find((x) => norm(x.libName) === n);
     if (exact) return exact;
+    // una sola lista: nombres distintos del mismo ejercicio («extensión de rodilla» = «extensión de cuádriceps en máquina»)
+    if (typeof Lifts !== 'undefined' && LIFT_GROUPS.includes(ex.group)) {
+      const to = Lifts.canonical(n);
+      const viaRule = to && all.find((x) => x.libName === to);
+      if (viaRule) return viaRule;
+      const tk = Lifts.tokens(n);
+      if (tk) { const same = all.filter((x) => Lifts.tokens(norm(x.libName)) === tk); if (same.length === 1) return same[0]; }
+    }
     // nombre abreviado en tu catálogo (p. ej. «Jalón al pecho» ↔ «Jalón al pecho en polea»)
     if (n.length >= 8) {
       // solo si en TODA la biblioteca hay una única coincidencia (si no, es ambiguo y no se adivina)
