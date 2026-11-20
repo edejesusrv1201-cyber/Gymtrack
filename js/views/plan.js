@@ -417,7 +417,7 @@ const PlanView = (() => {
           Utils.el('div', { class: 'rt-top' }, [
             Utils.el('span', { class: 'rt-num', text: `${idx + 1}${letter}` }),
             Utils.el('div', { class: 'rt-name' }, [
-              Utils.el('div', { text: ex ? ex.name : '(eliminado)' }),
+              Utils.el('div', {}, [ex ? ex.name : '(eliminado)', ex ? Leaderboard.starPill(ex) : null]),
               Utils.el('div', { class: 'rt-group', text: group }),
             ]),
             Utils.el('div', { class: 'rt-actions' }, [up, down, del]),

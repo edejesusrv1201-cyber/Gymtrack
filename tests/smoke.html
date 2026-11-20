@@ -426,6 +426,20 @@
     if (t !== '120|2.5 L|1,234') throw new Error(t);
   });
 
+  await test('Ranking: solo los ⭐ (lista corta y sin ejercicios de la comunidad)', async () => {
+    const L = A.Leaderboard; const n = L.starList().length;
+    if (n < 10 || n > 22) throw new Error(`la lista tiene ${n} ejercicios`);
+    const st = (name, g, extra) => L.starOf({ id: 'zz', name, group: g || 'pierna', ...(extra || {}) });
+    if (!st('Press de banca', 'pecho')) throw new Error('banca debe tener ⭐');
+    if (!st('Extensión de rodilla')) throw new Error('extensión de rodilla debe tener ⭐');
+    if (st('Mi ejercicio raro con cadenas')) throw new Error('un ejercicio propio no debe tener ⭐');
+    if (st('Hack squat')) throw new Error('hack squat no está en la lista corta');
+    if (st('Extensión de rodilla', 'pierna', { unilateral: true })) throw new Error('unilateral no cuenta');
+    const pill = L.starPill({ id: 'zz', name: 'Sentadilla', group: 'pierna' });
+    if (!pill || pill.textContent !== '⭐') throw new Error('falta la estrella');
+    if (L.starPill({ id: 'zz', name: 'Cosa propia', group: 'pierna' })) throw new Error('no debe haber estrella');
+  });
+
   // ---- respaldo: exportar e importar mantiene los datos
   await test('Respaldo: exportar → importar conserva los datos', async () => {
     const a = JSON.stringify(A.DB.exportAll());

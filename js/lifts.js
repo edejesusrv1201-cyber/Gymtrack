@@ -50,6 +50,15 @@ const Lifts = (() => {
     { to: 'Pullover con mancuerna', re: '(pull ?over)', not: '(polea|cable|barra|cuerda)' },
   ];
 
+  // ⭐ Los ÚNICOS ejercicios del ranking (en este orden). Las palabras en minúscula sin espacios son los 6 básicos
+  // (claves del servidor); lo demás es el nombre del ejercicio en la biblioteca.
+  const STARS = [
+    'banca', 'sentadilla', 'peso_muerto', 'press_militar', 'remo_barra', 'hip_thrust',
+    'Press inclinado con mancuernas', 'Prensa de pierna 45°', 'Peso muerto rumano', 'Jalón al pecho en polea', 'Remo en polea baja',
+    'Press de pecho en máquina', 'Extensión de cuádriceps en máquina', 'Curl femoral sentado', 'Curl de bíceps con barra',
+    'Extensión de tríceps en polea (cuerda)', 'Abductores en máquina', 'Aductores en máquina', 'Elevación de talones de pie',
+  ];
+
   const STOP = new Set(['de', 'en', 'con', 'el', 'la', 'los', 'las', 'a', 'al', 'un', 'una', 'y', 'del', 'para', 'tu', 'mi']);
   const stem = (w) => (w.length > 5 && w.endsWith('es') ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w);
   // palabras sin conectores y en singular, ordenadas: «Máquina de extensión de cuádriceps» = «Extensión de cuádriceps en máquina»
@@ -62,5 +71,5 @@ const Lifts = (() => {
     return hit ? hit.to : null;
   };
 
-  return { RULES, canonical, tokens };
+  return { RULES, STARS, canonical, tokens };
 })();

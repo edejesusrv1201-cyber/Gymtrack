@@ -3,8 +3,8 @@
    · Usuario sin correo: solo un nombre (y, si quieres, una
      contraseña corta para volver a entrar desde otro celular).
    · Tú decides qué marcas publicas; nada se envía antes.
-   · Listas: Mixto / Hombres / Mujeres, por ejercicios básicos o de
-     la comunidad. Gana quien levantó MÁS PESO; si el peso es igual, quien hizo más repeticiones (sin 1RM estimado).
+   · Listas: Mixto / Hombres / Mujeres, solo para los ~20 ejercicios con ⭐
+     (Lifts.STARS; no hay ejercicios de la comunidad). Gana quien levantó MÁS PESO; si el peso es igual, quien hizo más repeticiones (sin 1RM estimado).
    Servidor: Supabase (ver supabase/setup.sql). Solo se envía tu
    nombre elegido, tu sexo (opcional) y las marcas que publiques.
    ============================================================ */
@@ -123,8 +123,8 @@ const Leaderboard = (() => {
     liftsCache = arr;
     return arr;
   }
-  // a qué prueba del ranking corresponde uno de tus ejercicios (o null)
-  function liftOf(ex) {
+  // a qué ejercicio de la biblioteca/básico corresponde uno de tus ejercicios (o null)
+  function liftRaw(ex) {
     if (!ex || ex.group === 'cardio' || ex.group === 'movilidad') return null;
     const n = norm(ex.name);
     const b = BASICS.find((x) => x.re.test(n) && !x.not.test(n));
@@ -150,16 +150,28 @@ const Leaderboard = (() => {
     }
     return null;
   }
-  // tus ejercicios propios (que no están en la biblioteca) también entran solos con el nombre que les pusiste
-  const customOn = () => DB.getSettings().lbCustom !== false;
-  function liftAny(ex) {
-    const l = liftOf(ex);
-    if (l) return l;
-    if (!ex || !customOn() || ex.bodyweight || ex.unilateral || !LIFT_GROUPS.includes(ex.group)) return null;
-    const key = `c:${slug(ex.name)}`;
-    if (key.length < 4) return null;
-    return { key, name: cleanName(ex.name), group: 'propio' };
+  // ⭐ el ranking tiene solo unos 19 ejercicios fijos (Lifts.STARS): nada de ejercicios de la comunidad
+  let starCache = null;
+  function starList() {
+    if (starCache) return starCache;
+    const arr = [];
+    ((typeof Lifts !== 'undefined' && Lifts.STARS) || BASICS.map((b) => b.key)).forEach((k) => {
+      const b = BASICS.find((x) => x.key === k);
+      if (b) { arr.push({ key: b.key, name: b.name, group: 'básico' }); return; }
+      const l = lifts().find((x) => x.libName === k);
+      if (l) arr.push({ key: l.key, name: l.name, group: l.group });
+    });
+    starCache = arr;
+    return arr;
   }
+  const starKeys = () => new Set(starList().map((x) => x.key));
+  // el ejercicio del ranking (⭐) al que cuenta uno de tus ejercicios, o null si no es uno de los ⭐
+  function liftOf(ex) {
+    const l = liftRaw(ex);
+    return l && starKeys().has(l.key) ? l : null;
+  }
+  const liftAny = liftOf;
+  const starOf = liftOf;
   const bestForLift = (key) => bestFor((e) => { const l = liftAny(e); return !!l && l.key === key; });
 
   // ---- publicación automática
@@ -266,9 +278,7 @@ const Leaderboard = (() => {
       if (!lift) {
         if (ex.bodyweight) why = 'es de peso corporal (no se compara por peso)';
         else if (ex.unilateral) why = 'está marcado como unilateral (peso por lado)';
-        else if (!LIFT_GROUPS.includes(ex.group)) why = `el grupo «${ex.group}» no entra al ranking`;
-        else if (!customOn()) why = 'no está en la biblioteca y tus ejercicios propios están apagados';
-        else why = 'su nombre no se puede usar';
+        else why = 'no es uno de los ejercicios ⭐ del ranking';
       }
       return { ex, lift, why, sets: counts[ex.id], best: lift ? bestForLift(lift.key) : null, pub: lift ? ui.mine.find((m) => m.exercise_key === lift.key) : null };
     }).sort((a, b) => (a.lift ? 0 : 1) - (b.lift ? 0 : 1) || b.sets - a.sets);
@@ -319,7 +329,7 @@ const Leaderboard = (() => {
   function renderSetup(view) {
     const card = Utils.el('div', { class: 'card' });
     card.appendChild(Utils.el('h3', { text: '🌍 Ranking global' }));
-    card.appendChild(Utils.el('p', { text: 'Compite con otras personas en los básicos (press de banca, sentadilla, peso muerto…) y en ejercicios de la comunidad, en listas de hombres, mujeres o mixtas.' }));
+    card.appendChild(Utils.el('p', { text: 'Compite con otras personas en unos 20 ejercicios con ⭐ (press de banca, sentadilla, peso muerto, prensa, jalón…), en listas de hombres, mujeres o mixtas. Los ⭐ los verás marcados en tus rutinas.' }));
     card.appendChild(Utils.el('div', { class: 'nut-hint', text: 'El ranking todavía no está conectado a un servidor. Cuando esté listo aparecerá aquí.' }));
     const det = Utils.el('details', { class: 'scan-raw', style: 'margin-top:12px;' });
     det.appendChild(Utils.el('summary', { text: 'Conectar servidor (solo quien administra la app)' }));
@@ -376,7 +386,7 @@ const Leaderboard = (() => {
         autoChip.addEventListener('click', () => { ui.auto = ui.auto === false; paintAuto(); });
         paintAuto();
         card.appendChild(autoChip);
-        card.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:0 0 10px;', text: 'Solo ejercicios de la biblioteca de la app (y los básicos). Puedes cambiarlo cuando quieras en «Mis marcas».' }));
+        card.appendChild(Utils.el('div', { class: 'small text-dim', style: 'margin:0 0 10px;', text: `Solo cuentan los ${starList().length} ejercicios con ⭐ (los verás en tus rutinas). Puedes cambiarlo cuando quieras en «Mis marcas».` }));
       }
       const go = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', text: mode === 'new' ? 'Crear mi usuario' : 'Entrar' });
       go.addEventListener('click', async () => {
@@ -437,23 +447,7 @@ const Leaderboard = (() => {
     const fillSelect = () => {
       exSel.innerHTML = '';
       const count = (k) => { const x = ui.exercises.find((e) => e.exercise_key === k); return x ? Number(x.athletes) : 0; };
-      const og1 = Utils.el('optgroup', { label: '⭐ Básicos' });
-      BASICS.forEach((b) => og1.appendChild(Utils.el('option', { value: b.key, text: `${b.name}${count(b.key) ? ` (${count(b.key)})` : ''}` })));
-      exSel.appendChild(og1);
-      LIFT_GROUPS.forEach((g) => {
-        const items = lifts().filter((l) => l.group === g);
-        if (!items.length) return;
-        const og = Utils.el('optgroup', { label: g.charAt(0).toUpperCase() + g.slice(1) });
-        items.forEach((l) => og.appendChild(Utils.el('option', { value: l.key, text: `${l.name}${count(l.key) ? ` (${count(l.key)})` : ''}` })));
-        exSel.appendChild(og);
-      });
-      const known = new Set(BASICS.map((b) => b.key).concat(lifts().map((l) => l.key)));
-      const com = ui.exercises.filter((x) => !known.has(x.exercise_key));
-      if (com.length) {
-        const og2 = Utils.el('optgroup', { label: 'Otros de la comunidad' });
-        com.forEach((x) => og2.appendChild(Utils.el('option', { value: x.exercise_key, text: `${x.exercise_name} (${x.athletes})` })));
-        exSel.appendChild(og2);
-      }
+      starList().forEach((l) => exSel.appendChild(Utils.el('option', { value: l.key, text: `⭐ ${l.name}${count(l.key) ? ` (${count(l.key)})` : ''}` })));
       exSel.value = ui.key;
       if (exSel.value !== ui.key) { ui.key = 'banca'; exSel.value = 'banca'; }
     };
@@ -538,34 +532,15 @@ const Leaderboard = (() => {
     auto.addEventListener('click', () => { setAuto(!autoOn()); if (autoOn()) syncAll(u).then((n) => { if (n > 0) Utils.toast(`🌍 ${n} marca${n === 1 ? '' : 's'} publicada${n === 1 ? '' : 's'}`); loadMine(u).then(() => paintMine(host, u)); }); paintMine(host, u); });
     card.appendChild(auto);
     card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:0 0 8px;', text: autoOn()
-      ? 'Cuando mejoras tu marca en un ejercicio de la biblioteca de la app, se publica sola con tu nombre. Aquí abajo puedes ajustar o quitar cada una.'
+      ? 'Cuando mejoras tu marca en un ejercicio con ⭐, se publica sola con tu nombre. Aquí abajo puedes ajustar o quitar cada una.'
       : 'Nada se envía solo. Publica tú las marcas que quieras con los botones.' }));
 
-    const keys = new Set();
-    const rowsData = [];
-    BASICS.forEach((b) => { keys.add(b.key); rowsData.push({ key: b.key, name: b.name, group: 'básico', local: bestForLift(b.key), pub: ui.mine.find((m) => m.exercise_key === b.key) }); });
-    const used = new Set();
-    DB.getExercises().forEach((e) => { const l = liftOf(e); if (l && !keys.has(l.key) && !used.has(l.key)) { used.add(l.key); } });
-    used.forEach((k) => {
-      const l = lifts().find((x) => x.key === k);
-      if (!l) return;
-      keys.add(k);
-      rowsData.push({ key: k, name: l.name, group: l.group, local: bestForLift(k), pub: ui.mine.find((m) => m.exercise_key === k) });
-    });
-    // lo que ya publicaste y no está arriba (ejercicios propios)
-    ui.mine.filter((m) => !keys.has(m.exercise_key)).forEach((m) => {
-      const ex = DB.getExercises().find((e) => 'c:' + slug(e.name) === m.exercise_key);
-      rowsData.push({ key: m.exercise_key, name: m.exercise_name, group: 'propio', local: ex ? bestOfExercise(ex.id) : null, pub: m });
-    });
+    const rowsData = starList().map((l) => ({ key: l.key, name: l.name, group: l.group, local: bestForLift(l.key), pub: ui.mine.find((m) => m.exercise_key === l.key) }));
     const withData = rowsData.filter((r) => r.local || r.pub);
-    const empty = rowsData.filter((r) => !r.local && !r.pub && r.group === 'básico');
-    if (!withData.length) card.appendChild(Utils.el('p', { class: 'small text-dim', text: 'Registra series de los básicos o de ejercicios de la biblioteca y aparecerán aquí.' }));
-    let lastG = '';
-    withData.forEach((r) => {
-      if (r.group !== lastG) { lastG = r.group; card.appendChild(Utils.el('div', { class: 'eyebrow mk-group', text: r.group === 'básico' ? '⭐ Básicos' : r.group })); }
-      card.appendChild(markRow(u, r, host));
-    });
-    if (empty.length) card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: `Aún sin registros: ${empty.map((r) => r.name).join(', ')}.` }));
+    const empty = rowsData.filter((r) => !r.local && !r.pub);
+    if (!withData.length) card.appendChild(Utils.el('p', { class: 'small text-dim', text: 'Haz series de un ejercicio con ⭐ (en tus rutinas) y tu marca aparecerá aquí.' }));
+    withData.forEach((r) => card.appendChild(markRow(u, r, host)));
+    if (empty.length) card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: `Con ⭐ y aún sin registros: ${empty.map((r) => r.name).join(', ')}.` }));
 
     // si la última publicación falló por algo que no es internet, se muestra aquí
     const err = lastErr();
@@ -575,11 +550,6 @@ const Leaderboard = (() => {
       warn.appendChild(dismiss);
       card.appendChild(warn);
     }
-
-    // incluir ejercicios propios
-    const cust = Utils.el('button', { class: `uni-chip${customOn() ? ' on' : ''}`, type: 'button', style: 'margin:10px 0 4px;', text: customOn() ? '✓ Incluir también mis ejercicios propios' : 'Incluir también mis ejercicios propios (apagado)' });
-    cust.addEventListener('click', () => { const st = DB.getSettings(); st.lbCustom = !customOn(); DB.saveSettings(st); if (customOn() && autoOn()) syncAll(u).then(() => loadMine(u).then(() => paintMine(host, u))); paintMine(host, u); });
-    card.appendChild(cust);
 
     // revisión de todos tus ejercicios
     const diag = diagnose();
@@ -604,7 +574,7 @@ const Leaderboard = (() => {
         ]));
       });
       det.appendChild(list);
-      det.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:8px 2px 0;', text: 'Cuentan las series normales con peso (no aproximaciones). Si algo dice «No entra», cámbialo en el ejercicio (quita «unilateral» o «peso corporal») o usa «Publicar un ejercicio propio».' }));
+      det.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin:8px 2px 0;', text: 'Cuentan las series normales con peso (no aproximaciones). Solo cuentan los ejercicios con ⭐. Si uno tuyo es de ese tipo pero dice «No entra», revisa que no esté marcado «unilateral» o «peso corporal».' }));
       card.appendChild(det);
     }
 
@@ -616,9 +586,6 @@ const Leaderboard = (() => {
       await loadMine(u); paintMine(host, u);
     });
     card.appendChild(now);
-    const add = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:8px;', text: '➕ Publicar un ejercicio propio' });
-    add.addEventListener('click', () => openCommunityPicker(u, host));
-    card.appendChild(add);
     host.appendChild(card);
   }
 
@@ -673,36 +640,6 @@ const Leaderboard = (() => {
     Modal.open(`📤 ${o.name}`, body);
   }
 
-  function openCommunityPicker(u, host) {
-    const body = Utils.el('div');
-    body.appendChild(Utils.el('p', { class: 'small', text: 'Elige uno de tus ejercicios para publicar tu mejor marca. Otras personas que tengan el mismo ejercicio podrán competir contigo.' }));
-    const search = Utils.el('input', { type: 'search', class: 'ax-search', placeholder: '🔎 Buscar ejercicio…' });
-    const list = Utils.el('div');
-    body.appendChild(search); body.appendChild(list);
-    const mine = DB.getExercises().filter((e) => e.group !== 'cardio' && e.group !== 'movilidad');
-    const paint = () => {
-      list.innerHTML = '';
-      const q = norm(search.value);
-      const items = mine.filter((e) => !q || norm(e.name).includes(q)).map((e) => ({ e, best: bestOfExercise(e.id) })).filter((x) => x.best).sort((a, b) => cmpBest(a.best, b.best)).slice(0, 60);
-      if (!items.length) list.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: 'No hay ejercicios con series registradas que coincidan.' }));
-      items.forEach(({ e, best }) => {
-        const r = Utils.el('div', { class: 'food-row' }, [
-          Utils.el('div', { class: 'fr-main' }, [Utils.el('div', { class: 'fr-name', text: e.name }), Utils.el('div', { class: 'meta', text: `Tu mejor: ${Units.label(best.kg)} × ${best.reps}` })]),
-          Utils.el('span', { class: 'fr-add', text: '+' }),
-        ]);
-        r.addEventListener('click', () => {
-          const isBasic = BASICS.find((b) => basicMatch(b)(e));
-          const key = isBasic ? isBasic.key : `c:${slug(e.name)}`;
-          if (key.length < 4) { Utils.toast('Ese nombre no se puede publicar'); return; }
-          openPublish(u, { key, name: isBasic ? isBasic.name : (e.name.replace(/[^\p{L}\p{N} ._()/+-]/gu, '').slice(0, 40) || 'Ejercicio'), local: best, pub: ui.mine.find((m) => m.exercise_key === key) }, host);
-        });
-        list.appendChild(r);
-      });
-    };
-    search.addEventListener('input', paint); paint();
-    Modal.open('➕ Publicar otro ejercicio', body);
-  }
-
   function openAccount(u) {
     const body = Utils.el('div');
     body.appendChild(Utils.el('p', { text: `Sesión: ${u.name}${u.sex === 'M' ? ' (hombre)' : u.sex === 'F' ? ' (mujer)' : ''}` }));
@@ -721,5 +658,10 @@ const Leaderboard = (() => {
   // al restaurar desde la nube en otro teléfono: recupera tu usuario del ranking
   function adopt(u) { if (u && u.id && u.secret && !user()) { setUser({ id: u.id, secret: u.secret, name: u.name, sex: u.sex || null }); pubLoaded = false; return true; } return false; }
 
-  return { render, configured, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, lifts, beats };
+  // ⭐ pequeña marca para ponerla junto al nombre de un ejercicio que cuenta para el ranking (o null)
+  function starPill(ex) {
+    try { return starOf(ex) ? Utils.el('span', { class: 'star-pill', title: 'Cuenta para el ranking', 'aria-label': 'Ejercicio del ranking', text: '⭐' }) : null; } catch (e) { return null; }
+  }
+
+  return { render, configured, starPill, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, starOf, starList, lifts, beats };
 })();

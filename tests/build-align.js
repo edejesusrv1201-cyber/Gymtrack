@@ -1,4 +1,4 @@
-// Genera supabase/align_names.sql: junta en el servidor las marcas del ranking que están con nombres distintos
+// Genera supabase/align_names.sql y supabase/ranking_stars.sql: junta en el servidor las marcas del ranking que están con nombres distintos
 // del mismo ejercicio (básicos + las reglas de js/lifts.js).
 // Uso:  node tests/build-align.js     (corre otra vez cada vez que cambies js/lifts.js)
 const fs = require('fs');
@@ -85,10 +85,71 @@ where s.profile_id = m.profile_id and s.exercise_key = m.old_key;
 select new_key as ejercicio, count(*) as marcas_movidas from _gt_map group by new_key order by 1;
 `;
 
+// ---- ranking de ⭐ ejercicios fijos: solo esas claves se pueden publicar
+const STARS = ctx.Lifts.STARS;
+const starKeys = STARS.map((k) => (/^[a-z_]+$/.test(k) ? k : `c:${slug(k)}`));
+const starsSql = `-- ============================================================
+--  MyGymTrack · Ranking con ⭐ ejercicios fijos (sin ejercicios de la comunidad)
+--  Pega TODO en Supabase → SQL Editor → New query → Run. Se puede correr más de una vez.
+--  (Archivo generado por \`node tests/build-align.js\` a partir de js/lifts.js: no lo edites a mano.)
+--
+--  Solo estos ${starKeys.length} ejercicios se pueden publicar. Las marcas viejas de otros ejercicios
+--  no se borran: simplemente ya no aparecen ni se pueden crear nuevas.
+-- ============================================================
+
+create or replace function public.gt_publish(p_secret uuid, p_key text, p_name text, p_weight numeric, p_reps int)
+returns json
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_id    uuid;
+  v_key   text := lower(btrim(coalesce(p_key, '')));
+  v_ename text := btrim(coalesce(p_name, ''));
+  v_e     numeric;
+begin
+  select id into v_id from public.gt_profiles where secret = p_secret;
+  if v_id is null then raise exception 'not_auth'; end if;
+  if p_weight is null or p_weight <= 0 or p_weight > 700 or p_reps is null or p_reps < 1 or p_reps > 30 then raise exception 'bad_values'; end if;
+  if v_key not in (${starKeys.map(q).join(', ')}) then raise exception 'bad_exercise'; end if;
+  if char_length(v_ename) < 2 or char_length(v_ename) > 40 then raise exception 'bad_exercise'; end if;
+  if v_ename !~ '^[[:alnum:] ._()/+-]+$' then raise exception 'bad_exercise'; end if;
+  v_e := round(case when p_reps = 1 then p_weight else p_weight * (1 + p_reps / 30.0) end, 2);
+  insert into public.gt_scores (profile_id, exercise_key, exercise_name, weight_kg, reps, e1rm)
+  values (v_id, v_key, v_ename, p_weight, p_reps, v_e)
+  on conflict (profile_id, exercise_key) do update
+    set exercise_name = excluded.exercise_name, weight_kg = excluded.weight_kg, reps = excluded.reps,
+        e1rm = excluded.e1rm, updated_at = now();
+  return json_build_object('e1rm', v_e);
+end;
+$$;
+
+-- lista de ejercicios con marcas: solo los ⭐
+create or replace function public.gt_exercises()
+returns table (exercise_key text, exercise_name text, athletes bigint)
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  select s.exercise_key, (array_agg(s.exercise_name order by s.updated_at desc))[1], count(*)
+  from public.gt_scores s
+  where s.exercise_key in (${starKeys.map(q).join(', ')})
+  group by s.exercise_key
+  order by count(*) desc, s.exercise_key;
+$$;
+
+revoke all on function public.gt_publish(uuid, text, text, numeric, int) from public;
+grant execute on function public.gt_publish(uuid, text, text, numeric, int) to anon, authenticated;
+grant execute on function public.gt_exercises() to anon, authenticated;
+`;
+
 const out = path.join(root, 'supabase/align_names.sql');
+const out2 = path.join(root, 'supabase/ranking_stars.sql');
 if (process.argv.includes('--check')) {
-  const cur = fs.existsSync(out) ? fs.readFileSync(out, 'utf8').replace(/\r\n/g, '\n') : '';
-  process.exit(cur === sql ? 0 : 1);
+  const rd = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)) : '');
+  process.exit(rd(out) === sql && rd(out2) === starsSql ? 0 : 1);
 }
 fs.writeFileSync(out, sql);
-console.log(`supabase/align_names.sql generado (${BASICS.length} básicos + ${RULES.length} reglas)`);
+fs.writeFileSync(out2, starsSql);
+console.log(`supabase/align_names.sql y ranking_stars.sql generados (${BASICS.length} básicos + ${RULES.length} reglas, ${starKeys.length} ejercicios ⭐)`);

@@ -313,7 +313,7 @@ const MoreView = (() => {
         const eq = ExerciseUI.eqLabel(ex.equipment);
         const row = Utils.el('div', { class: 'list-item', style: 'cursor:pointer;' }, [
           Utils.el('div', { style: 'min-width:0;' }, [
-            Utils.el('div', { style: 'font-weight:700;' }, [ex.name, ex.unilateral ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
+            Utils.el('div', { style: 'font-weight:700;' }, [ex.name, Leaderboard.starPill(ex), ex.unilateral ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
             eq ? Utils.el('div', { class: 'meta', text: eq }) : null,
           ]),
           Utils.el('span', { class: 'text-dim', text: '›' }),

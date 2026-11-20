@@ -394,8 +394,8 @@ const ExerciseUI = (() => {
 
     function paintChips() {
       chipsRow.innerHTML = '';
-      ['todos'].concat(GROUPS.filter((g) => LIB.some((l) => l[1] === g))).forEach((g) => {
-        const c = Utils.el('button', { type: 'button', class: `rt-chip${g === group && !query ? ' active' : ''}`, style: `--gc:${g === 'todos' ? 'var(--accent-light)' : (Utils.GROUP_COLORS[g] || '#8d95a8')}`, text: g });
+      ['todos', 'ranking'].concat(GROUPS.filter((g) => LIB.some((l) => l[1] === g))).forEach((g) => {
+        const c = Utils.el('button', { type: 'button', class: `rt-chip${g === group && !query ? ' active' : ''}`, style: `--gc:${g === 'todos' || g === 'ranking' ? 'var(--accent-light)' : (Utils.GROUP_COLORS[g] || '#8d95a8')}`, text: g === 'ranking' ? '⭐ ranking' : g });
         c.addEventListener('click', () => { group = g; search.value = ''; query = ''; paintChips(); paintList(); });
         chipsRow.appendChild(c);
       });
@@ -405,7 +405,8 @@ const ExerciseUI = (() => {
       list.innerHTML = '';
       const owned = have();
       const q = norm(query);
-      let items = LIB.filter((l) => (q ? norm(l[0]).includes(q) || norm(l[1]).includes(q) || norm(eqLabel(l[2])).includes(q) : group === 'todos' || l[1] === group));
+      const isStar = (l) => !!Leaderboard.starOf({ name: l[0], group: l[1], unilateral: !!l[3], bodyweight: !!l[4] });
+      let items = LIB.filter((l) => (q ? norm(l[0]).includes(q) || norm(l[1]).includes(q) || norm(eqLabel(l[2])).includes(q) : group === 'todos' ? true : group === 'ranking' ? isStar(l) : l[1] === group));
       if (!items.length) {
         list.appendChild(Utils.el('p', { class: 'small text-dim', style: 'padding:12px 0;', text: 'No hay coincidencias. Puedes crear el tuyo con el botón de abajo.' }));
       }
@@ -416,7 +417,7 @@ const ExerciseUI = (() => {
         const gbtn = Utils.el('button', { class: 'btn-small', type: 'button', text: '🎓', title: 'Cómo se hace' });
         const row = Utils.el('div', { class: `list-item${has ? ' ax-added' : ''}` }, [
           Utils.el('div', { style: 'min-width:0;' }, [
-            Utils.el('div', { style: 'font-weight:700;' }, [name, uni ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null, bw ? Utils.el('span', { class: 'uni-pill', text: 'peso corporal' }) : null]),
+            Utils.el('div', { style: 'font-weight:700;' }, [name, Leaderboard.starPill({ name, group: g, unilateral: !!uni, bodyweight: !!bw }), uni ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null, bw ? Utils.el('span', { class: 'uni-pill', text: 'peso corporal' }) : null]),
             Utils.el('div', { class: `meta grp-${g}`, text: `${g} · ${eqLabel(eq)}${has ? ' · ya en tu catálogo' : ''}` }),
           ]),
           Utils.el('div', { class: 'gd-btns' }, [gbtn, btn]),

@@ -337,7 +337,7 @@ const WorkoutView = (() => {
       Utils.el('span', { class: 'ex-num', text: String(idx + 1) }),
       Utils.el('div', { class: 'now-main' }, [
         Utils.el('div', { class: 'now-label', text: 'AHORA' }),
-        Utils.el('div', { class: 'now-name', text: ex ? ex.name : '(ejercicio eliminado)' }),
+        Utils.el('div', { class: 'now-name' }, [ex ? ex.name : '(ejercicio eliminado)', ex ? Leaderboard.starPill(ex) : null]),
       ]),
       Utils.el('span', { class: 'counter-chip' + (target && n >= target.targetSets ? ' done' : ''), text: target ? `${n}/${target.targetSets}` : `${n}` }),
     ]);
@@ -490,7 +490,7 @@ const WorkoutView = (() => {
     ]);
     card.appendChild(Utils.el('div', { class: 'ex-header' }, [
       Utils.el('div', { style: 'min-width:0;' }, [
-        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: `${opts.num}${opts.ssLetter || ''}` }) : null, ex ? ex.name : '(ejercicio eliminado)']),
+        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: `${opts.num}${opts.ssLetter || ''}` }) : null, ex ? ex.name : '(ejercicio eliminado)', ex ? Leaderboard.starPill(ex) : null]),
         ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: ex.group }) : null,
       ]),
       headerBtns,
@@ -1440,7 +1440,7 @@ const WorkoutView = (() => {
       btn.disabled = isAdded;
       const row = Utils.el('div', { class: `list-item${isAdded ? ' ax-added' : ''}` }, [
         Utils.el('div', { style: 'min-width:0;' }, [
-          Utils.el('div', { style: 'font-weight:700;' }, [ex.name, ex.unilateral ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
+          Utils.el('div', { style: 'font-weight:700;' }, [ex.name, Leaderboard.starPill(ex), ex.unilateral ? Utils.el('span', { class: 'uni-pill', text: 'unilateral' }) : null]),
           Utils.el('div', { class: `meta grp-${ex.group}`, text: best ? `${ex.group} · última vez ${Metrics.formatSet(best.best, isCardio)}` : `${ex.group} · sin registros` }),
         ]),
         btn,

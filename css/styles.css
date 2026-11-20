@@ -2185,3 +2185,6 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .uf-row input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
 .uf-main { display: flex; flex-direction: column; min-width: 0; }
 .uf-main span { overflow-wrap: anywhere; }
+
+/* ⭐ ejercicio del ranking */
+.star-pill { display: inline-block; margin-left: 6px; font-size: .78em; line-height: 1; vertical-align: .08em; filter: drop-shadow(0 0 5px rgba(255, 196, 61, .55)); }
