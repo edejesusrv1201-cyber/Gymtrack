@@ -19,6 +19,39 @@ const Fx = (() => {
     document.body.appendChild(node);
     setTimeout(() => { node.remove(); active = Math.max(0, active - 1); }, 1300);
   }
+  // ---------- números que suben al abrir una pantalla ----------
+  // Solo cuenta números simples («12», «2.5», «108lb», «0 L»); con las animaciones activadas y sin ahorro de batería.
+  const SIMPLE = /^(\d+)(?:\.(\d+))?(\D.*)?$/;
+  function countUp(root) {
+    try {
+      if (!on() || !root || (typeof Perf !== 'undefined' && Perf.isLow())) return;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const nodes = root.querySelectorAll('.tile-val, .kpi-val');
+      nodes.forEach((el) => {
+        // el número puede ir suelto o con una unidad dentro de <small>: solo se anima el primer nodo de texto
+        const tn = Array.from(el.childNodes).find((n) => n.nodeType === 3 && n.nodeValue.trim());
+        if (!tn) return;
+        const m = SIMPLE.exec(tn.nodeValue.trim());
+        if (!m) return;
+        const dec = m[2] ? m[2].length : 0;
+        const end = parseFloat(`${m[1]}${m[2] ? `.${m[2]}` : ''}`);
+        if (!(end >= 2) || end > 1e7) return;
+        const tail = m[3] || '';
+        const lead = tn.nodeValue.match(/^\s*/)[0];
+        const t0 = performance.now(); const dur = 650;
+        const fmt = (v) => `${lead}${dec ? v.toFixed(dec) : String(Math.round(v))}${tail}`;
+        tn.nodeValue = fmt(0);
+        const step = (now) => {
+          const k = Math.min(1, (now - t0) / dur);
+          tn.nodeValue = fmt(end * (1 - Math.pow(1 - k, 3)));
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        setTimeout(() => { tn.nodeValue = fmt(end); }, dur + 400);   // por si el navegador pausa la animación
+      });
+    } catch (e) { /* sin animación */ }
+  }
+
   // ---------- subida de nivel a pantalla completa ----------
   // res = { up: {from, to}, ev: { lvl } } (lo que devuelve Gamify.check). done() se llama al cerrar.
   function levelUp(res, done) {
@@ -69,5 +102,5 @@ const Fx = (() => {
     setTimeout(() => { try { btn.focus({ preventScroll: true }); } catch (e) { /* nada */ } }, 2300);
   }
 
-  return { xp, levelUp };
+  return { xp, levelUp, countUp };
 })();

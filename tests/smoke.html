@@ -403,6 +403,29 @@
     if (miss.length) throw new Error(`reglas sin ejercicio en la biblioteca: ${miss.join(', ')}`);
   });
 
+  await test('Corregir pesos: convierte a libras y se puede deshacer', async () => {
+    const UF = frame.contentWindow.eval('UnitFix');
+    const before = JSON.stringify(A.DB.getWorkoutLog());
+    const rows = UF.scan(); if (!rows.length) throw new Error('sin series con peso en los datos de ejemplo');
+    const r = rows[0];
+    const n = UF.apply([r.id], '');
+    if (n !== r.sets) throw new Error(`cambió ${n} series y esperaba ${r.sets}`);
+    const after = UF.scan().find((x) => x.id === r.id);
+    if (Math.abs(after.max - r.max * 0.45359237) > 0.01) throw new Error(`máximo ${after.max} ≠ ${r.max * 0.45359237}`);
+    const back = UF.undo();
+    if (back !== n || JSON.stringify(A.DB.getWorkoutLog()) !== before) throw new Error('deshacer no restauró los datos');
+  });
+
+  await test('Números animados: terminan en el valor real', async () => {
+    const d = frame.contentDocument; const prevUi = d.documentElement.dataset.ui; d.documentElement.dataset.ui = 'on';
+    const box = d.createElement('div'); box.innerHTML = '<div class="tile-val">120</div><div class="kpi-val">2.5 L</div><div class="tile-val">1,234</div>'; d.body.appendChild(box);
+    frame.contentWindow.eval('Fx').countUp(box);
+    await wait(1400);
+    const t = Array.from(box.children).map((x) => x.textContent).join('|');
+    box.remove(); if (prevUi === undefined) delete d.documentElement.dataset.ui; else d.documentElement.dataset.ui = prevUi;
+    if (t !== '120|2.5 L|1,234') throw new Error(t);
+  });
+
   // ---- respaldo: exportar e importar mantiene los datos
   await test('Respaldo: exportar → importar conserva los datos', async () => {
     const a = JSON.stringify(A.DB.exportAll());

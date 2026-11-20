@@ -191,6 +191,10 @@ const MoreView = (() => {
     platesBtn.addEventListener('click', () => Plates.open());
     toolsCard.appendChild(platesBtn);
     toolsCard.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: 'Dime el peso total y te digo qué discos poner por lado. También está en el menú ⋯ de cada ejercicio.' }));
+    const fixBtn = Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin-top:8px;', text: '🔧 Corregir pesos (libras vs kilos)' });
+    fixBtn.addEventListener('click', () => UnitFix.open());
+    toolsCard.appendChild(fixBtn);
+    toolsCard.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: '¿Anotaste libras cuando la app estaba en kilos? Aquí lo arreglas por ejercicio.' }));
     view.appendChild(toolsCard);
     view.appendChild(buildInstallCard());
 

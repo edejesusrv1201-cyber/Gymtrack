@@ -2178,3 +2178,10 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .fr-crown { margin-top: 12px; text-align: center; }
 .fr-manage { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(var(--ov), 0.06); }
 .fr-manage:first-child { border-top: 0; }
+
+/* corregir pesos (libras vs kilos) */
+.uf-list { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow: auto; margin: 6px 0; }
+.uf-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; background: rgba(var(--ov), .05); border: 1px solid rgba(var(--ov), .08); cursor: pointer; }
+.uf-row input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
+.uf-main { display: flex; flex-direction: column; min-width: 0; }
+.uf-main span { overflow-wrap: anywhere; }

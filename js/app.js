@@ -46,6 +46,7 @@ const App = (() => {
     clearTimeout(navigate.animTimer);
     navigate.animTimer = setTimeout(() => root.classList.remove('anim-in'), 1100);
     mod.render(root, params);
+    try { Fx.countUp(root); } catch (e) { /* sin números animados */ }
     Theme.apply(viewName === 'workout' && params.date ? params.date : undefined);
     updateChrome();
     window.scrollTo(0, 0);
