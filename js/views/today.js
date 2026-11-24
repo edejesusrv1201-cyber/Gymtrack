@@ -479,6 +479,20 @@ const TodayView = (() => {
       ]) });
     }
 
+    // Android/Chrome: instalar como app con un toque
+    let androidDismissed = false;
+    try { androidDismissed = localStorage.getItem('gt_hint_install') === '1'; } catch (e) { /* sin almacenamiento */ }
+    if (App.canInstall && !Utils.isStandalone() && !androidDismissed) {
+      const inst = Utils.el('button', { class: 'btn-small btn-primary-s', type: 'button', text: 'Instalar' });
+      inst.addEventListener('click', async () => { await App.install(); rerender(); });
+      const no = Utils.el('button', { class: 'link-btn small', type: 'button', text: 'Ahora no' });
+      no.addEventListener('click', () => { try { localStorage.setItem('gt_hint_install', '1'); } catch (e) { /* nada */ } rerender(); });
+      notices.push({ key: 'instalar', node: Utils.el('div', { class: 'banner' }, [
+        Utils.el('span', { text: '📲 Instala MyGymTrack como app en tu celular.' }),
+        Utils.el('div', { style: 'display:flex;align-items:center;gap:6px;flex:none;' }, [inst, no]),
+      ]) });
+    }
+
     // en Safari (iPhone/iPad) sin instalar: una pista de cómo añadirla a la pantalla de inicio
     let hintDismissed = false;
     try { hintDismissed = localStorage.getItem('gt_hint_ios') === '1'; } catch (e) { /* sin almacenamiento */ }

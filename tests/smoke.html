@@ -46,7 +46,7 @@
   const w = frame.contentWindow; const d = frame.contentDocument;
   // los módulos son «const» globales: no cuelgan de window, se leen con eval
   const A = {};
-  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats', 'Stories', 'RoutineShare', 'Friends', 'Gamify'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
+  const bind = () => { ['App', 'DB', 'Utils', 'Modal', 'Guide', 'Muscles', 'ExerciseUI', 'Privacy', 'Diet', 'Leaderboard', 'ErrLog', 'Feedback', 'Activity', 'Gamify', 'Energy', 'Fx', 'Treats', 'Stories', 'RoutineShare', 'Friends', 'Gamify', 'Guard'].forEach((n) => { A[n] = frame.contentWindow.eval(n); }); };
   bind();
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason && e.reason.message || e.reason)));
@@ -438,6 +438,21 @@
     const pill = L.starPill({ id: 'zz', name: 'Sentadilla', group: 'pierna' });
     if (!pill || pill.textContent !== '⭐') throw new Error('falta la estrella');
     if (L.starPill({ id: 'zz', name: 'Cosa propia', group: 'pierna' })) throw new Error('no debe haber estrella');
+  });
+
+  await test('Protección: solo las direcciones oficiales (y tu computadora) abren la app', async () => {
+    const G = frame.contentWindow.eval('Guard');
+    ['localhost', '127.0.0.1', '192.168.1.20', 'edejesusrv1201-cyber.github.io'].forEach((h) => { if (!G.allowed(h)) throw new Error(`debe permitir ${h}`); });
+    ['copia.netlify.app', 'otro.github.io', 'edejesusrv1201-cyber.github.io.malo.com', ''].forEach((h) => { if (G.allowed(h)) throw new Error(`no debe permitir «${h}»`); });
+  });
+
+  await test('Accesos directos: «agua» suma 250 ml', async () => {
+    const day = A.Utils.todayISO(); const sum = () => (A.DB.getWaterLog()[day] || []).reduce((s, e) => s + e.ml, 0);
+    const before = sum();
+    const old = frame.src; await new Promise((res) => { frame.onload = () => { frame.onload = null; res(); }; frame.src = '../index.html?go=agua'; }); await wait(900); bind();
+    const after = sum();
+    if (after - before !== 250) throw new Error(`sumó ${after - before}`);
+    if (/go=agua/.test(frame.contentWindow.location.search)) throw new Error('el parámetro no se limpió: recargar sumaría otra vez');
   });
 
   // ---- respaldo: exportar e importar mantiene los datos

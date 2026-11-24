@@ -5,6 +5,9 @@
    a las tablas, solo a las funciones del ranking.
    ============================================================ */
 window.GT_CONFIG = {
+  // direcciones donde la app puede funcionar (además de tu computadora). Si cambias de dominio, agrégalo aquí.
+  hosts: ['edejesusrv1201-cyber.github.io'],
+  homeUrl: 'https://edejesusrv1201-cyber.github.io/Gymtrack/',
   supabaseUrl: 'https://hbcruzvypyzuqyabjskx.supabase.co',
   friends: true,  // liga de amigos (supabase/friends.sql ya ejecutado el 2026-11-24)
   cloud: true,    // cuentas y respaldo en la nube (supabase/cloud.sql ya ejecutado el 2026-11-18)

@@ -40,3 +40,27 @@ Estado: la app ya es una **PWA completa** (instalable, funciona sin internet, co
 2. Guardar la **llave de firma** en un lugar seguro (si se pierde, no se puede actualizar la app).
 3. Subir el `.aab` a Play Console → prueba cerrada → producción.
 4. Cada actualización de la web se refleja sola en la app de Play (es una TWA): no hay que volver a subir nada salvo cambios del paquete.
+
+## 6. Proteger el código (decidido por partes)
+
+Ya está: archivo LICENSE (todos los derechos reservados), aviso © en la app y `js/guard.js`
+(la app solo abre en las direcciones de `hosts` en config.js; si cambias de dominio, agrégalo antes).
+Eso frena copias simples, pero quien sepa programar puede quitarlo: el código de una web siempre se puede leer.
+
+Falta (requiere decidirlo):
+- **Repositorio privado para el código** y publicar solo la versión comprimida/ofuscada. En GitHub gratis,
+  Pages deja de funcionar si el repo es privado: se usa un repo público solo con el resultado, o Netlify /
+  Cloudflare Pages (gratis con repo privado). El historial público actual sigue mostrando el código viejo.
+- Registrar la obra (Dirección Nacional de Derecho de Autor) y la marca (DIGERPI) en Panamá.
+- La protección fuerte es el servidor: cuentas y membresía validadas en Supabase.
+
+## 7. APK, iPhone y widgets
+
+- **Hoy:** Android → «Instalar app» crea una app real (WebAPK) que se actualiza sola. iPhone → Safari →
+  Compartir → «Añadir a pantalla de inicio». Accesos rápidos en Android al mantener presionado el icono.
+- **APK / Play Store:** TWA (PWABuilder o Bubblewrap). La app sigue cargando la web, así que se actualiza
+  sola; solo se vuelve a subir si cambian nombre, icono o permisos. Requiere `assetlinks.json` en la raíz
+  del dominio (dominio propio o repo `<usuario>.github.io`) y guardar bien la llave de firma.
+- **App Store:** envoltura con Capacitor, Mac con Xcode y 99 USD/año; Apple rechaza webs sin funciones nativas.
+- **Widgets en pantalla:** una web no puede. Se necesitan en código nativo (Android: AppWidget en la
+  envoltura Capacitor; iOS: WidgetKit). Hacerlo junto con la publicación en tiendas.

@@ -166,6 +166,10 @@ const MoreView = (() => {
     card.appendChild(Utils.el('h3', { text: '📲 Instalar en tu celular' }));
     if (Utils.isStandalone()) {
       card.appendChild(Utils.el('p', { text: '✅ Ya la tienes instalada: estás usando MyGymTrack como app.' }));
+    } else if (App.canInstall) {
+      const inst = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', text: '📲 Instalar la app ahora' });
+      inst.addEventListener('click', async () => { if (await App.install()) inst.remove(); });
+      card.appendChild(inst);
     }
     const step = (title, lines) => Utils.el('div', { style: 'margin-top:10px;' }, [
       Utils.el('div', { class: 'eyebrow', text: title }),
@@ -173,6 +177,7 @@ const MoreView = (() => {
     ]);
     card.appendChild(step('iPhone / iPad (Safari)', '1) Abre la página en Safari. 2) Toca el botón Compartir (el cuadrado con la flecha hacia arriba). 3) Elige "Añadir a pantalla de inicio" y toca Añadir.'));
     card.appendChild(step('Android (Chrome)', 'Toca el menú ⋮ y elige "Instalar app" o "Añadir a pantalla de inicio".'));
+    card.appendChild(step('Accesos rápidos (Android)', 'Con la app instalada, mantén presionado su icono: salen «Entrenar», «Comida», «Agua» y «Progreso». Puedes arrastrar cualquiera a la pantalla de inicio para tenerlo como botón aparte.'));
     card.appendChild(Utils.el('p', { class: 'small', style: 'margin-top:10px;', text: 'Importante: la app instalada guarda sus datos aparte de los del navegador. Si ya la usabas en el navegador, exporta tu respaldo aquí abajo e impórtalo en la app instalada.' }));
     return card;
   }
@@ -482,6 +487,7 @@ const MoreView = (() => {
     aboutCard.appendChild(updBtn);
     view.appendChild(aboutCard);
 
+    view.appendChild(Utils.el('p', { class: 'small text-dim', style: 'text-align:center;margin:6px 0 2px;', text: `© ${new Date().getFullYear()} MyGymTrack. Todos los derechos reservados.` }));
     root.appendChild(view);
   }
 

@@ -121,7 +121,12 @@ const App = (() => {
     try { go = new URLSearchParams(location.search).get('go') || ''; } catch (e) { return; }
     if (!go) return;
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* nada */ }
-    if (go === 'comida') navigate('calorias');
+    if (go === 'agua') {   // acceso directo: suma un vaso y muestra Hoy
+      const day = Utils.todayISO(); const wl = DB.getWaterLog();
+      wl[day] = (wl[day] || []).concat([{ id: DB.uid(), ml: 250, time: new Date().toISOString() }]);
+      DB.saveWaterLog(wl);
+      navigate('hoy'); Utils.toast('💧 +250 ml anotados');
+    } else if (go === 'comida') navigate('calorias');
     else if (go === 'progreso') navigate('progreso');
     else if (go === 'entreno') {
       // solo el botón de entrenar de hoy (no otros avisos como "plan de regreso")
@@ -130,7 +135,25 @@ const App = (() => {
     }
   }
 
+  // Android/Chrome avisa cuando la app se puede instalar: guardamos el aviso para ofrecer un botón de un toque
+  let installEvent = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); installEvent = e;
+    if (currentView === 'hoy' && !document.querySelector('.modal-backdrop')) navigate('hoy');
+  });
+  window.addEventListener('appinstalled', () => { installEvent = null; Utils.toast('📲 ¡App instalada!'); });
+  async function install() {
+    const e = installEvent;
+    if (!e) return false;
+    installEvent = null;
+    e.prompt();
+    let ok = false;
+    try { ok = (await e.userChoice).outcome === 'accepted'; } catch (err) { /* cancelado */ }
+    return ok;
+  }
+
   function init() {
+    if (typeof Guard !== 'undefined' && !Guard.allowed()) { Guard.block(); return; }
     DB.ensureSeed();
     // pide al navegador (Safari incluido) que no borre los datos si hay poco espacio
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -165,7 +188,7 @@ const App = (() => {
     try { Perf.measure(); } catch (e) { /* sin medición */ }
   }
 
-  return { navigate, init, get currentView() { return currentView; }, get currentParams() { return currentParams; } };
+  return { navigate, init, install, get canInstall() { return !!installEvent; }, get currentView() { return currentView; }, get currentParams() { return currentParams; } };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);
