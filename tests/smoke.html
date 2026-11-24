@@ -219,7 +219,7 @@
     const wx = A.Gamify.weeklyXp(A.Utils.toISODate(new Date(Date.now() - ((new Date().getDay()) * 86400000))));
     if (!(wx.xp > 0) || wx.sessions < 0 || wx.days < wx.sessions) throw new Error(`XP semanal raro: ${JSON.stringify(wx)}`);
     if (wx.xp < A.Activity.xpOfDay(today)) throw new Error('el XP semanal no incluye el deporte de hoy');
-    W.GT_CONFIG.friends = true; W.GT_CONFIG.supabaseUrl = 'https://fake.supabase.co'; W.GT_CONFIG.supabaseKey = 'sb_publishable_fake';
+    const prevFriends = W.GT_CONFIG.friends; W.GT_CONFIG.friends = true; W.GT_CONFIG.supabaseUrl = 'https://fake.supabase.co'; W.GT_CONFIG.supabaseKey = 'sb_publishable_fake';
     W.localStorage.setItem('gt_lbUser', JSON.stringify({ id: 'u1', secret: '11111111-1111-1111-1111-111111111111', name: 'Yo', sex: 'M' }));
     const calls = [];
     W.fetch = async (url, opts) => {
@@ -242,7 +242,7 @@
     if (overflow() > 1) throw new Error('se sale de la pantalla');
     const inp = D.querySelector('.fr-input'); inp.value = 'zzzzzz'; [...D.querySelectorAll('.btn-primary')].find((b) => b.textContent === 'Agregar').click(); await wait(600);
     if (!calls.some((c) => c.fn === 'gt_add_friend' && c.body.p_code === 'zzzzzz')) throw new Error('no llamó a agregar amigo');
-    W.GT_CONFIG.friends = false; W.localStorage.removeItem('gt_lbUser');
+    W.GT_CONFIG.friends = prevFriends; W.localStorage.removeItem('gt_lbUser');
     W.fetch = async () => new W.Response('[]', { status: 200 });
   });
   await modal('Historias (menú)', () => A.Stories.hub());
