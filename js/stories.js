@@ -264,6 +264,117 @@ const Stories = (() => {
     });
   }
 
+  // ---------- 5) resumen del mes ----------
+  const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const monthOffset = () => (new Date().getDate() <= 3 ? -1 : 0);   // los primeros días se comparte el mes que acabó
+  async function month(prefs, offset) {
+    const off = offset === undefined ? monthOffset() : offset;
+    const range = Metrics.monthRange(off);
+    const tot = Metrics.totals(range.start, range.end);
+    const sports = typeof Activity !== 'undefined' ? Activity.list(range.start, range.end) : [];
+    const sportMin = Math.round(sports.reduce((n, a) => n + (a.min || 0), 0));
+    const sportKm = sports.reduce((n, a) => n + (a.km || 0), 0);
+    const prs = typeof Records !== 'undefined' ? Records.compute().filter((r) => r.date >= range.start && r.date <= range.end).length : 0;
+    const first = Utils.parseISO(range.start); const days = Utils.parseISO(range.end).getDate();
+    return frame(prefs, { sub: 'Mi mes', chip: `${tot.days} ${tot.days === 1 ? 'día' : 'días'} 🏋️`, eyebrow: 'RESUMEN DEL MES', title: `${MESES[first.getMonth()]} ${first.getFullYear()}`, gold: prs > 0 }, async (c, y0) => {
+      let y = y0;
+      const { ctx, t, k, FONT, fmt, grad } = c;
+      y = tiles(c, y, [{ v: String(tot.days), l: 'días de gym' }, { v: String(tot.sets), l: 'series' }, { v: String(prs), l: prs === 1 ? 'récord' : 'récords' }], fmt.tileH);
+      const sportTxt = sportMin >= 60 ? `${Math.floor(sportMin / 60)} h ${String(sportMin % 60).padStart(2, '0')}` : `${sportMin} min`;
+      y = tiles(c, y, [{ v: k.bigNum(Units.fromKg(tot.volume)), l: `${Units.current()} de volumen` }, { v: sports.length ? sportTxt : '–', l: sportKm > 0 ? `deporte · ${Utils.round1(sportKm)} km` : 'de deporte' }], Math.round(fmt.tileH * 0.85));
+
+      // calendario del mes
+      const lead = first.getDay(); const rows = Math.ceil((lead + days) / 7);
+      const cell = c.story ? 78 : 54; const ph = 142 + rows * cell;
+      const iy = titled(c, y, ph, 'MIS DÍAS ACTIVOS');
+      const wl = DB.getWorkoutLog(); const cw = 880 / 7;
+      ctx.textAlign = 'center';
+      for (let i = 0; i < 7; i += 1) { ctx.fillStyle = t.dim; ctx.font = `800 22px ${FONT}`; ctx.fillText(DAY[i], 100 + cw * i + cw / 2, iy + 20); }
+      for (let d = 1; d <= days; d += 1) {
+        const dt = new Date(first.getFullYear(), first.getMonth(), d); const iso = Utils.toISODate(dt);
+        const idx = lead + d - 1; const cx = 100 + cw * (idx % 7) + cw / 2; const cy = iy + 40 + Math.floor(idx / 7) * cell + cell / 2;
+        const gym = ((wl[iso] || {}).exercises || []).some((e) => (e.sets || []).some((s) => !Metrics.isWarmup(s)));
+        const sport = sports.some((a) => a.date === iso);
+        const r = cell * 0.4;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = gym ? grad(cx - r, cx + r) : sport ? SPORT : t.track; ctx.fill();
+        if (gym && sport) { ctx.beginPath(); ctx.arc(cx + r * 0.75, cy - r * 0.75, r * 0.3, 0, Math.PI * 2); ctx.fillStyle = SPORT; ctx.fill(); }
+        ctx.fillStyle = gym || sport ? (t.light ? '#fff' : '#0b0d12') : t.dim; ctx.font = `800 ${Math.round(r * 0.9)}px ${FONT}`; ctx.fillText(String(d), cx, cy + r * 0.32);
+      }
+      ctx.textAlign = 'left';
+      y += ph + fmt.gap;
+
+      if (c.story) {
+        const groups = Object.keys(tot.byGroup).filter((g) => g !== 'cardio' && g !== 'movilidad').map((g) => ({ g, n: tot.byGroup[g].sets })).sort((a, b) => b.n - a.n).slice(0, 4);
+        if (groups.length) {
+          const rowH = 52; const gh = 84 + groups.length * rowH;
+          const gy = titled(c, y, gh, 'LO QUE MÁS ENTRENÉ');
+          const max = Math.max(1, ...groups.map((x) => x.n));
+          groups.forEach((g, i) => {
+            const yy = gy + 20 + i * rowH;
+            ctx.fillStyle = t.text; ctx.font = `700 29px ${FONT}`; ctx.fillText(g.g.charAt(0).toUpperCase() + g.g.slice(1), 100, yy);
+            k.rrect(ctx, 340, yy - 22, 520, 22, 11); ctx.fillStyle = t.track; ctx.fill();
+            k.rrect(ctx, 340, yy - 22, Math.max(22, 520 * (g.n / max)), 22, 11); ctx.fillStyle = grad(340, 860); ctx.fill();
+            ctx.textAlign = 'right'; ctx.fillStyle = c.accentText; ctx.font = `800 28px ${FONT}`; ctx.fillText(String(g.n), 980, yy); ctx.textAlign = 'left';
+          });
+          y += gh;
+        }
+      }
+      return y;
+    });
+  }
+
+  // ---------- 6) mi cuerpo (peso y medidas de los últimos 90 días) ----------
+  const BODY_FIELDS = [['waist', 'Cintura'], ['hips', 'Cadera'], ['chest', 'Pecho'], ['armR', 'Brazo'], ['thighR', 'Muslo'], ['calfR', 'Pantorrilla']];
+  function bodyData() {
+    const all = DB.getMeasurements().filter((m) => m.date).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+    const from = new Date(); from.setDate(from.getDate() - 90); const since = Utils.toISODate(from);
+    let list = all.filter((m) => m.date >= since);
+    if (list.filter((m) => m.weight).length < 2) list = all;   // pocos datos recientes: todo el historial
+    const weights = list.filter((m) => m.weight).map((m) => ({ date: m.date, kg: Number(m.weight) }));
+    const changes = BODY_FIELDS.map(([key, name]) => {
+      const v = list.filter((m) => Number(m[key]) > 0);
+      return v.length < 2 ? null : { name, from: Number(v[0][key]), to: Number(v[v.length - 1][key]) };
+    }).filter(Boolean);
+    return { weights, changes };
+  }
+  async function body(prefs) {
+    const d = bodyData();
+    const w = d.weights; const n = w.length;
+    return frame(prefs, { sub: 'Mi progreso físico', eyebrow: 'MI CUERPO', title: n > 1 ? `Desde ${Utils.shortDate(w[0].date)}` : 'Mi punto de partida' }, async (c, y0) => {
+      let y = y0;
+      const { ctx, t, k, FONT, fmt, grad } = c;
+      if (!n) { ctx.fillStyle = t.dim; ctx.font = `700 34px ${FONT}`; ctx.fillText('Anota tu peso en Progreso → Cuerpo y vuelve aquí.', 70, y + 60); return y + 90; }
+      const unit = Units.current(); const now = Units.num(w[n - 1].kg, unit); const delta = Math.round((now - Units.num(w[0].kg, unit)) * 10) / 10;
+      y = tiles(c, y, [{ v: String(now), l: `${unit} hoy` }, { v: n > 1 ? `${delta > 0 ? '+' : ''}${delta}` : '–', l: `${unit} de cambio` }], fmt.tileH);
+      if (n > 1) {
+        const ph = c.story ? 480 : 330;
+        const iy = titled(c, y, ph, 'MI PESO');
+        const x0 = 110; const x1 = 970; const yb = y + ph - 40; const yt = iy + 24;
+        const min = Math.min(...w.map((p) => p.kg)); const max = Math.max(...w.map((p) => p.kg)); const span = Math.max(1, max - min);
+        const t0 = Utils.parseISO(w[0].date).getTime(); const t1 = Math.max(t0 + 1, Utils.parseISO(w[n - 1].date).getTime());
+        const pts = w.map((p) => [x0 + (x1 - x0) * ((Utils.parseISO(p.date).getTime() - t0) / (t1 - t0)), yb - (yb - yt) * ((p.kg - min) / span)]);
+        ctx.lineWidth = 10; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = grad(x0, x1);
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke();
+        [pts[0], pts[pts.length - 1]].forEach((p) => { ctx.beginPath(); ctx.arc(p[0], p[1], 13, 0, Math.PI * 2); ctx.fillStyle = t.text; ctx.fill(); });
+        y += ph + fmt.gap;
+      }
+      const rows = d.changes.slice(0, c.story ? 6 : 3);
+      if (rows.length) {
+        const rowH = 62; const ph = 90 + rows.length * rowH;
+        const iy = titled(c, y, ph, 'MEDIDAS (CM)');
+        rows.forEach((r, i) => {
+          const yy = iy + 24 + i * rowH; const df = Math.round((r.to - r.from) * 10) / 10;
+          ctx.fillStyle = t.text; ctx.font = `700 31px ${FONT}`; ctx.fillText(r.name, 100, yy);
+          ctx.fillStyle = t.dim; ctx.font = `700 28px ${FONT}`; ctx.fillText(`${r.from} → ${r.to}`, 430, yy);
+          ctx.textAlign = 'right'; ctx.fillStyle = c.accentText; ctx.font = `900 32px ${FONT}`; ctx.fillText(`${df > 0 ? '+' : ''}${df}`, 976, yy); ctx.textAlign = 'left';
+        });
+        y += ph;
+      }
+      return y;
+    });
+  }
+
   // ---------- ventana con vista previa (formato, estilo, compartir/guardar) ----------
   async function preview(title, render, fileBase) {
     const k = K(); const prefs = k.loadPrefs();
@@ -314,6 +425,8 @@ const Stories = (() => {
   const openActivity = (a) => preview('🏃 Mi actividad', (p) => activity(p, a), `actividad-${a.date}`);
   const openLevel = () => preview('🎮 Mi nivel', (p) => level(p), `nivel-${Utils.todayISO()}`);
   const openRecords = () => preview('🏆 Mis récords', (p) => records(p), `records-${Utils.todayISO()}`);
+  const openMonth = (offset) => preview('🗓️ Mi mes', (p) => month(p, offset), `mes-${Utils.todayISO()}`);
+  const openBody = () => preview('📏 Mi cuerpo', (p) => body(p), `cuerpo-${Utils.todayISO()}`);
 
   // menú con todas las historias
   function hub() {
@@ -322,9 +435,11 @@ const Stories = (() => {
     const last = typeof Activity !== 'undefined' ? Activity.list()[0] : null;
     const items = [
       ['📊', 'Mi semana', 'Entrenos, deporte, días activos y nivel', () => openWeekly(new Date().getDay() === 1 ? -1 : 0)],
+      ['🗓️', 'Mi mes', 'Calendario, series, volumen y récords', () => openMonth()],
       ['🎮', 'Mi nivel', 'Nivel, XP, medallas y racha', openLevel],
       ['🏆', 'Mis récords', 'Tus últimas marcas personales', openRecords],
     ];
+    if (DB.getMeasurements().some((m) => m.weight)) items.push(['📏', 'Mi cuerpo', 'Peso y medidas (solo si quieres mostrarlos)', openBody]);
     if (last) items.push([Activity.typeOf(last.type).i, 'Mi última actividad', `${Activity.typeOf(last.type).n} · ${Utils.shortDate(last.date)}`, () => openActivity(last)]);
     items.forEach(([ic, name, desc, fn]) => {
       const b = Utils.el('button', { type: 'button', class: 'story-item' }, [Utils.el('span', { class: 'si-i', text: ic }), Utils.el('span', { class: 'si-t' }, [Utils.el('b', { text: name }), Utils.el('small', { text: desc })])]);
@@ -334,5 +449,5 @@ const Stories = (() => {
     Modal.open('📤 Historias para compartir', body);
   }
 
-  return { hub, openWeekly, openActivity, openLevel, openRecords, weekly, activity, level, records };
+  return { hub, openWeekly, openActivity, openLevel, openRecords, openMonth, openBody, weekly, activity, level, records, month, body };
 })();

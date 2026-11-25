@@ -455,6 +455,30 @@
     if (/go=agua/.test(frame.contentWindow.location.search)) throw new Error('el parámetro no se limpió: recargar sumaría otra vez');
   });
 
+  await test('Historias: mi mes y mi cuerpo se dibujan en todos los formatos', async () => {
+    const S = A.Stories;
+    for (const format of ['feed', 'story']) {
+      for (const style of ['dark', 'clear']) {
+        for (const fn of ['month', 'body']) {
+          const cv = await S[fn]({ format, style });
+          if (!cv || cv.width !== 1080 || cv.height < 1300) throw new Error(`${fn} ${format} ${style}: ${cv && cv.width}x${cv && cv.height}`);
+        }
+      }
+    }
+    await S.month({ format: 'feed', style: 'light' }, -1);
+  });
+
+  await test('Calorías gastadas: estima pesas, cardio y deporte', async () => {
+    const CV = frame.contentWindow.eval('CaloriesView'); const day = '2031-05-05';
+    const ex = A.DB.getExercises().find((e) => e.group === 'pecho');
+    const wl = A.DB.getWorkoutLog(); wl[day] = { exercises: [{ exerciseId: ex.id, sets: [{ weight: 40, reps: 8 }, { weight: 40, reps: 8 }, { weight: 20, reps: 8, type: 'warmup' }] }] }; A.DB.saveWorkoutLog(wl);
+    const b = CV.burnedOf(day);
+    const w2 = A.DB.getWorkoutLog(); delete w2[day]; A.DB.saveWorkoutLog(w2);
+    if (b.sets !== 2) throw new Error(`series contadas: ${b.sets}`);
+    if (!(b.gym > 10 && b.gym < 200) || b.total !== b.gym + b.cardio + b.sport) throw new Error(JSON.stringify(b));
+    if (CV.burnedOf('2031-05-06').total !== 0) throw new Error('un día vacío debe dar 0');
+  });
+
   // ---- respaldo: exportar e importar mantiene los datos
   await test('Respaldo: exportar → importar conserva los datos', async () => {
     const a = JSON.stringify(A.DB.exportAll());

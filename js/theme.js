@@ -21,6 +21,10 @@ const Theme = (() => {
     { key: 'rosa', label: 'Rosa chicle', colors: ['#ff6fae', '#ffb0d6', '#c79bff'] },
     { key: 'lila', label: 'Lila', colors: ['#c79bff', '#ffb0d6', '#8ec5ff'] },
     { key: 'durazno', label: 'Durazno', colors: ['#ff9a8b', '#ffcf9e', '#ff7eb6'] },
+    { key: 'oro', label: 'Oro', colors: ['#ffc23c', '#ff8a2b', '#ffe08a'] },
+    { key: 'neon', label: 'Neón', colors: ['#39ff9f', '#00d4ff', '#b8ff3d'] },
+    { key: 'carmesi', label: 'Carmesí', colors: ['#ff3b5c', '#ff7a45', '#b3134f'] },
+    { key: 'medianoche', label: 'Medianoche', colors: ['#4f6bff', '#2a2f8f', '#21c7d9'] },
     { key: 'grafito', label: 'Grafito', colors: ['#7f8aa3', '#5b6478', '#3d4558'] },
   ];
   // glow = opacidad de las manchas · card = opacidad de las tarjetas (más baja = se ve más el fondo)

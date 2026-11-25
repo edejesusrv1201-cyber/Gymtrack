@@ -39,6 +39,9 @@ const MeasurementsView = (() => {
       Modal.open('Registrar medidas', buildForm(null, () => { Modal.close(); render(root); }));
     });
     view.appendChild(addBtn);
+    if (measurements.filter((m) => m.weight).length >= 2 && typeof Stories !== 'undefined') {
+      view.appendChild(Utils.el('button', { class: 'btn-secondary btn-block', type: 'button', style: 'margin:-6px 0 14px;', text: '📤 Compartir mi progreso físico', onclick: () => Stories.openBody() }));
+    }
 
     view.appendChild(goalCard(measurements, () => render(root)));
     if (measurements.length >= 2) view.appendChild(responseCard(measurements, root));

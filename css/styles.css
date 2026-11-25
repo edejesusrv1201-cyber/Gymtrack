@@ -2188,3 +2188,9 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 
 /* ⭐ ejercicio del ranking */
 .star-pill { display: inline-block; margin-left: 6px; font-size: .78em; line-height: 1; vertical-align: .08em; filter: drop-shadow(0 0 5px rgba(255, 196, 61, .55)); }
+
+/* calorías gastadas */
+.burn-card { padding-top: 12px; padding-bottom: 12px; }
+.burn-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.burn-t { font-weight: 800; }
+.burn-v { font-size: 1.3rem; font-weight: 800; }

@@ -111,6 +111,8 @@ const CaloriesView = (() => {
     view.appendChild(renderSummary(settings, entries));
     const fillCard = renderFill(settings, entries);
     if (fillCard) view.appendChild(fillCard);
+    const burnCard = renderBurned(cursorIso);
+    if (burnCard) view.appendChild(burnCard);
 
     // ---- acciones principales ----
     const addMain = Utils.el('button', { class: 'btn-primary', text: '➕ Agregar', title: 'Agregar alimento' });
@@ -182,6 +184,38 @@ const CaloriesView = (() => {
   }
 
   // ---------------------------------------------------------------- resumen
+  // calorías gastadas (aproximadas) en el día: pesas, cardio del entreno y deportes. Es solo una referencia.
+  function burnedOf(iso) {
+    const kg = Metrics.bodyWeightKg(iso) || Number(DB.getSettings().calcWeightKg) || 70;
+    const entries = ((DB.getWorkoutLog()[iso] || {}).exercises || []);
+    const exs = DB.getExercises();
+    let sets = 0; let cardio = 0;
+    entries.forEach((en) => {
+      const ex = exs.find((x) => x.id === en.exerciseId);
+      (en.sets || []).forEach((s) => {
+        if (ex && ex.group === 'cardio') cardio += Number(s.calories) || 7 * kg * ((Number(s.duration) || 0) / 60);
+        else if (!(ex && ex.group === 'movilidad') && !Metrics.isWarmup(s) && !Metrics.isDrop(s)) sets += 1;
+      });
+    });
+    // pesas: unos 2,5 min por serie (con su descanso) a intensidad media (MET 5)
+    const gym = Math.round(5 * kg * ((sets * 2.5) / 60));
+    const sport = typeof Activity !== 'undefined' ? Math.round(Activity.kcalOfDay(iso)) : 0;
+    return { sets, gym, cardio: Math.round(cardio), sport, total: gym + Math.round(cardio) + sport };
+  }
+  function renderBurned(iso) {
+    const b = burnedOf(iso);
+    if (!b.total) return null;
+    const parts = [];
+    if (b.gym) parts.push(`🏋️ Pesas (${b.sets} serie${b.sets === 1 ? '' : 's'}) ${b.gym}`);
+    if (b.cardio) parts.push(`❤️ Cardio ${b.cardio}`);
+    if (b.sport) parts.push(`🏃 Deporte ${b.sport}`);
+    return Utils.el('div', { class: 'card burn-card' }, [
+      Utils.el('div', { class: 'burn-top' }, [Utils.el('span', { class: 'burn-t', text: '🔥 Gastado (aprox.)' }), Utils.el('b', { class: 'burn-v', text: `${b.total} kcal` })]),
+      Utils.el('div', { class: 'small text-dim', text: parts.join(' · ') }),
+      Utils.el('div', { class: 'small text-dim', text: 'Es una estimación y no cambia tu meta de comida.' }),
+    ]);
+  }
+
   function renderSummary(settings, entries) {
     const t = sumOf(entries);
     const bonus = entries.reduce((n, e) => n + (e.treat ? (Number(e.kcal) || 0) : 0), 0);   // calorías de premios: se suman a la meta
@@ -1437,5 +1471,5 @@ const CaloriesView = (() => {
     else openQuickAdd('snack', null, { treat: true });
   }
 
-  return { render, addNow, addTreat };
+  return { burnedOf, render, addNow, addTreat };
 })();
