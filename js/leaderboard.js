@@ -159,7 +159,7 @@ const Leaderboard = (() => {
       const b = BASICS.find((x) => x.key === k);
       if (b) { arr.push({ key: b.key, name: b.name, group: 'básico' }); return; }
       const l = lifts().find((x) => x.libName === k);
-      if (l) arr.push({ key: l.key, name: l.name, group: l.group });
+      if (l) arr.push({ key: l.key, name: l.name, label: l.libName, group: l.group });
     });
     starCache = arr;
     return arr;
@@ -447,7 +447,7 @@ const Leaderboard = (() => {
     const fillSelect = () => {
       exSel.innerHTML = '';
       const count = (k) => { const x = ui.exercises.find((e) => e.exercise_key === k); return x ? Number(x.athletes) : 0; };
-      starList().forEach((l) => exSel.appendChild(Utils.el('option', { value: l.key, text: `⭐ ${l.name}${count(l.key) ? ` (${count(l.key)})` : ''}` })));
+      starList().forEach((l) => exSel.appendChild(Utils.el('option', { value: l.key, text: `⭐ ${l.label || l.name}${count(l.key) ? ` (${count(l.key)})` : ''}` })));
       exSel.value = ui.key;
       if (exSel.value !== ui.key) { ui.key = 'banca'; exSel.value = 'banca'; }
     };
@@ -540,7 +540,13 @@ const Leaderboard = (() => {
     const empty = rowsData.filter((r) => !r.local && !r.pub);
     if (!withData.length) card.appendChild(Utils.el('p', { class: 'small text-dim', text: 'Haz series de un ejercicio con ⭐ (en tus rutinas) y tu marca aparecerá aquí.' }));
     withData.forEach((r) => card.appendChild(markRow(u, r, host)));
-    if (empty.length) card.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:8px;', text: `Con ⭐ y aún sin registros: ${empty.map((r) => r.name).join(', ')}.` }));
+    if (empty.length) {
+      card.appendChild(Utils.el('div', { class: 'eyebrow', style: 'margin:12px 0 6px;', text: `Con ⭐ y aún sin registros (${empty.length})` }));
+      card.appendChild(Utils.el('div', { class: 'mk-empty' }, empty.map((r) => Utils.el('span', { text: r.name }))));
+    }
+    const rv = Utils.el('button', { class: `uni-chip${rivalOn() ? ' on' : ''}`, type: 'button', style: 'margin:12px 0 0;', text: rivalOn() ? '🎯 Mostrar el rival al entrenar: sí' : '🎯 Mostrar el rival al entrenar: no' });
+    rv.addEventListener('click', () => { const st = DB.getSettings(); st.lbRival = !rivalOn(); DB.saveSettings(st); paintMine(host, u); });
+    card.appendChild(rv);
 
     // si la última publicación falló por algo que no es internet, se muestra aquí
     const err = lastErr();
@@ -658,10 +664,51 @@ const Leaderboard = (() => {
   // al restaurar desde la nube en otro teléfono: recupera tu usuario del ranking
   function adopt(u) { if (u && u.id && u.secret && !user()) { setUser({ id: u.id, secret: u.secret, name: u.name, sex: u.sex || null }); pubLoaded = false; return true; } return false; }
 
+  // ---------- 🎯 «tu rival» mientras entrenas: quién va delante en un ejercicio ⭐ ----------
+  const rivalCache = new Map();   // clave → { t, p } (5 minutos: se redibuja a menudo y no hay que preguntar cada vez)
+  function rivalRows(key) {
+    const c = rivalCache.get(key);
+    if (c && Date.now() - c.t < 300000) return c.p;
+    const p = rpc('gt_leaderboard', { p_key: key, p_sex: null, p_limit: 50 }).then((r) => r || []);
+    rivalCache.set(key, { t: Date.now(), p });
+    p.catch(() => rivalCache.delete(key));
+    return p;
+  }
+  // rows = lista ordenada del servidor; mine = tu mejor marca {kg, reps} o null; myName = tu nombre en el ranking
+  function rivalInfo(rows, mine, myName) {
+    const isMe = (r) => !!myName && norm(r.name) === norm(myName);
+    const asMark = (r) => ({ kg: Number(r.weight_kg), reps: Number(r.reps) });
+    const txt = (m) => `${Units.label(m.kg)} × ${m.reps}`;
+    let best = mine || null;
+    const own = rows.find(isMe);
+    if (own && beats(asMark(own), best)) best = asMark(own);
+    const others = rows.filter((r) => !isMe(r));
+    if (!others.length) return { icon: '👑', text: best ? `Vas de primero con ${txt(best)}` : 'Nadie ha marcado este ejercicio: sé el primero' };
+    if (!best) return { icon: '🏆', text: `Líder: ${others[0].name} · ${txt(asMark(others[0]))}` };
+    const above = others.filter((r) => beats(asMark(r), best));
+    if (!above.length) return { icon: '👑', text: `Vas de primero con ${txt(best)}` };
+    const next = above[above.length - 1];
+    return { icon: '🎯', text: `Puesto ${above.length + 1} · supera a ${next.name}: ${txt(asMark(next))}` };
+  }
+  const rivalOn = () => DB.getSettings().lbRival !== false;
+  function rivalLine(ex) {
+    const lift = starOf(ex);
+    if (!lift || !configured() || !rivalOn() || navigator.onLine === false) return null;
+    const el = Utils.el('button', { type: 'button', class: 'rival-line hidden', title: 'Ver el ranking de este ejercicio' });
+    el.addEventListener('click', () => { ui.key = lift.key; ui.mode = 'global'; App.navigate('progreso', { section: 'ranking' }); });
+    rivalRows(lift.key).then((rows) => {
+      const u = user();
+      const r = rivalInfo(rows, bestForLift(lift.key), u && u.name);
+      el.textContent = `${r.icon} ${r.text}`;
+      el.classList.remove('hidden');
+    }).catch(() => { /* sin conexión: no se muestra */ });
+    return el;
+  }
+
   // ⭐ pequeña marca para ponerla junto al nombre de un ejercicio que cuenta para el ranking (o null)
   function starPill(ex) {
     try { return starOf(ex) ? Utils.el('span', { class: 'star-pill', title: 'Cuenta para el ranking', 'aria-label': 'Ejercicio del ranking', text: '⭐' }) : null; } catch (e) { return null; }
   }
 
-  return { render, configured, starPill, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, starOf, starList, lifts, beats };
+  return { render, configured, starPill, rpc, BASICS, onSet, syncAll, dailySync, autoJoin, user, rankName, adopt, diagnose, liftOf, liftAny, starOf, starList, lifts, beats, rivalInfo, rivalLine };
 })();

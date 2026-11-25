@@ -2194,3 +2194,14 @@ html.scrolling .bg-glow, html.scrolling .bg-glow *, html.scrolling .bg-glow::bef
 .burn-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }
 .burn-t { font-weight: 800; }
 .burn-v { font-size: 1.3rem; font-weight: 800; }
+
+/* 🎯 rival en el entreno y ejercicios ⭐ sin marca */
+.rival-line { display: block; width: 100%; text-align: left; margin: 8px 0 2px; padding: 8px 11px; border-radius: 12px; font: inherit; font-size: .82rem; font-weight: 700; color: var(--text); background: rgba(255, 196, 61, .12); border: 1px solid rgba(255, 196, 61, .3); cursor: pointer; }
+.rival-line.hidden { display: none; }
+.mk-empty { display: flex; flex-wrap: wrap; gap: 6px; }
+.mk-empty span { font-size: .75rem; font-weight: 700; color: var(--text-dim); padding: 4px 9px; border-radius: 99px; background: rgba(var(--ov), .05); border: 1px solid rgba(var(--ov), .08); }
+
+/* aviso de unidad distinta al anotar */
+.unit-btn.diff { background: rgba(255, 196, 61, .22); border-color: rgba(255, 196, 61, .75); }
+.unit-warn { margin: -2px 0 10px; padding: 7px 10px; border-radius: 10px; font-size: .78rem; font-weight: 700; background: rgba(255, 196, 61, .12); border: 1px solid rgba(255, 196, 61, .35); }
+.unit-warn.hidden { display: none; }

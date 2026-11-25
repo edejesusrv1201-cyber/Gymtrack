@@ -70,7 +70,7 @@
       wl[iso(i)] = { exercises: exs.slice(0, 5).map((e, k) => ({ exerciseId: e.id, sets: [1, 2, 3].map((s) => ({ weight: 40 + k * 10 + (24 - i) * 0.5, reps: 10 - s, felt: 'normal' })) })) };
     }
     DB.saveWorkoutLog(wl);
-    const s = DB.getSettings(); Object.assign(s, { calorieGoal: 2400, proteinGoal: 150, carbGoal: 270, fatGoal: 70, userName: 'Prueba' }); DB.saveSettings(s);
+    const s = DB.getSettings(); Object.assign(s, { calorieGoal: 2400, proteinGoal: 150, carbGoal: 270, fatGoal: 70, userName: 'Prueba', lbRival: false }); DB.saveSettings(s);
     const cl = {};
     for (let i = 0; i < 10; i++) cl[iso(i)] = [{ id: DB.uid(), foodName: 'Comida', kcal: 2300 + i * 20, protein: 130, carbs: 250, fat: 65, meal: 'almuerzo' }];
     DB.saveCalorieLog(cl);
@@ -477,6 +477,44 @@
     if (b.sets !== 2) throw new Error(`series contadas: ${b.sets}`);
     if (!(b.gym > 10 && b.gym < 200) || b.total !== b.gym + b.cardio + b.sport) throw new Error(JSON.stringify(b));
     if (CV.burnedOf('2031-05-06').total !== 0) throw new Error('un día vacío debe dar 0');
+  });
+
+  await test('Rival al entrenar: dice quién va delante (sin conexión no estorba)', async () => {
+    const L = A.Leaderboard;
+    const rows = [{ name: 'Ana', weight_kg: 120, reps: 3 }, { name: 'Beto', weight_kg: 100, reps: 9 }, { name: 'Yo', weight_kg: 90, reps: 5 }, { name: 'Carl', weight_kg: 80, reps: 8 }];
+    const t = (mine, me) => L.rivalInfo(rows, mine, me).text;
+    if (!/Puesto 3 .*Beto/.test(t({ kg: 90, reps: 5 }, 'Yo'))) throw new Error(t({ kg: 90, reps: 5 }, 'Yo'));
+    if (!/Puesto 2 .*Ana/.test(t({ kg: 100, reps: 10 }, 'Yo'))) throw new Error(t({ kg: 100, reps: 10 }, 'Yo'));
+    if (!/primero/.test(t({ kg: 130, reps: 1 }, 'Yo'))) throw new Error(t({ kg: 130, reps: 1 }, 'Yo'));
+    if (!/Líder: Ana/.test(t(null, null))) throw new Error(t(null, null));
+    if (!/sé el primero/.test(L.rivalInfo([], null, 'Yo').text)) throw new Error('lista vacía');
+    // en pantalla, con un servidor simulado
+    const W = frame.contentWindow; const st = A.DB.getSettings(); const prev = st.lbRival; delete st.lbRival; A.DB.saveSettings(st);
+    const of = W.fetch; W.fetch = async (u, o) => (String(u).includes('gt_leaderboard') ? new W.Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json' } }) : of(u, o));
+    try {
+      const el = L.rivalLine({ id: 'zz', name: 'Sentadilla', group: 'pierna' });
+      if (!el) throw new Error('no creó la línea'); await wait(300);
+      if (el.classList.contains('hidden') || !el.textContent) throw new Error('no se llenó');
+      if (L.rivalLine({ id: 'zz', name: 'Cosa mía', group: 'pierna' })) throw new Error('solo en ⭐');
+    } finally { W.fetch = of; const s2 = A.DB.getSettings(); s2.lbRival = prev === undefined ? false : prev; A.DB.saveSettings(s2); }
+  });
+
+  await test('Entrenamiento: avisa si un ejercicio se anota en otra unidad', async () => {
+    const day = A.Utils.todayISO(); const wl = A.DB.getWorkoutLog(); const keep = wl[day] ? JSON.stringify(wl[day]) : null;
+    const ex = A.DB.getExercises().find((e) => e.group === 'pecho'); const st = A.DB.getSettings(); const prevU = JSON.stringify(st.exerciseUnits || {}); const prevUnits = st.units;
+    st.units = 'lb'; st.exerciseUnits = { [ex.id]: 'kg' }; A.DB.saveSettings(st);
+    wl[day] = { exercises: [{ exerciseId: ex.id, sets: [] }] }; A.DB.saveWorkoutLog(wl);
+    try {
+      A.App.navigate('workout', { date: day }); await wait(500);
+      const D2 = frame.contentDocument; const warn = D2.querySelector('.unit-warn:not(.hidden)');
+      if (!warn || !/KILOS/.test(warn.textContent)) throw new Error('no avisa que está en kilos');
+      D2.querySelector('.unit-btn').click(); await wait(100);
+      if (D2.querySelector('.unit-warn:not(.hidden)')) throw new Error('el aviso debe irse al pasar a lb');
+    } finally {
+      A.Modal.close();
+      const s2 = A.DB.getSettings(); s2.units = prevUnits; s2.exerciseUnits = JSON.parse(prevU); A.DB.saveSettings(s2);
+      const w2 = A.DB.getWorkoutLog(); if (keep) w2[day] = JSON.parse(keep); else delete w2[day]; A.DB.saveWorkoutLog(w2);
+    }
   });
 
   // ---- respaldo: exportar e importar mantiene los datos

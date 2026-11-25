@@ -490,11 +490,14 @@ const WorkoutView = (() => {
     ]);
     card.appendChild(Utils.el('div', { class: 'ex-header' }, [
       Utils.el('div', { style: 'min-width:0;' }, [
-        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: `${opts.num}${opts.ssLetter || ''}` }) : null, ex ? ex.name : '(ejercicio eliminado)', ex ? Leaderboard.starPill(ex) : null]),
-        ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;', text: ex.group }) : null,
+        Utils.el('h3', { class: 'mb-0' }, [opts.num ? Utils.el('span', { class: 'ex-num', text: `${opts.num}${opts.ssLetter || ''}` }) : null, ex ? ex.name : '(ejercicio eliminado)']),
+        ex ? Utils.el('div', { class: `eyebrow grp-${ex.group}`, style: 'margin-top:3px;' }, [ex.group, Leaderboard.starPill(ex)]) : null,
       ]),
       headerBtns,
     ]));
+    // 🎯 en los ejercicios ⭐: quién va delante en el ranking
+    const rival = ex && !isCardio ? Leaderboard.rivalLine(ex) : null;
+    if (rival) card.appendChild(rival);
 
     // --- nota del ejercicio (ej. "asiento en 4") ---
     if (ex) {
@@ -675,6 +678,15 @@ const WorkoutView = (() => {
     } else {
       weightInput = Utils.el('input', { type: 'number', inputmode: 'decimal', placeholder: `Peso (${inputUnit})`, step: 'any' });
       const unitBtn = Utils.el('button', { class: 'unit-btn', type: 'button', title: 'Cambiar entre kg y lb', text: inputUnit });
+      // aviso si este ejercicio se anota en una unidad distinta a la tuya (para no confundir kilos con libras)
+      const unitWarn = Utils.el('div', { class: 'unit-warn', role: 'status' });
+      const paintUnitWarn = () => {
+        const diff = inputUnit !== Units.current();
+        unitBtn.classList.toggle('diff', diff);
+        unitWarn.classList.toggle('hidden', !diff);
+        unitWarn.textContent = diff ? `⚠️ Aquí estás anotando en ${inputUnit === 'kg' ? 'KILOS' : 'LIBRAS'} (tu unidad es ${Units.current()}). Si no es así, toca «${inputUnit}».` : '';
+      };
+      paintUnitWarn();
       unitBtn.addEventListener('click', () => {
         const next = inputUnit === 'kg' ? 'lb' : 'kg';
         const typed = parseFloat(weightInput.value);
@@ -683,8 +695,9 @@ const WorkoutView = (() => {
         Units.rememberInputUnit(entry.exerciseId, next);
         unitBtn.textContent = next;
         weightInput.placeholder = placeholderFor(next);
+        paintUnitWarn();
       });
-      repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Repeticiones' });
+      repsInput = Utils.el('input', { type: 'number', inputmode: 'numeric', placeholder: 'Reps', 'aria-label': 'Repeticiones' });
       weightInput.value = suggestWeight(typeSelected);
 
       const pillRow = Utils.el('div', { class: 'pill-row' });
@@ -758,6 +771,7 @@ const WorkoutView = (() => {
         Utils.el('div', { class: 'sf-col' }, [Utils.el('div', { class: 'sf-label' }, [Utils.el('span', { text: 'Peso' }), unitBtn]), stepBtns(weightInput, () => Units.step(inputUnit, true), -9999)]),
         Utils.el('div', { class: 'sf-col' }, [Utils.el('div', { class: 'sf-label' }, [Utils.el('span', { text: 'Repeticiones' })]), stepBtns(repsInput, () => 1, 0)]),
       ]));
+      form.appendChild(unitWarn);
       adv.type.appendChild(Utils.el('div', { class: 'adv-label', text: 'Cómo se carga' }));
       adv.type.appendChild(Utils.el('div', { class: 'chip-pair' }, [uniChip, bwChip]));
       addSetBtn.textContent = BTN_TEXT[typeSelected];
