@@ -1,63 +1,7 @@
-/* ============================================================
-   feedback.js — «Enviar feedback» dentro de la app
-   Va a tu base de datos (Supabase) con la versión y el modelo del
-   celular. Si no hay internet, se comparte o copia el texto.
-   ============================================================ */
-
-const Feedback = (() => {
-  const KINDS = [['bug', '🐞 Algo falla'], ['idea', '💡 Una idea'], ['love', '😍 Me gustó'], ['other', '💬 Otro']];
-
-  function version() {
-    try { const s = document.querySelector('script[src*="js/app.js"]'); const m = s && s.src.match(/v=(\d+)/); return m ? `v${m[1]}` : ''; } catch (e) { return ''; }
-  }
-  function device() {
-    const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-    return `${navigator.userAgent.slice(0, 140)} | ${screen.width}x${screen.height} | ${standalone ? 'app instalada' : 'navegador'}`;
-  }
-
-  function open(preset) {
-    const body = Utils.el('div');
-    let kind = (preset && preset.kind) || 'idea';
-    body.appendChild(Utils.el('p', { class: 'small', text: 'Cuéntame qué te gusta, qué falla o qué te gustaría que tuviera la app. Me llega directo.' }));
-    const row = Utils.el('div', { class: 'rt-chips' });
-    const paint = () => { row.innerHTML = ''; KINDS.forEach(([k, t]) => { const c = Utils.el('button', { type: 'button', class: `rt-chip plain${kind === k ? ' active' : ''}`, style: '--gc:var(--accent-light)', text: t }); c.addEventListener('click', () => { kind = k; paint(); }); row.appendChild(c); }); };
-    paint();
-    body.appendChild(row);
-    const msg = Utils.el('textarea', { rows: '5', maxlength: '2000', placeholder: 'Escribe aquí…', style: 'width:100%;margin-top:10px;' });
-    body.appendChild(msg);
-    const name = Utils.el('input', { type: 'text', maxlength: '40', placeholder: 'Tu nombre (opcional)', value: DB.getSettings().userName || '', style: 'margin-top:8px;' });
-    body.appendChild(name);
-    let withDevice = true;
-    const dev = Utils.el('button', { type: 'button', class: 'uni-chip on', style: 'margin-top:10px;', text: '✓ Incluir versión y modelo del celular (ayuda a arreglar fallas)' });
-    dev.addEventListener('click', () => { withDevice = !withDevice; dev.classList.toggle('on', withDevice); dev.textContent = withDevice ? '✓ Incluir versión y modelo del celular (ayuda a arreglar fallas)' : 'No incluir datos del celular'; });
-    body.appendChild(dev);
-    body.appendChild(Utils.el('p', { class: 'small text-dim', style: 'margin-top:6px;', text: 'No se envían tus entrenos, comidas ni fotos: solo lo que escribas aquí (y, si dejas marcada la casilla de arriba, los últimos errores internos de la app).' }));
-    const send = Utils.el('button', { class: 'btn-primary btn-block', type: 'button', style: 'margin-top:8px;', text: '📨 Enviar' });
-    send.addEventListener('click', async () => {
-      const text = msg.value.trim();
-      if (text.length < 3) { Utils.toast('Escribe tu mensaje'); return; }
-      send.disabled = true; send.textContent = 'Enviando…';
-      // con "incluir datos del celular" también van los últimos errores internos (ayudan a encontrar la falla)
-      const errs = withDevice && typeof ErrLog !== 'undefined' ? ErrLog.summary(3) : '';
-      const sent = errs ? `${text.slice(0, 1500)}\n\n[Errores recientes]\n${errs}`.slice(0, 2000) : text;
-      const payload = { p_kind: kind, p_message: sent, p_version: version(), p_device: withDevice ? device() : '', p_name: name.value.trim() };
-      try {
-        if (typeof Leaderboard === 'undefined' || !Leaderboard.configured()) throw new Error('sin servidor');
-        await Leaderboard.rpc('gt_send_feedback', payload);
-        Modal.close();
-        Utils.toast('¡Gracias! Lo recibí 🙌');
-      } catch (e) {
-        // sin internet o sin servidor: lo comparte o lo copia para que no se pierda
-        const full = `[MyGymTrack ${payload.p_version}] ${KINDS.find((x) => x[0] === kind)[1]}\n${sent}${payload.p_name ? `\n— ${payload.p_name}` : ''}${withDevice ? `\n${payload.p_device}` : ''}`;
-        send.disabled = false; send.textContent = '📨 Enviar';
-        if (navigator.share) { try { await navigator.share({ text: full }); Modal.close(); return; } catch (err) { /* cerró */ } }
-        try { await navigator.clipboard.writeText(full); Utils.toast('No pude enviarlo: lo copié para que lo pegues en un mensaje'); } catch (err) { Utils.toast('No pude enviarlo. Revisa tu internet.'); }
-      }
-    });
-    body.appendChild(send);
-    Modal.open('💬 Enviar feedback', body);
-    setTimeout(() => { try { msg.focus(); } catch (e) { /* sin foco */ } }, 350);
-  }
-
-  return { open, version };
-})();
+/*! MyGymTrack © 2026. Todos los derechos reservados. Prohibida su copia o redistribución. */
+const Feedback=(()=>{const e=[["bug","🐞 Algo falla"],["idea","💡 Una idea"],["love","😍 Me gustó"],["other","💬 Otro"]];function t(){try{const e=document.querySelector('script[src*="js/app.js"]'),t=e&&e.src.match(/v=(\d+)/);return t?`v${t[1]}`:""}catch(e){return""}}function a(){const e=window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches||!0===window.navigator.standalone;return`${navigator.userAgent.slice(0,140)} | ${screen.width}x${screen.height} | ${e?"app instalada":"navegador"}`}return{open:function(n){const i=Utils.el("div");let s=n&&n.kind||"idea"
+;i.appendChild(Utils.el("p",{class:"small",text:"Cuéntame qué te gusta, qué falla o qué te gustaría que tuviera la app. Me llega directo."}));const l=Utils.el("div",{class:"rt-chips"}),r=()=>{l.innerHTML="",e.forEach(([e,t])=>{const a=Utils.el("button",{type:"button",class:"rt-chip plain"+(s===e?" active":""),style:"--gc:var(--accent-light)",text:t});a.addEventListener("click",()=>{s=e,r()}),l.appendChild(a)})};r(),i.appendChild(l);const o=Utils.el("textarea",{rows:"5",maxlength:"2000",placeholder:"Escribe aquí…",style:"width:100%;margin-top:10px;"});i.appendChild(o);const c=Utils.el("input",{
+type:"text",maxlength:"40",placeholder:"Tu nombre (opcional)",value:DB.getSettings().userName||"",style:"margin-top:8px;"});i.appendChild(c);let d=!0;const p=Utils.el("button",{type:"button",class:"uni-chip on",style:"margin-top:10px;",text:"✓ Incluir versión y modelo del celular (ayuda a arreglar fallas)"});p.addEventListener("click",()=>{d=!d,p.classList.toggle("on",d),p.textContent=d?"✓ Incluir versión y modelo del celular (ayuda a arreglar fallas)":"No incluir datos del celular"}),i.appendChild(p),i.appendChild(Utils.el("p",{class:"small text-dim",style:"margin-top:6px;",
+text:"No se envían tus entrenos, comidas ni fotos: solo lo que escribas aquí (y, si dejas marcada la casilla de arriba, los últimos errores internos de la app)."}));const u=Utils.el("button",{class:"btn-primary btn-block",type:"button",style:"margin-top:8px;",text:"📨 Enviar"});u.addEventListener("click",async()=>{const n=o.value.trim();if(n.length<3)return void Utils.toast("Escribe tu mensaje");u.disabled=!0,u.textContent="Enviando…";const i=d&&"undefined"!=typeof ErrLog?ErrLog.summary(3):"",l=i?`${n.slice(0,1500)}\n\n[Errores recientes]\n${i}`.slice(0,2e3):n,r={p_kind:s,p_message:l,
+p_version:t(),p_device:d?a():"",p_name:c.value.trim()};try{if("undefined"==typeof Leaderboard||!Leaderboard.configured())throw new Error("sin servidor");await Leaderboard.rpc("gt_send_feedback",r),Modal.close(),Utils.toast("¡Gracias! Lo recibí 🙌")}catch(t){const a=`[MyGymTrack ${r.p_version}] ${e.find(e=>e[0]===s)[1]}\n${l}${r.p_name?`\n— ${r.p_name}`:""}${d?`\n${r.p_device}`:""}`;if(u.disabled=!1,u.textContent="📨 Enviar",navigator.share)try{return await navigator.share({text:a}),void Modal.close()}catch(e){}try{await navigator.clipboard.writeText(a),
+Utils.toast("No pude enviarlo: lo copié para que lo pegues en un mensaje")}catch(e){Utils.toast("No pude enviarlo. Revisa tu internet.")}}}),i.appendChild(u),Modal.open("💬 Enviar feedback",i),setTimeout(()=>{try{o.focus()}catch(e){}},350)},version:t}})();
